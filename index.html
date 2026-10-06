@@ -424,8 +424,8 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 
 @media (min-width:900px){
   #app{max-width:1200px;width:min(1200px,calc(100vw - 40px));margin:20px auto;height:calc(100dvh - 40px);display:grid;grid-template-columns:208px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"side top" "side banner" "side main";border:1px solid var(--glass-b);border-radius:22px;box-shadow:var(--gshadow-lg);background:rgba(28,22,19,0.72);}
-  #navbar{grid-area:side;position:relative;inset:auto;width:auto;height:auto;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;padding:18px 10px;border-top:none;border-right:1px solid var(--glass-b);border-radius:22px 0 0 22px;z-index:5;box-shadow:none;}
-  .nav-item{flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;min-height:44px;padding:10px 12px;border-radius:12px;}
+  #navbar{grid-area:side;position:relative;inset:auto;width:auto;height:auto;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;padding:18px 10px;border-top:none;border-right:1px solid var(--glass-b);border-radius:22px 0 0 22px;z-index:5;box-shadow:none;overflow-y:auto;}
+  .nav-item{flex:0 0 auto;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;min-height:44px;padding:10px 12px;border-radius:12px;}
   .nav-label{font-size:14px;text-align:left;}
   .nav-item.active{background:var(--red-l);}
   #topbar{grid-area:top;border-radius:0 22px 0 0;}
