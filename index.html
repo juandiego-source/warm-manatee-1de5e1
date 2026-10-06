@@ -869,7 +869,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- JOB DETAIL -->
 <div class="detail-panel" id="job-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('job')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-job-num">Job</span>
     <span class="pill" id="detail-job-pill"></span>
   </div>
@@ -879,7 +879,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- CUSTOMER DETAIL -->
 <div class="detail-panel" id="cust-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('cust')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-cust-name">Client</span>
   </div>
   <div class="detail-scroll" id="detail-cust-body"></div>
@@ -888,7 +888,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- ESTIMATE DETAIL -->
 <div class="detail-panel" id="est-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('est')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-est-num">Estimate</span>
     <span class="pill" id="detail-est-pill"></span>
   </div>
@@ -898,7 +898,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- INVOICE DETAIL -->
 <div class="detail-panel" id="inv-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('inv')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-inv-num">Invoice</span>
     <span class="pill" id="detail-inv-pill"></span>
   </div>
@@ -1077,12 +1077,16 @@ async function afterLogin(user){
       await loadAll();
       dataReady=true;
       renderAll();
+      applyRoute(location.pathname);
+      history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       await initNotifications();
     }else if(prof?.subcontractor_id){
       currentSubId=prof.subcontractor_id;
       showApp('sub');
       await loadAll();
       dataReady=true;
+      applyRoute(location.pathname);
+      history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       const sub=subs.find(s=>s.id===currentSubId);
       document.getElementById('sub-welcome-name').textContent='Hey, '+(sub?.name||'there')+'!';
       document.getElementById('user-badge').textContent='Sub';
@@ -1232,6 +1236,7 @@ function showApp(role){
   hideSplash();
   hideAuthScreen();
   document.getElementById('more-menu-btn').style.display=role==='admin'?'flex':'none';
+  routeSilent=true;
   if(role==='admin'){document.getElementById('navbar').style.display='flex';showView('dashboard',document.querySelector('.nav-item'));renderAll();}
   else if(role==='sub'){
     document.getElementById('navbar').innerHTML=`<div class="nav-item active" onclick="showView('sub-portal',this)"><div class="nav-icon">${ICONS.home}</div><div class="nav-label">My Jobs</div><div class="nav-dot"></div></div>`;
@@ -1240,6 +1245,7 @@ function showApp(role){
     document.getElementById('navbar').style.display='none';
     document.getElementById('content').innerHTML=`<div class="empty" style="padding-top:80px"><div class="empty-icon">${ICONS.hourglass}</div><div class="empty-title">Account pending</div><div class="empty-sub">Your account was created.<br>Your admin needs to link it to your profile.</div><button class="btn btn-glass btn-sm" style="margin-top:20px" onclick="doSignOut()">Sign out</button></div>`;
   }
+  routeSilent=false;
 }
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
@@ -1899,7 +1905,7 @@ function openCustDetail(id){
       <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
     </div>`;
   wireAddressAutocomplete(`new-prop-${id}`,`new-prop-suggest-${id}`);
-  document.getElementById('cust-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('cust-detail').classList.add('open');syncRecordUrl('cust',c);
 }
 
 async function addProp(custId){
@@ -3000,7 +3006,7 @@ async function openEstDetail(id){
       <button class="action-btn ab-glass" onclick="editEst('${id}')">${ICONS.pencil} Edit Estimate</button>
       <button class="action-btn ab-danger" onclick="deleteEst('${id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('est-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('est-detail').classList.add('open');syncRecordUrl('est',e);
 }
 function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
@@ -3594,7 +3600,7 @@ async function openInvDetail(id){
       <button class="action-btn ab-glass" onclick="editInv('${id}')">${ICONS.pencil} Edit Invoice</button>
       <button class="action-btn ab-danger" onclick="deleteInv('${id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('inv-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('inv-detail').classList.add('open');syncRecordUrl('inv',inv);
 }
 function invoiceCSS(){
   return `
@@ -4054,7 +4060,7 @@ async function openJobDetail(id){
       ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${id}')">${ICONS.send} Notify Sub</button>`:''}
       ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${id}')">${ICONS.trash} Delete Job</button>`:''}
     </div>`;
-  document.getElementById('job-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('job-detail').classList.add('open');syncRecordUrl('job',j);
   await renderJobPhotos(id);
   renderSiteReport(j);
 }
@@ -4431,67 +4437,192 @@ function closeDetail(type){
   const el=document.getElementById(map[type]);if(el)el.classList.remove('open');
 }
 const NAV_ORDER=['dashboard','jobs','calendar','customers','estimates','invoices'];
-// ── BACK BUTTON / HISTORY HANDLING ──
-// Push a history entry whenever we open something, so the phone's back button/gesture
-// closes it (or returns to the dashboard) instead of exiting the app.
+// ── REAL URLS ──
+// History routes (/jobs/SMK-97456, /estimates/EST-0015, …) plus a Netlify
+// SPA rewrite so refresh and the back button stay on the same record.
+let routeSilent=false;
+const VIEW_PATH={dashboard:'/',jobs:'/jobs',calendar:'/calendar',customers:'/clients',estimates:'/estimates',invoices:'/invoices',subs:'/subs',payments:'/reports',recurring:'/maintenance','sub-portal':'/my-jobs'};
+const PATH_VIEW={'':'dashboard',jobs:'jobs',calendar:'calendar',clients:'customers',estimates:'estimates',invoices:'invoices',subs:'subs',reports:'payments',maintenance:'recurring',quotes:'estimates','my-jobs':'sub-portal'};
+function currentUrl(){return location.pathname+location.search;}
+function pushUrl(path,replace){
+  if(routeSilent||!path)return;
+  if(currentUrl()===path)return;
+  const state={sumak:true,path};
+  if(!replace)state.from=currentUrl();
+  try{if(replace)history.replaceState(state,'',path);else history.pushState(state,'',path);}catch(e){}
+}
+function viewPath(name){return VIEW_PATH[name]||'/';}
+function recordPath(kind,rec){
+  if(!rec)return null;
+  if(kind==='job')return '/jobs/'+encodeURIComponent(rec.job_number||rec.id);
+  if(kind==='est')return '/estimates/'+encodeURIComponent(rec.estimate_number||rec.id);
+  if(kind==='inv')return '/invoices/'+encodeURIComponent(rec.invoice_number||rec.id);
+  if(kind==='cust')return '/clients/'+encodeURIComponent(rec.id);
+  return null;
+}
+function syncRecordUrl(kind,rec){
+  const path=recordPath(kind,rec);
+  if(!path)return;
+  pushUrl(path);
+  const label=rec.job_number||rec.estimate_number||rec.invoice_number||rec.name||'';
+  document.title=label?label+' · Sumak Ops':'Sumak Ops';
+  document.body.dataset.route=path;
+}
+function resetListFilters(){
+  jobFilter='all';estFilter='all';invFilter='all';
+  ['job-search','est-search','inv-search'].forEach(id=>{const n=document.getElementById(id);if(n)n.value='';});
+  ['#view-jobs','#view-estimates','#view-invoices'].forEach(sel=>{
+    const chips=[...document.querySelectorAll(sel+' .filters .fchip')];
+    chips.forEach((c,i)=>c.classList.toggle('active',i===0));
+  });
+}
+function closeAllOverlays(){
+  document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');const modal=m.querySelector('.modal');if(modal)modal.style.transform='';});
+  ['job','cust','est','inv'].forEach(closeDetail);
+  const trash=document.getElementById('trash-overlay');if(trash)trash.style.display='none';
+  const activity=document.getElementById('activity-overlay');if(activity)activity.style.display='none';
+  const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
+}
+function applyRoute(pathname){
+  const path=pathname||location.pathname;
+  const parts=path.split('/').filter(Boolean).map(decodeURIComponent);
+  const head=parts[0]||'';
+  const slug=parts[1]||null;
+  if(currentProfile?.role==='sub'){
+    routeSilent=true;
+    showView('sub-portal',document.querySelector('.nav-item'));
+    routeSilent=false;
+    document.title='My Jobs · Sumak Ops';
+    if(head==='jobs'&&slug&&dataReady){
+      const j=jobs.find(x=>x.job_number===slug||x.id===slug);
+      if(j)openJobDetail(j.id);else toast('Job not found');
+    }
+    return;
+  }
+  const page=PATH_VIEW[head]||'dashboard';
+  routeSilent=true;
+  closeAllOverlays();
+  showView(page,null);
+  if(page==='calendar'&&typeof renderCalendar==='function')renderCalendar();
+  if(page==='payments'&&typeof renderPayments==='function')renderPayments();
+  if(page==='recurring'&&typeof renderRecurringView==='function')renderRecurringView();
+  if(page==='subs'&&typeof renderSubsList==='function')renderSubsList();
+  if(page==='jobs')renderJobs();
+  if(page==='estimates')renderEstimates();
+  if(page==='invoices')renderInvoices();
+  if(page==='customers')renderCustomers();
+  routeSilent=false;
+  document.body.dataset.route=path;
+  document.title='Sumak Ops';
+  if(!slug||!dataReady)return;
+  if(page==='jobs'){
+    const j=jobs.find(x=>x.job_number===slug||x.id===slug);
+    if(j)openJobDetail(j.id);else toast('Job not found');
+  }else if(page==='estimates'){
+    const e=estimates.find(x=>x.estimate_number===slug||x.id===slug);
+    if(e)openEstDetail(e.id);else toast('Estimate not found');
+  }else if(page==='invoices'){
+    const inv=invoices.find(x=>x.invoice_number===slug||x.id===slug);
+    if(inv)openInvDetail(inv.id);else toast('Invoice not found');
+  }else if(page==='customers'){
+    const c=customers.find(x=>x.id===slug);
+    if(c)openCustDetail(c.id);else toast('Client not found');
+  }
+}
+function historyBack(){
+  if(history.state&&history.state.from){history.back();return;}
+  const parts=location.pathname.split('/').filter(Boolean);
+  const page=PATH_VIEW[parts[0]||'']||'dashboard';
+  closeAllOverlays();
+  routeSilent=true;
+  showView(page,null);
+  routeSilent=false;
+  pushUrl(viewPath(page),true);
+  document.title='Sumak Ops';
+  if(page==='jobs')renderJobs();
+  else if(page==='estimates')renderEstimates();
+  else if(page==='invoices')renderInvoices();
+  else if(page==='customers')renderCustomers();
+  else if(page==='dashboard')renderDashboard();
+  else if(page==='calendar')renderCalendar();
+  else if(page==='payments')renderPayments();
+  else if(page==='recurring')renderRecurringView();
+}
 function pushHistoryState(kind){
-  try{history.pushState({sumak:true,kind,t:Date.now()},'');}catch(e){}
+  if(routeSilent)return;
+  try{history.pushState({sumak:true,kind,path:currentUrl()},'',currentUrl());}catch(e){}
 }
 function anyOverlayOpen(){
   return document.querySelector('.modal-overlay.open')
-    ||document.querySelector('.detail.open')
     ||document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open')
-    ||document.getElementById('trash-overlay')?.style.display==='flex';
+    ||document.getElementById('trash-overlay')?.style.display==='flex'
+    ||document.getElementById('activity-overlay')?.style.display==='flex';
 }
 function closeTopOverlay(){
-  // Close whatever's on top, in priority order. Returns true if something closed.
+  const activity=document.getElementById('activity-overlay');
+  if(activity&&activity.style.display==='flex'){activity.style.display='none';return true;}
   const trash=document.getElementById('trash-overlay');
   if(trash&&trash.style.display==='flex'){trash.style.display='none';return true;}
   const notifPanel=document.getElementById('notif-panel');
   if(notifPanel&&notifPanel.classList.contains('open')){notifPanel.classList.remove('open');return true;}
-  const openModal=document.querySelector('.modal-overlay.open');
-  if(openModal){openModal.classList.remove('open');return true;}
+  const openModalEl=document.querySelector('.modal-overlay.open');
+  if(openModalEl){openModalEl.classList.remove('open');return true;}
   const openDetail=document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
   if(openDetail){openDetail.classList.remove('open');return true;}
   return false;
 }
-window.addEventListener('popstate',(e)=>{
-  // Back button pressed. Close any open overlay first.
-  if(closeTopOverlay()){
-    pushHistoryState('overlay-guard'); // re-arm so the next back press has something to consume
+window.addEventListener('popstate',()=>{
+  if(document.getElementById('public-quote-host'))return;
+  const modalOpen=document.querySelector('.modal-overlay.open');
+  const trash=document.getElementById('trash-overlay');
+  const activity=document.getElementById('activity-overlay');
+  const notif=document.getElementById('notif-panel');
+  const sheetOpen=(trash&&trash.style.display==='flex')||(activity&&activity.style.display==='flex')||(notif&&notif.classList.contains('open'));
+  if(modalOpen||sheetOpen){
+    if(modalOpen){modalOpen.classList.remove('open');const modal=modalOpen.querySelector('.modal');if(modal)modal.style.transform='';}
+    if(trash)trash.style.display='none';
+    if(activity)activity.style.display='none';
+    if(notif)notif.classList.remove('open');
+    if(location.pathname.split('/').filter(Boolean).length<2){['job','cust','est','inv'].forEach(closeDetail);}
     return;
   }
-  // No overlay — if we're not on the dashboard, go there instead of exiting.
-  const activeView=document.querySelector('.view.active');
-  const activeName=activeView?activeView.id.replace('view-',''):'dashboard';
-  if(currentProfile?.role==='admin'&&activeName!=='dashboard'){
-    showView('dashboard',document.querySelector('.nav-item'));
-    pushHistoryState('view-guard');
-    return;
-  }
-  if(currentProfile?.role==='sub'){
-    // subs have one view; keep them in the app
-    pushHistoryState('sub-guard');
-    return;
-  }
-  // On dashboard with nothing open — allow the app to actually close/leave.
+  applyRoute(location.pathname);
 });
 function showView(name,el){
+  const fromNav=!routeSilent;
   attnFocus=null;
+  if(fromNav){
+    closeDetail('job');closeDetail('cust');closeDetail('est');closeDetail('inv');
+    resetListFilters();
+  }
+  const viewEl=document.getElementById('view-'+name);
+  if(!viewEl)return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  viewEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const highlightName=name==='recurring'?'jobs':name;
   const idx=NAV_ORDER.indexOf(highlightName);
   const navItems=document.querySelectorAll('.nav-item');
   if(idx>=0&&navItems[idx])navItems[idx].classList.add('active');
   else if(el)el.classList.add('active');
-  // Keep the Jobs/Maintenance toggle in sync with the actual view being shown
   if(name==='jobs'&&typeof setJobsToggle==='function')setJobsToggle('jobs');
   else if(name==='recurring'&&typeof setJobsToggle==='function')setJobsToggle('maintenance');
   try{sessionStorage.setItem('sumak_last_view',name);}catch(e){}
-  // Arm a history entry when navigating away from dashboard so back returns here
-  if(name!=='dashboard')pushHistoryState('view-'+name);
+  if(fromNav){
+    pushUrl(viewPath(name));
+    document.title='Sumak Ops';
+    document.body.dataset.route=viewPath(name);
+    if(name==='jobs')renderJobs();
+    else if(name==='estimates')renderEstimates();
+    else if(name==='invoices')renderInvoices();
+    else if(name==='customers')renderCustomers();
+    else if(name==='calendar')renderCalendar();
+    else if(name==='payments')renderPayments();
+    else if(name==='recurring')renderRecurringView();
+    else if(name==='subs')renderSubsList();
+    else if(name==='dashboard')renderDashboard();
+  }
+  const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
 }
 function toast(msg,actionFn,actionArg,actionLabel){
   const t=document.getElementById('toast');
