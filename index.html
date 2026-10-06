@@ -544,7 +544,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <div class="fchip" onclick="filterJobs(this,'Completed')">Completed</div>
       <div class="fchip" onclick="filterJobs(this,'Cancelled')">Cancelled</div>
     </div>
-    <div style="padding:0 14px 8px"><input class="form-input" id="job-search" placeholder="Search by job, client, address..." oninput="renderJobs()"></div>
+    <div style="padding:0 14px 8px"><input class="form-input" id="job-search" placeholder="Search by job, client, initials, address..." oninput="renderJobs()"></div>
     <div class="page-body" id="jobs-list"></div>
   </div>
 
@@ -565,7 +565,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <!-- CLIENTS -->
   <div class="view" id="view-customers">
     <div class="page-header"><div class="page-title">Clients</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openModal('import')">Import</button><button class="btn btn-red btn-sm" onclick="openModal('customer')">+ New</button></div></div>
-    <div style="padding:0 14px 10px"><input class="form-input" id="cust-search" placeholder="Search by name, phone, email, city..." oninput="renderCustomers()"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="cust-search" placeholder="Search by name, initials, phone, email, city..." oninput="renderCustomers()"></div>
     <div class="page-body" id="customers-list"></div>
   </div>
 
@@ -603,7 +603,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-estimates">
     <div class="page-header"><div class="page-title">Estimates</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openCostRequestModal()">Request Quote</button><button class="btn btn-red btn-sm" onclick="openModal('estimate')">+ New</button></div></div>
     <div id="cost-requests-section" style="padding:0 14px"></div>
-    <div style="padding:0 14px 10px"><input class="form-input" id="est-search" placeholder="Search by number, client, address..." oninput="renderEstimates()"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="est-search" placeholder="Search by number, client, initials, address..." oninput="renderEstimates()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterEst(this,'all')">All</div>
       <div class="fchip" onclick="filterEst(this,'Draft')">Draft</div>
@@ -618,7 +618,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-invoices">
     <div class="page-header"><div class="page-title">Invoices</div><button class="btn btn-red btn-sm" onclick="openModal('invoice')">+ New</button></div>
     <div id="batch-invoice-section" style="padding:0 14px"></div>
-    <div style="padding:0 14px 10px"><input class="form-input" id="inv-search" placeholder="Search by number, client, address..." oninput="renderInvoices()"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="inv-search" placeholder="Search by number, client, initials, address..." oninput="renderInvoices()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterInv(this,'all')">All</div>
       <div class="fchip" onclick="filterInv(this,'Unpaid')">Unpaid</div>
@@ -1424,6 +1424,91 @@ function customerNameOf(row){
   const c=customers.find(x=>x.id===row?.customer_id);
   return c?.name||'';
 }
+function searchFold(s){return String(s??'').toLowerCase().replace(/[^a-z0-9]+/g,'');}
+function nameInitials(s){
+  return String(s??'').split(/[^A-Za-z0-9]+/).filter(Boolean).map(w=>w[0].toLowerCase()).join('');
+}
+function clientNameFields(row){
+  if(!row)return [];
+  return [row.name,row.company,row.company_name,row.business_name,row.billing_name,row.billing_company].filter(v=>v!=null&&String(v).trim()!=='');
+}
+function clientSources(row){
+  const out=[];
+  const emb=row?.customers;
+  if(emb&&!Array.isArray(emb))out.push(emb);
+  else if(Array.isArray(emb)&&emb[0])out.push(emb[0]);
+  if(row?.customer_id){
+    const stored=customers.find(x=>x.id===row.customer_id);
+    if(stored)out.push(stored);
+  }else if(row&&clientNameFields(row).length){
+    out.push(row);
+  }
+  return out;
+}
+function recordMatchesQuery(q,fields,sources){
+  const raw=String(q??'').trim();
+  if(!raw)return true;
+  const lower=raw.toLowerCase();
+  const folded=searchFold(raw);
+  const blobs=(fields||[]).filter(v=>v!=null&&String(v).trim()!=='').map(v=>String(v));
+  (sources||[]).forEach(src=>clientNameFields(src).forEach(n=>blobs.push(String(n))));
+  if(blobs.some(v=>v.toLowerCase().includes(lower)||(folded&&searchFold(v).includes(folded))))return true;
+  if(folded.length>=2){
+    const initials=[];
+    (sources||[]).forEach(src=>clientNameFields(src).forEach(n=>initials.push(nameInitials(n))));
+    if(initials.some(ini=>ini===folded||ini.startsWith(folded)))return true;
+  }
+  return false;
+}
+function shortBizDate(s){
+  if(!s)return '';
+  if(isDateOnly(s)){
+    const [y,m,d]=s.split('-').map(Number);
+    return new Date(Date.UTC(y,m-1,d)).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+  }
+  const dt=new Date(s);
+  if(Number.isNaN(dt.getTime()))return '';
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:BIZ_TZ});
+}
+function sentOrCreatedLabel(row){
+  if(!row)return '';
+  if(row.sent_at){const d=shortBizDate(row.sent_at);return d?'Sent '+d:'';}
+  if(row.created_at){const d=shortBizDate(row.created_at);return d?'Created '+d:'';}
+  return '';
+}
+function invoiceAnchorYMD(i){
+  const raw=i&&(i.sent_at||i.created_at);
+  if(!raw)return '';
+  if(isDateOnly(raw))return raw;
+  return bizYMD(raw)||'';
+}
+function calendarDaysBetween(fromYmd,toYmd){
+  if(!fromYmd||!toYmd)return 0;
+  const [y1,m1,d1]=fromYmd.split('-').map(Number);
+  const [y2,m2,d2]=toYmd.split('-').map(Number);
+  if(!y1||!m1||!d1||!y2||!m2||!d2)return 0;
+  return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/86400000);
+}
+function invoiceAgeDays(i){
+  const anchor=invoiceAnchorYMD(i);
+  const today=bizYMD();
+  if(!anchor||!today)return 0;
+  return Math.max(0,calendarDaysBetween(anchor,today));
+}
+function invoiceAgeBucket(days){
+  if(days<=30)return '0-30';
+  if(days<=60)return '31-60';
+  if(days<=90)return '61-90';
+  return '90+';
+}
+const recentRecordOpens=new Map();
+function beginRecordOpen(id){
+  const key=String(id||'');
+  const now=Date.now();
+  if(now-(recentRecordOpens.get(key)||0)<400)return false;
+  recentRecordOpens.set(key,now);
+  return true;
+}
 function jobWhenText(j){
   if(j.scheduled_date)return fmtDate(j.scheduled_date);
   if(j.status==='Completed'&&j.completed_at)return 'Completed '+fmtDate(j.completed_at);
@@ -1667,7 +1752,7 @@ function renderJobs(){
     banner=attnBanner(`${plural(list.length,'job')} missing a sub or a date`);
   }
   if(q){
-    list=list.filter(j=>[j.job_number,j.title,j.address,j.status,customerNameOf(j),j.subcontractors?.name].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
+    list=list.filter(j=>recordMatchesQuery(q,[j.job_number,j.title,j.address,j.status,j.subcontractors?.name,customerNameOf(j)],clientSources(j)));
   }
   document.getElementById('jobs-list').innerHTML=banner+(list.length?list.map(j=>jobCard(j,`openJobDetail('${j.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.jobs}</div><div class="empty-title">${jobFilter==='unpaid'?'Nothing unpaid':'No jobs'}</div>${jobFilter==='unpaid'?'<div class="empty-sub">Every sub is paid up ✓</div>':'<div class="empty-sub">One-off jobs show here</div>'}</div>`);
@@ -1860,8 +1945,8 @@ async function confirmImport(){
   await fetchCustomers();renderCustomers();
 }
 function renderCustomers(){
-  const q=(document.getElementById('cust-search')?.value||'').trim().toLowerCase();
-  const list=q?customers.filter(c=>[c.name,c.phone,c.email,c.city].filter(Boolean).some(v=>v.toLowerCase().includes(q))):customers;
+  const q=(document.getElementById('cust-search')?.value||'').trim();
+  const list=q?customers.filter(c=>recordMatchesQuery(q,[c.name,c.phone,c.email,c.billing_email,c.city,c.notes],clientSources(c))):customers;
   document.getElementById('customers-list').innerHTML=list.length
     ?list.map(c=>`<div class="card" data-type="client" data-id="${c.id}" onclick="openCustDetail('${c.id}')">
       <div class="card-top">
@@ -1883,11 +1968,15 @@ function renderCustomers(){
 
 function openCustDetail(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
+  if(!beginRecordOpen(c.id))return;
+  document.getElementById('detail-cust-name').textContent=c.name||'Client';
+  document.getElementById('cust-detail').classList.add('open');
+  syncRecordUrl('cust',c);
   const cj=jobs.filter(j=>j.customer_id===id);
   const cProps=properties.filter(p=>p.customer_id===id);
   const cEst=estimates.filter(e=>e.customer_id===id);
   const cInv=sortInvoices(invoices.filter(i=>i.customer_id===id));
-  document.getElementById('detail-cust-name').textContent=c.name;
+  document.getElementById('detail-cust-name').textContent=c.name||'Client';
   document.getElementById('detail-cust-body').innerHTML=`
     <div class="detail-card">
       <div class="detail-section-lbl">Contact</div>
@@ -1923,21 +2012,14 @@ function openCustDetail(id){
     </div>
     ${cj.map(j=>jobCard(j,`closeDetail('cust');openJobDetail('${j.id}')`)).join('')||'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No jobs yet</div>'}
     <div class="section-lbl" style="margin-top:16px">Estimates (${cEst.length})</div>
-    ${cEst.length?cEst.map(e=>`<div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="closeDetail('cust');openEstDetail('${e.id}')">
-      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}</div><div class="card-title">${esc(e.address||'No address')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
-      <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
-    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No estimates yet</div>'}
+    ${cEst.length?cEst.map(e=>estimateListCard(e,`closeDetail('cust');openEstDetail('${e.id}')`)).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No estimates yet</div>'}
     <div class="section-lbl" style="margin-top:16px">Invoices (${cInv.length})</div>
-    ${cInv.length?cInv.map(i=>`<div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="closeDetail('cust');openInvDetail('${i.id}')">
-      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}</div><div class="card-title">${esc(i.address||i.status||'')}</div></div><span class="${pClass(i.status)}">${esc(i.status||'')}</span></div>
-      <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
-    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No invoices yet</div>'}
+    ${cInv.length?cInv.map(i=>invoiceListCard(i,`closeDetail('cust');openInvDetail('${i.id}')`)).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No invoices yet</div>'}
     <div class="action-row" style="margin-top:12px">
       <button class="action-btn ab-glass" onclick="editCustFromDetail('${id}')">${ICONS.pencil} Edit Client</button>
       <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
     </div>`;
   wireAddressAutocomplete(`new-prop-${id}`,`new-prop-suggest-${id}`);
-  document.getElementById('cust-detail').classList.add('open');syncRecordUrl('cust',c);
 }
 
 async function addProp(custId){
@@ -2777,13 +2859,8 @@ function renderEstimates(){
     list=estimates.filter(e=>{if(e.status!=='Sent')return false;return (today-new Date(e.created_at))/(1000*60*60*24)>7;});
     banner=`<div onclick="attnFocus=null;renderEstimates()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer"><div style="font-size:12.5px;font-weight:600;color:var(--ink)">⚑ Showing: ${list.length} estimate${list.length!==1?'s':''} awaiting a reply</div><div style="font-size:11px;color:var(--rose);font-weight:600;white-space:nowrap">✕ Show all</div></div>`;
   }
-  if(q)list=list.filter(e=>[e.estimate_number,customerNameOf(e),e.address,e.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
-  document.getElementById('estimates-list').innerHTML=banner+(list.length?list.map(e=>`
-    <div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="openEstDetail('${e.id}')">
-      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
-      <div class="card-meta">${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
-      <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
-    </div>`).join('')
+  if(q)list=list.filter(e=>recordMatchesQuery(q,[e.estimate_number,customerNameOf(e),e.address,e.status],clientSources(e)));
+  document.getElementById('estimates-list').innerHTML=banner+(list.length?list.map(e=>estimateListCard(e,`openEstDetail('${e.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">${q?'No matches':'No estimates'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create estimates for new clients'}</div></div>`);
 }
 function filterEst(el,val){estFilter=val;document.querySelectorAll('#view-estimates .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderEstimates();}
@@ -3051,11 +3128,24 @@ function estimateTimelineHTML(e){
   </div>`;
 }
 async function openEstDetail(id){
-  const e=estimates.find(x=>x.id===id);if(!e)return;
-  const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',id);
-  document.getElementById('detail-est-num').textContent=e.estimate_number;
-  const pill=document.getElementById('detail-est-pill');pill.className=pClass(e.status);pill.textContent=e.status;
-  document.getElementById('detail-est-body').innerHTML=`
+  const e=estimates.find(x=>x.id===id||x.estimate_number===id);if(!e)return;
+  if(!beginRecordOpen(e.id))return;
+  const numEl=document.getElementById('detail-est-num');
+  const pill=document.getElementById('detail-est-pill');
+  if(numEl)numEl.textContent=e.estimate_number||'Estimate';
+  if(pill){pill.className=pClass(e.status);pill.textContent=e.status||'';}
+  document.getElementById('est-detail').classList.add('open');
+  syncRecordUrl('est',e);
+  let items=[];
+  try{
+    const res=await db.from('estimate_items').select('*').eq('estimate_id',e.id);
+    items=Array.isArray(res&&res.data)?res.data:[];
+    if(res&&res.error)console.error('estimate_items',res.error);
+  }catch(err){console.error('estimate_items',err);}
+  const body=document.getElementById('detail-est-body');
+  if(!body)return;
+  try{
+  body.innerHTML=`
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
@@ -3074,19 +3164,22 @@ async function openEstDetail(id){
     </div>
     ${estimateTimelineHTML(e)}
     <div class="action-row">
-      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
-      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
+      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${e.id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
+      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${e.id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
       ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
-      <button class="action-btn ab-glass" onclick="printEstimate('${id}')">${ICONS.printer} Print / Save PDF</button>
-      <button class="action-btn ab-glass" onclick="shareEstimatePdf('${id}')">${ICONS.send} Share / Text PDF</button>
-      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-green" onclick="updateEstStatus('${id}','Approved')">${ICONS.check} Mark Approved</button>`:''}
-      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-danger" onclick="updateEstStatus('${id}','Declined')">${ICONS.alert} Mark Declined</button>`:''}
-      ${e.status==='Approved'?(jobs.find(j=>j.estimate_id===id)?`<button class="action-btn ab-red" onclick="closeDetail('est');showView('jobs',document.querySelectorAll('.nav-item')[1]);openJobDetail('${jobs.find(j=>j.estimate_id===id).id}')">${ICONS.wrench} View Job</button>`:`<button class="action-btn ab-red" onclick="setUpJobFromEstimate('${id}')">${ICONS.calendar} Set Up Job / Schedule</button>`):''}
-      ${e.status==='Approved'&&jobs.find(j=>j.estimate_id===id)?`<button class="action-btn ab-glass" onclick="convertEstToInvoice('${id}')">${ICONS.receipt} Convert to Invoice</button>`:''}
-      <button class="action-btn ab-glass" onclick="editEst('${id}')">${ICONS.pencil} Edit Estimate</button>
-      <button class="action-btn ab-danger" onclick="deleteEst('${id}')">${ICONS.trash} Delete</button>
+      <button class="action-btn ab-glass" onclick="printEstimate('${e.id}')">${ICONS.printer} Print / Save PDF</button>
+      <button class="action-btn ab-glass" onclick="shareEstimatePdf('${e.id}')">${ICONS.send} Share / Text PDF</button>
+      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-green" onclick="updateEstStatus('${e.id}','Approved')">${ICONS.check} Mark Approved</button>`:''}
+      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-danger" onclick="updateEstStatus('${e.id}','Declined')">${ICONS.alert} Mark Declined</button>`:''}
+      ${e.status==='Approved'?(jobs.find(j=>j.estimate_id===e.id)?`<button class="action-btn ab-red" onclick="closeDetail('est');showView('jobs',document.querySelectorAll('.nav-item')[1]);openJobDetail('${jobs.find(j=>j.estimate_id===e.id).id}')">${ICONS.wrench} View Job</button>`:`<button class="action-btn ab-red" onclick="setUpJobFromEstimate('${e.id}')">${ICONS.calendar} Set Up Job / Schedule</button>`):''}
+      ${e.status==='Approved'&&jobs.find(j=>j.estimate_id===e.id)?`<button class="action-btn ab-glass" onclick="convertEstToInvoice('${e.id}')">${ICONS.receipt} Convert to Invoice</button>`:''}
+      <button class="action-btn ab-glass" onclick="editEst('${e.id}')">${ICONS.pencil} Edit Estimate</button>
+      <button class="action-btn ab-danger" onclick="deleteEst('${e.id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('est-detail').classList.add('open');syncRecordUrl('est',e);
+  }catch(err){
+    console.error('openEstDetail',err);
+    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(e)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(e.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(e.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded.</div></div>`;
+  }
 }
 function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
@@ -3558,10 +3651,60 @@ function invSentLabel(i){
   if(i.status==='Paid'||i.status==='Cancelled')return '';
   return ' · <span style="color:var(--ink3)">Not sent</span>';
 }
+function cardWhenHTML(row){
+  const label=sentOrCreatedLabel(row);
+  return label?`<span class="card-meta-item">${ICONS.calendar} ${esc(label)}</span>`:'';
+}
+function invoiceDueCue(i){
+  if(!i||i.status==='Paid'||i.status==='Cancelled')return '';
+  const overdue=invIsOverdue(i)||i.status==='Overdue';
+  if(overdue){
+    const days=invoiceAgeDays(i);
+    return `<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} Overdue${days>0?` · ${days}d`:''}</span>`;
+  }
+  if(i.due_date){
+    const due=shortBizDate(i.due_date)||fmtDate(i.due_date);
+    return `<span class="card-meta-item">${ICONS.calendar} Due ${esc(due)}</span>`;
+  }
+  return '';
+}
+function estimateListCard(e,onclick){
+  return `<div class="card" data-type="estimate" data-id="${esc(e.id)}" data-number="${esc(e.estimate_number||'')}" onclick="${onclick}">
+    <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||e.address||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+    <div class="card-meta">${cardWhenHTML(e)}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
+    <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
+  </div>`;
+}
+function invoiceListCard(i,onclick){
+  const overdue=invIsOverdue(i)||i.status==='Overdue';
+  const displayStatus=overdue&&i.status!=='Paid'&&i.status!=='Cancelled'?'Overdue':i.status;
+  return `<div class="card" data-type="invoice" data-id="${esc(i.id)}" data-number="${esc(i.invoice_number||'')}" onclick="${onclick}">
+    <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
+    <div class="card-meta">${cardWhenHTML(i)}${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${invoiceDueCue(i)}</div>
+    <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
+  </div>`;
+}
+function unpaidAuditHTML(){
+  const open=openInvoices();
+  const total=unpaidInvoiceTotal();
+  const keys=['0-30','31-60','61-90','90+'];
+  const buckets={'0-30':{n:0,amt:0},'31-60':{n:0,amt:0},'61-90':{n:0,amt:0},'90+':{n:0,amt:0}};
+  open.forEach(i=>{
+    const key=invoiceAgeBucket(invoiceAgeDays(i));
+    buckets[key].n++;
+    buckets[key].amt=roundMoney(buckets[key].amt+moneyNum(i.total));
+  });
+  return `<div id="unpaid-audit" style="background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--rsm);padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--ink)">${plural(open.length,'unpaid invoice')} · ${fmt(total)}</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:3px">Same total as the Home Unpaid tile. Oldest first. Age is calendar days in Boise from the sent date, or the created date if it was never sent.</div>
+    <div class="card-meta" style="margin-top:8px">${keys.map(k=>`<span class="card-meta-item">${k} · ${buckets[k].n} · ${fmt(buckets[k].amt)}</span>`).join('')}</div>
+  </div>`;
+}
 function renderInvoices(){
   renderBatchInvoice();
-  const q=(document.getElementById('inv-search')?.value||'').trim().toLowerCase();
-  let list=invFilter==='all'?invoices.slice():invFilter==='Overdue'?invoices.filter(invIsOverdue):invoices.filter(i=>i.status===invFilter);
+  const q=(document.getElementById('inv-search')?.value||'').trim();
+  const unpaidView=invFilter==='Unpaid'&&!attnFocus;
+  let list=invFilter==='all'?invoices.slice():invFilter==='Overdue'?invoices.filter(invIsOverdue):unpaidView?openInvoices().slice():invoices.filter(i=>i.status===invFilter);
   let banner='';
   if(attnFocus==='notSent'){
     list=invoices.filter(i=>!i.sent_at&&i.status!=='Paid'&&i.status!=='Cancelled');
@@ -3571,19 +3714,15 @@ function renderInvoices(){
     list=invoices.filter(i=>{if(i.status==='Paid'||i.status==='Cancelled'||!i.sent_at)return false;return (today-new Date(i.sent_at))/(1000*60*60*24)>30;});
     banner=invAttnBanner(`${list.length} invoice${list.length!==1?'s':''} unpaid over 30 days`);
   }
-  list=sortInvoices(list);
-  if(q)list=list.filter(i=>[i.invoice_number,customerNameOf(i),i.address,i.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
-  document.getElementById('invoices-list').innerHTML=banner+(list.length?list.map(i=>{
-    const overdue=invIsOverdue(i);
-    const displayStatus=overdue?'Overdue':i.status;
-    const days=i.sent_at?Math.floor((new Date()-new Date(i.sent_at))/(1000*60*60*24)):null;
-    return`
-    <div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="openInvDetail('${i.id}')">
-      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
-      <div class="card-meta">${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${overdue&&days?`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} ${days} days unpaid</span>`:i.due_date?`<span class="card-meta-item">${ICONS.calendar} Due ${fmtDate(i.due_date)}</span>`:''}</div>
-      <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
-    </div>`;}).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">${q?'No matches':'No invoices'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create invoices or convert approved estimates'}</div></div>`);
+  if(unpaidView&&!attnFocus){
+    list=list.slice().sort((a,b)=>(invoiceAnchorYMD(a)||'9999-99-99').localeCompare(invoiceAnchorYMD(b)||'9999-99-99')||invoiceSortKey(a)-invoiceSortKey(b)||String(a.invoice_number||'').localeCompare(String(b.invoice_number||'')));
+  }else{
+    list=sortInvoices(list);
+  }
+  if(q)list=list.filter(i=>recordMatchesQuery(q,[i.invoice_number,customerNameOf(i),i.address,i.status],clientSources(i)));
+  const summary=unpaidView&&!attnFocus?unpaidAuditHTML():'';
+  document.getElementById('invoices-list').innerHTML=summary+banner+(list.length?list.map(i=>invoiceListCard(i,`openInvDetail('${i.id}')`)).join('')
+    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">${q?'No matches':'No invoices'}</div><div class="empty-sub">${q?'Try a number, client, initials, or address':'Create invoices or convert approved estimates'}</div></div>`);
 }
 function invAttnBanner(label){
   return `<div onclick="attnFocus=null;renderInvoices()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer">
@@ -3687,15 +3826,29 @@ function invoiceTimelineHTML(inv){
   </div>`;
 }
 async function openInvDetail(id){
-  const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const{data:items}=await db.from('invoice_items').select('*').eq('invoice_id',id);
-  document.getElementById('detail-inv-num').textContent=inv.invoice_number;
-  const pill=document.getElementById('detail-inv-pill');pill.className=pClass(inv.status);pill.textContent=inv.status;
-  document.getElementById('detail-inv-body').innerHTML=`
+  const inv=invoices.find(x=>x.id===id||x.invoice_number===id);if(!inv)return;
+  if(!beginRecordOpen(inv.id))return;
+  const numEl=document.getElementById('detail-inv-num');
+  const pill=document.getElementById('detail-inv-pill');
+  const panel=document.getElementById('inv-detail');
+  if(numEl)numEl.textContent=inv.invoice_number||'Invoice';
+  if(pill){pill.className=pClass(inv.status);pill.textContent=inv.status||'';}
+  if(panel)panel.classList.add('open');
+  syncRecordUrl('inv',inv);
+  let items=[];
+  try{
+    const res=await db.from('invoice_items').select('*').eq('invoice_id',inv.id);
+    items=Array.isArray(res&&res.data)?res.data:[];
+    if(res&&res.error)console.error('invoice_items',res.error);
+  }catch(err){console.error('invoice_items',err);}
+  const body=document.getElementById('detail-inv-body');
+  if(!body)return;
+  try{
+  body.innerHTML=`
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${inv.invoice_number}</div><div>Status: ${inv.status}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(inv.sent_at)}${inv.sent_to?` to ${esc(inv.sent_to)}`:''}</div>`:(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${inv.customers?.name||'—'}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${inv.address}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(inv.sent_at)}${inv.sent_to?` to ${esc(inv.sent_to)}`:''}</div>`:(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -3706,20 +3859,23 @@ async function openInvDetail(id){
         ${inv.tax_rate>0?`<div class="inv-total-row"><span>Tax (${inv.tax_rate}%)</span><span>${fmt(inv.tax_amount)}</span></div>`:''}
         <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(inv.total)}</span></div>
       </div>
-      ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${inv.notes}</div>`:''}
+      ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${esc(inv.notes)}</div>`:''}
     </div>
     ${invoiceTimelineHTML(inv)}
     <div class="action-row">
-      ${inv.status==='Unpaid'?`<button class="action-btn ab-green" onclick="markInvPaid('${id}')">${ICONS.dollar} Mark as Paid</button>`:''}
-      ${inv.status==='Unpaid'?`<button class="action-btn ab-red" onclick="markInvOverdue('${id}')">${ICONS.alert} Mark Overdue</button>`:''}
-      <button class="action-btn ab-glass" onclick="printInvoice('${id}')">${ICONS.printer} Print / Save PDF</button>
-      <button class="action-btn ab-glass" onclick="shareInvoicePdf('${id}')">${ICONS.send} Share / Text PDF</button>
-      <button class="action-btn ab-red" onclick="emailInvoice('${id}')">${ICONS.send} Email to Client</button>
-      <button class="action-btn ab-glass" onclick="toggleInvoiceSent('${id}')">${inv.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
-      <button class="action-btn ab-glass" onclick="editInv('${id}')">${ICONS.pencil} Edit Invoice</button>
-      <button class="action-btn ab-danger" onclick="deleteInv('${id}')">${ICONS.trash} Delete</button>
+      ${inv.status==='Unpaid'?`<button class="action-btn ab-green" onclick="markInvPaid('${inv.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${inv.status==='Unpaid'?`<button class="action-btn ab-red" onclick="markInvOverdue('${inv.id}')">${ICONS.alert} Mark Overdue</button>`:''}
+      <button class="action-btn ab-glass" onclick="printInvoice('${inv.id}')">${ICONS.printer} Print / Save PDF</button>
+      <button class="action-btn ab-glass" onclick="shareInvoicePdf('${inv.id}')">${ICONS.send} Share / Text PDF</button>
+      <button class="action-btn ab-red" onclick="emailInvoice('${inv.id}')">${ICONS.send} Email to Client</button>
+      <button class="action-btn ab-glass" onclick="toggleInvoiceSent('${inv.id}')">${inv.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
+      <button class="action-btn ab-glass" onclick="editInv('${inv.id}')">${ICONS.pencil} Edit Invoice</button>
+      <button class="action-btn ab-danger" onclick="deleteInv('${inv.id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('inv-detail').classList.add('open');syncRecordUrl('inv',inv);
+  }catch(err){
+    console.error('openInvDetail',err);
+    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(inv)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(inv.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(inv.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded. The invoice is still ${esc(inv.invoice_number||'on file')}.</div></div>`;
+  }
 }
 function invoiceCSS(){
   return `
@@ -4152,16 +4308,21 @@ async function deletePhoto(photoId,jobId){
 
 // ── JOB DETAIL ────────────────────────────────────────────────────────────
 async function openJobDetail(id){
-  const j=jobs.find(x=>x.id===id);if(!j)return;
+  const j=jobs.find(x=>x.id===id||x.job_number===id);if(!j)return;
   const isAdmin=currentProfile?.role==='admin';
   if(!isAdmin&&j.subcontractor_id===currentSubId&&!j.accepted_at){
     toast('Accept this job from your list first');
     return;
   }
-  document.getElementById('detail-job-num').textContent=j.job_number;
-  const pill=document.getElementById('detail-job-pill');pill.className=pClass(j.status);pill.textContent=j.status;
+  if(!beginRecordOpen(j.id))return;
+  document.getElementById('detail-job-num').textContent=j.job_number||'Job';
+  const pill=document.getElementById('detail-job-pill');if(pill){pill.className=pClass(j.status);pill.textContent=j.status||'';}
+  document.getElementById('job-detail').classList.add('open');
+  syncRecordUrl('job',j);
   const addr=j.address||'';
-  document.getElementById('detail-job-body').innerHTML=`
+  const jobBody=document.getElementById('detail-job-body');
+  try{
+  jobBody.innerHTML=`
     <div class="detail-card">
       <div style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;margin-bottom:14px">${j.title}</div>
       <div class="detail-section-lbl">Details</div>
@@ -4182,19 +4343,22 @@ async function openJobDetail(id){
     </div>
     <div class="detail-card">
       <div class="detail-section-lbl">Job Photos</div>
-      <div class="photo-grid" id="photos-${id}"></div>
-      <button class="photo-upload-btn" onclick="setupPhotoUpload('${id}')">${ICONS.camera} Upload Photos</button>
+      <div class="photo-grid" id="photos-${j.id}"></div>
+      <button class="photo-upload-btn" onclick="setupPhotoUpload('${j.id}')">${ICONS.camera} Upload Photos</button>
     </div>
     <div class="action-row">
-      ${j.status==='Pending'?`<button class="action-btn ab-red" onclick="updateStatus('${id}','In Progress')">${ICONS.play} Start Job</button>`:''}
-      ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
-      ${isAdmin&&j.payment_status==='Unpaid'?`<button class="action-btn ab-red" onclick="markPaidDetail('${id}')">${ICONS.dollar} Mark as Paid</button>`:''}
-      ${isAdmin&&j.status==='Completed'?(jobInvoiceMap[id]?`<button class="action-btn ab-glass" onclick="closeDetail('job');showView('invoices',document.querySelectorAll('.nav-item')[5]);openInvDetail('${jobInvoiceMap[id]}')">${ICONS.receipt} View Invoice</button>`:`<button class="action-btn ab-red" onclick="convertJobToInvoice('${id}')">${ICONS.receipt} Convert to Invoice</button>`):''}
-      ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${id}')">${ICONS.send} Notify Sub</button>`:''}
-      ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${id}')">${ICONS.trash} Delete Job</button>`:''}
+      ${j.status==='Pending'?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
+      ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${j.id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
+      ${isAdmin&&j.payment_status==='Unpaid'?`<button class="action-btn ab-red" onclick="markPaidDetail('${j.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${isAdmin&&j.status==='Completed'?(jobInvoiceMap[j.id]?`<button class="action-btn ab-glass" onclick="closeDetail('job');showView('invoices',document.querySelectorAll('.nav-item')[5]);openInvDetail('${jobInvoiceMap[j.id]}')">${ICONS.receipt} View Invoice</button>`:`<button class="action-btn ab-red" onclick="convertJobToInvoice('${j.id}')">${ICONS.receipt} Convert to Invoice</button>`):''}
+      ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${j.id}')">${ICONS.send} Notify Sub</button>`:''}
+      ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${j.id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${j.id}')">${ICONS.trash} Delete Job</button>`:''}
     </div>`;
-  document.getElementById('job-detail').classList.add('open');syncRecordUrl('job',j);
-  await renderJobPhotos(id);
+  }catch(err){
+    console.error('openJobDetail',err);
+    if(jobBody)jobBody.innerHTML=`<div class="detail-card"><div style="font-size:18px;font-weight:600">${esc(j.title||'Job')}</div><div style="margin-top:8px;font-size:12px;color:var(--ink3)">This job could not be fully drawn.</div></div>`;
+  }
+  await renderJobPhotos(j.id);
   renderSiteReport(j);
 }
 async function updateStatus(id,status){
@@ -4710,6 +4874,18 @@ function closeTopOverlay(){
   if(openDetail){openDetail.classList.remove('open');return true;}
   return false;
 }
+document.addEventListener('click',(e)=>{
+  if(e.target.closest('a,button,input,textarea,select,label'))return;
+  const card=e.target.closest('.card[data-type][data-id]');
+  if(!card)return;
+  const type=card.dataset.type;
+  const rid=card.dataset.id;
+  if(!rid)return;
+  if(type==='invoice')openInvDetail(rid);
+  else if(type==='estimate')openEstDetail(rid);
+  else if(type==='job')openJobDetail(rid);
+  else if(type==='client')openCustDetail(rid);
+});
 window.addEventListener('popstate',()=>{
   if(document.getElementById('public-quote-host'))return;
   const modalOpen=document.querySelector('.modal-overlay.open');
