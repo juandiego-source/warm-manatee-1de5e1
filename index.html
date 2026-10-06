@@ -1046,6 +1046,7 @@ let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
 let attnFocus=null; // when set, a list filters to just the flagged items from the dashboard
 let currentUser=null,currentProfile=null,currentSubId=null;
+const BIZ_TZ='America/Boise';
 let calYear=Number(bizYMD().slice(0,4)),calMonth=Number(bizYMD().slice(5,7))-1,calSelected=null;
 let currentPhotoJobId=null;
 
@@ -1359,7 +1360,6 @@ function restoreSectionStates(){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 function pClass(s){return'pill pill-'+({'Pending':'pending','In Progress':'progress','Completed':'completed','Cancelled':'cancelled','Unpaid':'unpaid','Paid':'paid','Draft':'draft','Sent':'sent','Approved':'approved','Declined':'declined','Overdue':'overdue'}[s]||'pending');}
-const BIZ_TZ='America/Boise';
 let dataReady=false;
 function moneyNum(n){const x=typeof n==='number'?n:parseFloat(n);return Number.isFinite(x)?x:0;}
 function roundMoney(n){return Math.round((moneyNum(n)+Number.EPSILON)*100)/100;}
