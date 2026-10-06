@@ -1043,7 +1043,7 @@ let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
 let attnFocus=null; // when set, a list filters to just the flagged items from the dashboard
 let currentUser=null,currentProfile=null,currentSubId=null;
-let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelected=null;
+let calYear=Number(bizYMD().slice(0,4)),calMonth=Number(bizYMD().slice(5,7))-1,calSelected=null;
 let currentPhotoJobId=null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
@@ -1754,8 +1754,7 @@ function renderCalendar(){
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
   const daysInPrev=new Date(calYear,calMonth,0).getDate();
-  const today=new Date();
-  const todayStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr=bizYMD();
   const jobMap={};jobs.forEach(j=>{if(j.scheduled_date){if(!jobMap[j.scheduled_date])jobMap[j.scheduled_date]=[];jobMap[j.scheduled_date].push(j);}});
   const recMap=projectRecurringOccurrences(calYear,calMonth);
   let html='';
@@ -1782,7 +1781,7 @@ function renderCalDay(ds){
   // (Jobs are generated up front now, so a real job normally exists — the projection would just be a duplicate.)
   const realRecIds=new Set(dj.filter(j=>j.recurring_service_id).map(j=>j.recurring_service_id));
   const dr=(recMap[ds]||[]).filter(r=>!realRecIds.has(r.id));
-  const lbl=dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const lbl=new Date(ds+'T00:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
   const el=document.getElementById('cal-day-jobs');el.style.display='block';
   const recHtml=dr.map(r=>`<div class="card" style="opacity:0.75;border-style:dashed" onclick="closeDetail('cust');showView('customers',document.querySelectorAll('.nav-item')[3])"><div class="card-top"><div><div class="card-id">${ICONS.calendar} Recurring · ${freqLabel(r.frequency)}</div><div class="card-title">${r.title}</div></div></div><div class="card-meta"><span class="card-meta-item">${ICONS.user} ${r.customerName}</span>${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${r.address}</span>`:''}</div><div style="font-size:10.5px;color:var(--ink3);margin-top:4px">Upcoming — not yet scheduled</div></div>`).join('');
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="cal-day-title">${lbl}</div><button class="btn btn-red btn-sm" onclick="openModalWithDate('${ds}')">+ Job</button></div>`+
@@ -1979,7 +1978,7 @@ function openRecModal(id,custId){
       document.getElementById('rec-customer').value=custId||'';
       document.getElementById('rec-sub').value='';
       document.getElementById('rec-frequency').value='monthly';
-      document.getElementById('rec-start').value=new Date().toISOString().slice(0,10);
+      document.getElementById('rec-start').value=bizYMD();
       document.getElementById('rec-end').value='';
       loadRecCustomerProps();
     }
@@ -2229,7 +2228,7 @@ async function saveRecService(){
     sub_pay:parseFloat(document.getElementById('rec-sub-pay').value)||0,
     subcontractor_id:document.getElementById('rec-sub').value||null,
     frequency:document.getElementById('rec-frequency').value,
-    next_run_date:document.getElementById('rec-start').value||new Date().toISOString().slice(0,10),
+    next_run_date:document.getElementById('rec-start').value||bizYMD(),
     end_date:endVal,
     active:true
   };
@@ -2263,7 +2262,7 @@ async function toggleRecService(id,active,custId){
   await db.from('recurring_services').update({active}).eq('id',id);
   if(!active){
     // Pausing/cancelling: remove future un-started jobs from this service, keep past/completed ones
-    const today=new Date().toISOString().slice(0,10);
+    const today=bizYMD();
     await db.from('jobs').update({deleted_at:new Date().toISOString()}).eq('recurring_service_id',id).eq('status','Pending').gte('scheduled_date',today);
   }
   await fetchRecurring();await fetchJobs();renderAll();refreshRecurringViews(custId);
@@ -2271,7 +2270,7 @@ async function toggleRecService(id,active,custId){
 }
 async function deleteRecService(id,custId){
   if(!confirm('Delete this recurring service? Upcoming un-started visits will be removed; completed ones stay for your records.'))return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   await db.from('jobs').update({deleted_at:new Date().toISOString()}).eq('recurring_service_id',id).eq('status','Pending').gte('scheduled_date',today);
   await db.from('recurring_services').delete().eq('id',id);
   await fetchRecurring();await fetchJobs();renderAll();refreshRecurringViews(custId);
@@ -2289,7 +2288,7 @@ function renderRecurringView(){
   if(recViewFilter==='paused')list=list.filter(r=>!r.active);
   else if(recViewFilter!=='all')list=list.filter(r=>r.frequency===recViewFilter&&r.active);
   else list=list.filter(r=>r.active);
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   document.getElementById('recurring-view-list').innerHTML=list.length?list.map(r=>{
     const visits=jobs.filter(j=>j.recurring_service_id===r.id);
     const upcoming=visits.filter(j=>j.scheduled_date>=today&&j.status!=='Completed'&&j.status!=='Cancelled');
@@ -2315,7 +2314,7 @@ function renderRecurringView(){
 }
 function openRecDetail(id){
   const r=recurring.find(x=>x.id===id);if(!r)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   const visits=jobs.filter(j=>j.recurring_service_id===id).sort((a,b)=>(a.scheduled_date||'').localeCompare(b.scheduled_date||''));
   const upcoming=visits.filter(j=>j.scheduled_date>=today&&j.status!=='Completed'&&j.status!=='Cancelled');
   const done=visits.filter(j=>j.status==='Completed').length;
@@ -2418,8 +2417,7 @@ function renderActivityLog(){
   const el=document.getElementById('activity-log-list');
   if(!el)return;
   el.innerHTML=list.length?list.map(a=>{
-    const dt=new Date(a.created_at);
-    const when=dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const when=fmtDateTime(a.created_at);
     return`<div style="padding:9px 0;border-bottom:1px solid var(--line)">
       <div style="color:var(--ink);font-weight:600">${a.action}</div>
       ${a.detail?`<div style="color:var(--ink2);margin-top:2px">${a.detail}</div>`:''}
@@ -2651,7 +2649,8 @@ function openSubReconcile(subKey,ym){
   const unbilledValue=unbilled.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
   let overlay=document.getElementById('trash-overlay');
   if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
-  const monthLbl=new Date(ym+'-01T00:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const [ymY,ymM]=ym.split('-').map(Number);
+  const monthLbl=new Date(Date.UTC(ymY,ymM-1,1)).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
       <div><div style="font-size:11px;color:var(--ink3)">${monthLbl} · reconciliation</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${subName}</div></div>
@@ -2918,11 +2917,12 @@ async function handleEstimateApproval(estId){
   const est=estimates.find(x=>x.id===estId)||(await db.from('estimates').select('*').eq('id',estId).single()).data;
   if(est&&est.is_recurring){
     // Recurring: generate the whole season, with a confirmation first
-    const start=est.rec_start_date||new Date().toISOString().slice(0,10);
+    const start=est.rec_start_date||bizYMD();
     const end=est.rec_end_date?new Date(est.rec_end_date+'T00:00:00'):seasonEndDate(start);
     const dates=buildRecurringJobDates(start,est.rec_frequency||'weekly',end);
     const freqWord={weekly:'weekly',biweekly:'every-2-week',monthly:'monthly'}[est.rec_frequency]||'recurring';
-    if(!confirm(`This will schedule ${dates.length} ${freqWord} visits from ${fmtDate(start)} through ${fmtDate(end.toISOString().slice(0,10))}. Set them up now?`)){
+    const endYmd=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;
+    if(!confirm(`This will schedule ${dates.length} ${freqWord} visits from ${fmtDate(start)} through ${fmtDate(endYmd)}. Set them up now?`)){
       toast('Approved — no visits scheduled yet');
       return;
     }
@@ -2953,7 +2953,7 @@ async function handleEstimateApproval(estId){
   }
 }
 
-function tlTime(ts){if(!ts)return '';const d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function tlTime(ts){return fmtDateTime(ts);}
 function estimateTimelineHTML(e){
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(e.created_at),icon:'✎'});
@@ -2996,7 +2996,7 @@ async function openEstDetail(id){
     <div class="action-row">
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
-      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDate(e.client_response_at.slice(0,10))}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
+      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
       <button class="action-btn ab-glass" onclick="printEstimate('${id}')">${ICONS.printer} Print / Save PDF</button>
       <button class="action-btn ab-glass" onclick="shareEstimatePdf('${id}')">${ICONS.send} Share / Text PDF</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-green" onclick="updateEstStatus('${id}','Approved')">${ICONS.check} Mark Approved</button>`:''}
@@ -3025,7 +3025,7 @@ function estimateDocHTML(est,items,cust){
   <div class="doc-meta">
     <div class="doc-title">Estimate</div>
     <div class="doc-num">${est.estimate_number}</div>
-    <div class="doc-date">Issued ${fmtDate(est.created_at?est.created_at.slice(0,10):new Date().toISOString().slice(0,10))}</div>
+    <div class="doc-date">Issued ${fmtDate(est.created_at||bizYMD())}</div>
     ${est.valid_until?`<div class="doc-date">Valid until ${fmtDate(est.valid_until)}</div>`:''}
     <div class="status-pill" style="color:${statusColor};background:${statusBg}">${est.status}</div>
   </div>
@@ -3105,7 +3105,7 @@ function subPayoutDocHTML(sub,ym,subJobs){
 }
 function printSubPayout(subId){
   const sub=subs.find(s=>s.id===subId);if(!sub)return;
-  const ym=document.getElementById('report-month').value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('report-month').value||bizYM();
   const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
   const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
   const w=window.open('','_blank');
@@ -3123,7 +3123,7 @@ function printSubPayout(subId){
 }
 async function getSubPayoutPdf(subId){
   const sub=subs.find(s=>s.id===subId);if(!sub)return null;
-  const ym=document.getElementById('report-month')?.value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('report-month')?.value||bizYM();
   const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
   const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
   const container=document.createElement('div');
@@ -3158,7 +3158,7 @@ async function openTrash(){
   const{data:djobs}=await db.from('jobs').select('*, customers(name)').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const{data:dcust}=await db.from('customers').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const items=[...(djobs||[]).map(j=>({type:'job',id:j.id,label:j.title,sub:j.customers?.name||'',deleted_at:j.deleted_at})),...(dcust||[]).map(c=>({type:'customer',id:c.id,label:c.name,sub:c.city||'',deleted_at:c.deleted_at}))].sort((a,b)=>(b.deleted_at||'').localeCompare(a.deleted_at||''));
-  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${i.label}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+i.sub:''} · deleted ${fmtDate((i.deleted_at||'').slice(0,10))}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
+  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${i.label}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+i.sub:''} · deleted ${fmtDate(i.deleted_at)}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
   let overlay=document.getElementById('trash-overlay');
   if(!overlay){
     overlay=document.createElement('div');
@@ -3410,8 +3410,8 @@ async function deleteEst(id){if(!confirm('Delete this estimate?'))return;await d
 async function convertEstToInvoice(estId){
   const e=estimates.find(x=>x.id===estId);if(!e)return;
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
-  const now=new Date();const due=new Date(now.setDate(now.getDate()+30));
-  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:e.subtotal,tax_rate:e.tax_rate,tax_amount:e.tax_amount,total:e.total,due_date:due.toISOString().split('T')[0],notes:e.notes}).select().single();
+  const due=addDaysYMD(bizYMD(),30);
+  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:e.subtotal,tax_rate:e.tax_rate,tax_amount:e.tax_amount,total:e.total,due_date:due,notes:e.notes}).select().single();
   if(error){toast('Error: '+error.message);return;}
   const{error:eiErr}=await db.from('invoice_items').insert((items||[]).map(i=>({invoice_id:inv.id,title:i.title||null,description:i.description||i.title||' ',quantity:i.quantity,unit_price:i.unit_price,total:i.total,cost:i.cost||0,margin_pct:i.margin_pct||0,pricing_mode:i.pricing_mode||'margin'})));
   if(eiErr){toast('Error copying line items: '+eiErr.message);return;}
@@ -3576,7 +3576,7 @@ async function openInvDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${inv.invoice_number}</div><div>Status: ${inv.status}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDate(inv.sent_at.slice(0,10))}</div>`:`<div style="color:var(--ink3)">Not sent yet</div>`}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${inv.customers?.name||'—'}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${inv.address}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${inv.invoice_number}</div><div>Status: ${inv.status}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(inv.sent_at)}${inv.sent_to?` to ${esc(inv.sent_to)}`:''}</div>`:(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${inv.customers?.name||'—'}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${inv.address}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -3666,7 +3666,7 @@ function invoiceDocHTML(inv,items,cust){
   <div class="doc-meta">
     <div class="doc-title">Invoice</div>
     <div class="doc-num">${inv.invoice_number}</div>
-    <div class="doc-date">Issued ${fmtDate(inv.created_at?inv.created_at.slice(0,10):new Date().toISOString().slice(0,10))}</div>
+    <div class="doc-date">Issued ${fmtDate(inv.created_at||bizYMD())}</div>
     ${inv.due_date?`<div class="doc-date">Due ${fmtDate(inv.due_date)}</div>`:''}
     <div class="status-pill" style="color:${statusColor};background:${statusBg}">${inv.status}</div>
   </div>
@@ -3944,7 +3944,7 @@ function renderSiteReport(job){
       const st=report.items?.[item]||'—';
       return`<div class="detail-row"><span class="detail-label">${item}</span><span class="detail-value" style="color:${stateColor[st]||'var(--ink2)'};font-weight:600">${st}</span></div>`;
     }).join('')+(report.notes?`<div style="margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:var(--rxs);font-size:12.5px;color:var(--ink2)">${report.notes}</div>`:'')+
-    (report.submitted_at?`<div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Submitted ${new Date(report.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>`:'');
+    (report.submitted_at?`<div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Submitted ${fmtDate(report.submitted_at)}</div>`:'');
     return;
   }
   // SUB view — fill out / edit the report
@@ -4096,7 +4096,7 @@ async function convertJobToInvoice(jobId){
 function markPaidDetail(id){
   document.getElementById('mp-job-id').value=id;
   document.getElementById('mp-method').value='Cash';
-  document.getElementById('mp-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('mp-date').value=bizYMD();
   document.getElementById('mp-title').textContent='Mark as Paid';
   openModal('markpaid');
 }
@@ -4144,7 +4144,7 @@ function bulkMarkPaid(){
   let total=0;ids.forEach(i=>{const j=jobs.find(x=>x.id===i);total+=parseFloat(j?.sub_pay)||0;});
   document.getElementById('mp-job-id').value='__BULK__';
   document.getElementById('mp-method').value='Cash';
-  document.getElementById('mp-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('mp-date').value=bizYMD();
   document.getElementById('mp-title').textContent=`Mark ${ids.length} jobs paid · ${fmt(total)}`;
   const mpOverlay=document.getElementById('modal-markpaid');
   if(mpOverlay){mpOverlay.style.zIndex='1000';mpOverlay.style.position='fixed';}
@@ -4183,14 +4183,13 @@ function renderSubPortal(){
   // and anything still needing accept, so nothing important gets hidden). "all" shows everything.
   let timed=myJobs;
   if(subTimeframe==='week'){
-    const today=new Date();today.setHours(0,0,0,0);
-    const weekEnd=new Date(today);weekEnd.setDate(weekEnd.getDate()+7);
+    const todayStr=bizYMD();
+    const weekEnd=addDaysYMD(todayStr,7);
     timed=myJobs.filter(j=>{
-      if(!j.accepted_at)return true;                 // always show anything awaiting accept
-      if(j.status==='In Progress')return true;        // always show active work
-      if(!j.scheduled_date)return true;               // undated → show it
-      const d=new Date(j.scheduled_date+'T00:00:00');
-      return d<=weekEnd;                              // scheduled within the next 7 days (or overdue)
+      if(!j.accepted_at)return true;
+      if(j.status==='In Progress')return true;
+      if(!j.scheduled_date)return true;
+      return j.scheduled_date<=weekEnd;
     });
   }
   const filtered=subJobFilter==='all'?timed:timed.filter(j=>j.status===subJobFilter);
