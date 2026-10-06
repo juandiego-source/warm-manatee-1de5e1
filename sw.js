@@ -1,9 +1,40 @@
-// Sumak Ops — push notification service worker
+// Sumak Ops — push notifications + network-first app shell.
+// Cache name bumps on each change so a deploy does not keep serving an old index.html.
+const SHELL_CACHE = 'sumak-ops-shell-v2';
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
+
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((key) => key !== SHELL_CACHE).map((key) => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET' || req.mode !== 'navigate') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  event.respondWith((async () => {
+    try {
+      const fresh = await fetch(req);
+      if (fresh && fresh.ok) {
+        const cache = await caches.open(SHELL_CACHE);
+        cache.put(req, fresh.clone());
+      }
+      return fresh;
+    } catch (err) {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      const shell = await caches.match('/index.html');
+      if (shell) return shell;
+      throw err;
+    }
+  })());
 });
 
 self.addEventListener('push', (event) => {
