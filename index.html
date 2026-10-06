@@ -74,7 +74,7 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 #notif-bell-icon svg{width:16px;height:16px;color:var(--ink2);}
 #notif-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:50px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
 #notif-panel{position:absolute;top:100%;right:16px;width:min(340px,calc(100% - 32px));max-height:0;overflow:hidden;background:var(--white);border:1px solid var(--glass-b);border-radius:var(--r);box-shadow:var(--gshadow-lg);transition:max-height 0.25s ease,opacity 0.2s ease;opacity:0;z-index:300;}
-#notif-panel.open{max-height:420px;opacity:1;}
+#notif-panel.open{max-height:min(420px,calc(100dvh - 160px));opacity:1;}
 #notif-panel-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;font-size:13px;font-weight:700;color:var(--ink);}
 #notif-mark-all{font-size:11px;font-weight:600;color:var(--red);cursor:pointer;}
 #notif-list{max-height:360px;overflow-y:auto;padding:0 8px 8px;}
@@ -93,7 +93,7 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 
 /* CONTENT & NAV */
 #content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(80px + env(safe-area-inset-bottom));}
-#navbar{position:absolute;bottom:0;left:0;right:0;background:var(--glass-s);backdrop-filter:var(--blur);border-top:1px solid var(--glass-b);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(139,100,60,0.08);}
+#navbar{position:absolute;bottom:0;left:0;right:0;background:var(--glass-s);backdrop-filter:var(--blur);border-top:1px solid var(--glass-b);display:flex;z-index:400;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(139,100,60,0.08);}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 2px;cursor:pointer;gap:3px;min-width:0;min-height:52px;}
 .nav-icon{font-size:18px;line-height:1;color:var(--ink3);}
 .nav-icon svg{width:21px;height:21px;color:var(--ink3);}
@@ -544,7 +544,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <div class="fchip" onclick="filterJobs(this,'Completed')">Completed</div>
       <div class="fchip" onclick="filterJobs(this,'Cancelled')">Cancelled</div>
     </div>
-    <div style="padding:0 14px 8px"><div style="font-size:11.5px;color:var(--ink3)">Recurring maintenance visits live in the Calendar and Maintenance tabs.</div></div>
+    <div style="padding:0 14px 8px"><input class="form-input" id="job-search" placeholder="Search by job, client, address..." oninput="renderJobs()"></div>
     <div class="page-body" id="jobs-list"></div>
   </div>
 
@@ -603,11 +603,13 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-estimates">
     <div class="page-header"><div class="page-title">Estimates</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openCostRequestModal()">Request Quote</button><button class="btn btn-red btn-sm" onclick="openModal('estimate')">+ New</button></div></div>
     <div id="cost-requests-section" style="padding:0 14px"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="est-search" placeholder="Search by number, client, address..." oninput="renderEstimates()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterEst(this,'all')">All</div>
       <div class="fchip" onclick="filterEst(this,'Draft')">Draft</div>
       <div class="fchip" onclick="filterEst(this,'Sent')">Sent</div>
       <div class="fchip" onclick="filterEst(this,'Approved')">Approved</div>
+      <div class="fchip" onclick="filterEst(this,'Declined')">Declined</div>
     </div>
     <div class="page-body" id="estimates-list"></div>
   </div>
@@ -616,6 +618,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-invoices">
     <div class="page-header"><div class="page-title">Invoices</div><button class="btn btn-red btn-sm" onclick="openModal('invoice')">+ New</button></div>
     <div id="batch-invoice-section" style="padding:0 14px"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="inv-search" placeholder="Search by number, client, address..." oninput="renderInvoices()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterInv(this,'all')">All</div>
       <div class="fchip" onclick="filterInv(this,'Unpaid')">Unpaid</div>
@@ -691,7 +694,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="modal-title" id="job-modal-title">New Job</div>
     <input type="hidden" id="job-edit-id">
     <div class="form-group"><label class="form-label">Job Title *</label><input class="form-input" id="job-title" placeholder="e.g. Lawn mowing & edging"></div>
-    <div class="form-group"><label class="form-label">Customer</label><select class="form-input" id="job-customer" onchange="loadCustomerProps()"><option value="">Select customer...</option></select></div>
+    <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="job-customer" required onchange="loadCustomerProps()"><option value="">Select customer...</option></select></div>
     <div class="form-group"><label class="form-label">Property Address</label>
       <select class="form-input" id="job-prop-select" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
       <input class="form-input" id="job-address" placeholder="Or type a new address" autocomplete="off">
@@ -912,16 +915,16 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="modal-title" id="cr-modal-title">Request a Quote from a Sub</div>
     <input type="hidden" id="cr-edit-id">
     <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Send a sub to look at a job and tell you what it'll cost. Once they submit it, you'll turn that into a client estimate with your markup.</div>
-    <div class="form-group"><label class="form-label">Client</label><select class="form-input" id="cr-customer" onchange="loadCrCustomerProps()"><option value="">Select client...</option></select></div>
+    <div class="form-group"><label class="form-label">Client *</label><select class="form-input" id="cr-customer" required onchange="loadCrCustomerProps()"><option value="">Select client...</option></select></div>
     <div class="form-group">
-      <label class="form-label">Property Address</label>
+      <label class="form-label">Property Address *</label>
       <select class="form-input" id="cr-prop-select" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
       <input class="form-input" id="cr-address" placeholder="Or type a new address" autocomplete="off">
       <div class="addr-suggest" id="cr-address-suggest"></div>
     </div>
-    <div class="form-group"><label class="form-label">Job Title</label><input class="form-input" id="cr-title" placeholder="e.g. Mulch replacement — front beds"></div>
+    <div class="form-group"><label class="form-label">Job Title *</label><input class="form-input" id="cr-title" required placeholder="e.g. Mulch replacement — front beds"></div>
     <div class="form-group"><label class="form-label">What to Assess</label><textarea class="form-input" id="cr-description" placeholder="Details for the sub — scope, what you want priced..."></textarea></div>
-    <div class="form-group"><label class="form-label">Send to Sub</label><select class="form-input" id="cr-sub"><option value="">Select subcontractor...</option></select></div>
+    <div class="form-group"><label class="form-label">Send to Sub *</label><select class="form-input" id="cr-sub" required><option value="">Select subcontractor...</option></select></div>
     <button class="btn btn-red btn-full" onclick="saveCostRequest()">Send Request</button>
     <button class="btn btn-full btn-full-ghost" onclick="closeModal('costreq')">Cancel</button>
   </div>
@@ -1300,8 +1303,26 @@ async function fetchCustomers(){const{data,error}=await fetchAllRows(()=>db.from
 async function fetchSubs(){const{data,error}=await fetchAllRows(()=>db.from('subcontractors').select('*').order('name'));if(error)console.error('fetchSubs',error);subs=data||[];buildSelect('job-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('rec-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('cr-sub',subs.filter(s=>s.active),'Select subcontractor...');}
 async function fetchProfiles(){const{data,error}=await fetchAllRows(()=>db.from('profiles').select('*'));if(error)console.error('fetchProfiles',error);profiles=data||[];}
 async function fetchProperties(){const{data,error}=await fetchAllRows(()=>db.from('properties').select('*').order('address'));if(error)console.error('fetchProperties',error);properties=data||[];}
-async function fetchEstimates(){const{data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));if(error)console.error('fetchEstimates',error);estimates=data||[];}
-async function fetchInvoices(){const{data,error}=await fetchAllRows(()=>db.from('invoices').select('*, customers(name,email,billing_email), jobs(title)').order('created_at',{ascending:false}));if(error)console.error('fetchInvoices',error);invoices=sortInvoices(data||[]);}
+async function fetchEstimates(){
+  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));
+  if(error){
+    console.error('fetchEstimates',error);
+    const retry=await fetchAllRows(()=>db.from('estimates').select('*').order('created_at',{ascending:false}));
+    data=retry.data;error=retry.error;
+    if(error)console.error('fetchEstimates fallback',error);
+  }
+  estimates=data||[];
+}
+async function fetchInvoices(){
+  let {data,error}=await fetchAllRows(()=>db.from('invoices').select('*, customers(name,email,billing_email), jobs(title)').order('created_at',{ascending:false}));
+  if(error){
+    console.error('fetchInvoices',error);
+    const retry=await fetchAllRows(()=>db.from('invoices').select('*').order('created_at',{ascending:false}));
+    data=retry.data;error=retry.error;
+    if(error)console.error('fetchInvoices fallback',error);
+  }
+  invoices=sortInvoices(data||[]);
+}
 function invoiceSortKey(inv){
   const m=String(inv.invoice_number||'').match(/(\d+)\s*$/);
   return m?parseInt(m[1],10):0;
@@ -1475,11 +1496,11 @@ function focusAttention(kind){
     jobFilter='all';showView('jobs',document.querySelectorAll('.nav-item')[1]);attnFocus='needInvoice';renderJobs();
     setTimeout(()=>document.getElementById('jobs-list')?.scrollIntoView({behavior:'smooth',block:'start'}),150);
   }else if(kind==='notSent'){
-    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[4]);attnFocus='notSent';renderInvoices();
+    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[5]);attnFocus='notSent';renderInvoices();
   }else if(kind==='overdue'){
-    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[4]);attnFocus='overdue';renderInvoices();
+    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[5]);attnFocus='overdue';renderInvoices();
   }else if(kind==='staleEst'){
-    estFilter='all';showView('estimates',document.querySelectorAll('.nav-item')[5]);attnFocus='staleEst';renderEstimates();
+    estFilter='all';showView('estimates',document.querySelectorAll('.nav-item')[4]);attnFocus='staleEst';renderEstimates();
   }else if(kind==='unassigned'){
     jobFilter='all';showView('jobs',document.querySelectorAll('.nav-item')[1]);attnFocus='unassigned';renderJobs();
   }
@@ -1842,7 +1863,7 @@ function renderCustomers(){
   const q=(document.getElementById('cust-search')?.value||'').trim().toLowerCase();
   const list=q?customers.filter(c=>[c.name,c.phone,c.email,c.city].filter(Boolean).some(v=>v.toLowerCase().includes(q))):customers;
   document.getElementById('customers-list').innerHTML=list.length
-    ?list.map(c=>`<div class="card" onclick="openCustDetail('${c.id}')">
+    ?list.map(c=>`<div class="card" data-type="client" data-id="${c.id}" onclick="openCustDetail('${c.id}')">
       <div class="card-top">
         <div><div class="card-title">${c.name}</div>
           <div class="card-meta" style="margin-top:6px">
@@ -1864,6 +1885,8 @@ function openCustDetail(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   const cj=jobs.filter(j=>j.customer_id===id);
   const cProps=properties.filter(p=>p.customer_id===id);
+  const cEst=estimates.filter(e=>e.customer_id===id);
+  const cInv=sortInvoices(invoices.filter(i=>i.customer_id===id));
   document.getElementById('detail-cust-name').textContent=c.name;
   document.getElementById('detail-cust-body').innerHTML=`
     <div class="detail-card">
@@ -1899,6 +1922,16 @@ function openCustDetail(id){
       <button class="btn btn-red btn-sm" onclick="newJobForCustomer('${id}')">+ New Job</button>
     </div>
     ${cj.map(j=>jobCard(j,`closeDetail('cust');openJobDetail('${j.id}')`)).join('')||'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No jobs yet</div>'}
+    <div class="section-lbl" style="margin-top:16px">Estimates (${cEst.length})</div>
+    ${cEst.length?cEst.map(e=>`<div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="closeDetail('cust');openEstDetail('${e.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}</div><div class="card-title">${esc(e.address||'No address')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+      <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No estimates yet</div>'}
+    <div class="section-lbl" style="margin-top:16px">Invoices (${cInv.length})</div>
+    ${cInv.length?cInv.map(i=>`<div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="closeDetail('cust');openInvDetail('${i.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}</div><div class="card-title">${esc(i.address||i.status||'')}</div></div><span class="${pClass(i.status)}">${esc(i.status||'')}</span></div>
+      <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No invoices yet</div>'}
     <div class="action-row" style="margin-top:12px">
       <button class="action-btn ab-glass" onclick="editCustFromDetail('${id}')">${ICONS.pencil} Edit Client</button>
       <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
@@ -2043,7 +2076,8 @@ async function saveCostRequest(){
   if(!subId){toast(`${ICONS.alert} Select who to send this to`);return;}
   const selAddr=document.getElementById('cr-prop-select').value;
   const manualAddr=document.getElementById('cr-address').value.trim();
-  const addr=manualAddr||selAddr||null;
+  const addr=manualAddr||selAddr||'';
+  if(!addr){toast(`${ICONS.alert} Property address is required`);document.getElementById('cr-address')?.focus();return;}
   const payload={customer_id:custId,address:addr,title,description:document.getElementById('cr-description').value.trim()||null,subcontractor_id:subId};
   if(editId){
     const prevSubId=costRequests.find(r=>r.id===editId)?.subcontractor_id;
@@ -2067,8 +2101,10 @@ function renderCostRequestsSection(){
   const el=document.getElementById('cost-requests-section');
   if(!el)return;
   const open=costRequests.filter(r=>r.status==='Requested'||r.status==='Submitted');
-  if(!open.length){el.innerHTML='';return;}
-  el.innerHTML=`<div class="batch-card" style="border-color:var(--blue);background:var(--blue-bg)">
+  const past=costRequests.filter(r=>r.status!=='Requested'&&r.status!=='Submitted');
+  let html='';
+  if(open.length){
+  html+=`<div class="batch-card" style="border-color:var(--blue);background:var(--blue-bg)">
     <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:10px">${ICONS.send} Quote Requests</div>
     ${open.map(r=>`
       <div class="batch-client">
@@ -2096,6 +2132,26 @@ function renderCostRequestsSection(){
           </div>`}
       </div>`).join('')}
   </div>`;
+  }
+  if(past.length){
+    html+=`<div class="batch-card" style="margin-top:${open.length?10:0}px">
+      <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:4px">Quote request history</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">Submitted requests that were turned into estimates, archived, or cancelled</div>
+      ${past.map(r=>`<div class="batch-client" data-type="cost_request" data-id="${r.id}" data-status="${esc(r.status||'')}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.title||'')}</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(customerNameOf(r)||'—')}${r.address?' · '+esc(r.address):''}${r.submitted_at?' · '+fmtDate(r.submitted_at):''}</div>
+          </div>
+          <div style="text-align:right">
+            <span class="pill ${r.status==='Converted'?'pill-approved':r.status==='Cancelled'?'pill-cancelled':'pill-pending'}">${esc(r.status||'')}</span>
+            ${r.submitted_cost!=null&&r.submitted_cost!==''?`<div style="font-weight:700;color:var(--red);margin-top:4px;font-family:'Cormorant Garamond',serif">${fmt(r.submitted_cost)}</div>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+  el.innerHTML=html;
 }
 function convertCostRequestToEstimate(id){
   const r=costRequests.find(x=>x.id===id);if(!r)return;
@@ -2390,19 +2446,36 @@ async function logActivity(action,detail,entityType,entityId){
     });
   }catch(e){/* logging must never block the real action */}
 }
+function closeActivity(){const o=document.getElementById('activity-overlay');if(o)o.style.display='none';}
+function activityRecord(a){
+  const id=a?.entity_id;if(!id)return null;
+  const t=a.entity_type;
+  if(t==='job'){const j=jobs.find(x=>x.id===id);return j?{label:j.job_number,type:'job',id}:null;}
+  if(t==='estimate'){const e=estimates.find(x=>x.id===id);return e?{label:e.estimate_number,type:'estimate',id}:null;}
+  if(t==='invoice'){const i=invoices.find(x=>x.id===id);return i?{label:i.invoice_number,type:'invoice',id}:null;}
+  if(t==='customer'||t==='client'){const c=customers.find(x=>x.id===id);return c?{label:c.name,type:'customer',id}:null;}
+  return null;
+}
+function openActivityRecord(type,id){
+  closeActivity();
+  if(type==='job')openJobDetail(id);
+  else if(type==='estimate')openEstDetail(id);
+  else if(type==='invoice')openInvDetail(id);
+  else if(type==='customer')openCustDetail(id);
+}
 async function openActivityLog(){
-  let overlay=document.getElementById('trash-overlay');
+  let overlay=document.getElementById('activity-overlay');
   if(!overlay){
     overlay=document.createElement('div');
-    overlay.id='trash-overlay';
+    overlay.id='activity-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)closeActivity();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:80vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeActivity()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">A record of everything that's happened — for looking back if a question ever comes up.</div>
-    <input class="form-input" id="activity-search" placeholder="Search by client, job, sub..." oninput="renderActivityLog()" style="margin-bottom:12px">
+    <input class="form-input" id="activity-search" placeholder="Search by client, job, sub, or number..." oninput="renderActivityLog()" style="margin-bottom:12px">
     <div id="activity-log-list" style="font-size:12.5px;color:var(--ink3)">Loading…</div>
   </div>`;
   overlay.style.display='flex';
@@ -2413,15 +2486,20 @@ async function openActivityLog(){
 function renderActivityLog(){
   const q=(document.getElementById('activity-search')?.value||'').trim().toLowerCase();
   let list=window._activityLog||[];
-  if(q)list=list.filter(a=>[a.action,a.detail,a.actor_name].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
+  if(q)list=list.filter(a=>{
+    const rec=activityRecord(a);
+    return [a.action,a.detail,a.actor_name,rec?.label].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
+  });
   const el=document.getElementById('activity-log-list');
   if(!el)return;
   el.innerHTML=list.length?list.map(a=>{
     const when=fmtDateTime(a.created_at);
+    const rec=activityRecord(a);
+    const num=rec?`<button type="button" style="margin-left:6px;border:none;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;padding:0" onclick="openActivityRecord('${rec.type}','${rec.id}')">${esc(rec.label)}</button>`:'';
     return`<div style="padding:9px 0;border-bottom:1px solid var(--line)">
-      <div style="color:var(--ink);font-weight:600">${a.action}</div>
-      ${a.detail?`<div style="color:var(--ink2);margin-top:2px">${a.detail}</div>`:''}
-      <div style="color:var(--ink3);font-size:10.5px;margin-top:3px">${a.actor_name||a.actor_role} · ${when}</div>
+      <div style="color:var(--ink);font-weight:600">${esc(a.action||'')}${num}</div>
+      ${a.detail?`<div style="color:var(--ink2);margin-top:2px">${esc(a.detail)}</div>`:''}
+      <div style="color:var(--ink3);font-size:10.5px;margin-top:3px">${esc(a.actor_name||a.actor_role||'')} · ${when}</div>
     </div>`;
   }).join(''):`<div style="padding:16px 0;text-align:center">${q?'No matching activity':'No activity recorded yet'}</div>`;
 }
@@ -2443,7 +2521,7 @@ function openNotifDiagnostics(){
     <div class="detail-row"><span class="detail-label">This device supports it</span><span class="detail-value" style="color:${supported?'var(--green)':'var(--rose)'}">${supported?'Yes':'No'}</span></div>
     <div class="detail-row"><span class="detail-label">Permission</span><span class="detail-value" style="color:${permission==='granted'?'var(--green)':permission==='denied'?'var(--rose)':'var(--amber)'}">${permissionLabel}</span></div>
     ${dismissed?'<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">You (or someone) tapped "Not now" on this device before, so it stopped asking automatically.</div>':''}
-    ${permission==='denied'?`<div style="font-size:11.5px;color:var(--rose);margin-top:10px;padding:10px;background:var(--rose-bg);border-radius:var(--rxs)">iOS is blocking this. Go to iPhone Settings → scroll down to find this app in the list → Notifications → turn Allow Notifications on. Then come back here and tap the button below.</div>`:''}
+    ${permission==='denied'?`<div style="font-size:11.5px;color:var(--rose);margin-top:10px;padding:10px;background:var(--rose-bg);border-radius:var(--rxs)">${(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))?`iOS is blocking this. Go to iPhone Settings → scroll down to find this app in the list → Notifications → turn Allow Notifications on. Then come back here and tap the button below.`:`This browser is blocking notifications. Click the lock or tune icon in the address bar → Site settings → Notifications → Allow. Then come back here and tap the button below.`}</div>`:''}
     <button class="btn btn-red btn-full" style="margin-top:16px" onclick="localStorage.removeItem('sumak_push_dismissed');closeTrash();enablePushNotifications();">Enable Notifications Now</button>
     <button class="btn btn-glass btn-full" style="margin-top:8px" onclick="testLocalNotification()">Test #1 — Show a notification now</button>
     <button class="btn btn-glass btn-full" style="margin-top:8px" onclick="testServerPush()">Test #2 — Send a real push from the server</button>
@@ -2691,20 +2769,22 @@ function openSubReconcile(subKey,ym){
 // ── ESTIMATES ─────────────────────────────────────────────────────────────
 function renderEstimates(){
   renderCostRequestsSection();
-  let list=estFilter==='all'?estimates:estimates.filter(e=>e.status===estFilter);
+  const q=(document.getElementById('est-search')?.value||'').trim().toLowerCase();
+  let list=estFilter==='all'?estimates.slice():estimates.filter(e=>e.status===estFilter);
   let banner='';
   if(attnFocus==='staleEst'){
     const today=new Date();
     list=estimates.filter(e=>{if(e.status!=='Sent')return false;return (today-new Date(e.created_at))/(1000*60*60*24)>7;});
     banner=`<div onclick="attnFocus=null;renderEstimates()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer"><div style="font-size:12.5px;font-weight:600;color:var(--ink)">⚑ Showing: ${list.length} estimate${list.length!==1?'s':''} awaiting a reply</div><div style="font-size:11px;color:var(--rose);font-weight:600;white-space:nowrap">✕ Show all</div></div>`;
   }
+  if(q)list=list.filter(e=>[e.estimate_number,customerNameOf(e),e.address,e.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
   document.getElementById('estimates-list').innerHTML=banner+(list.length?list.map(e=>`
-    <div class="card" onclick="openEstDetail('${e.id}')">
-      <div class="card-top"><div><div class="card-id">${e.estimate_number}</div><div class="card-title">${e.customers?.name||'—'}</div></div><span class="${pClass(e.status)}">${e.status}</span></div>
-      <div class="card-meta">${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
+    <div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="openEstDetail('${e.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+      <div class="card-meta">${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
       <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
     </div>`).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">No estimates</div><div class="empty-sub">Create estimates for new clients</div></div>`);
+    :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">${q?'No matches':'No estimates'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create estimates for new clients'}</div></div>`);
 }
 function filterEst(el,val){estFilter=val;document.querySelectorAll('#view-estimates .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderEstimates();}
 
@@ -2979,7 +3059,7 @@ async function openEstDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${e.estimate_number}</div><div>Status: ${e.status}</div>${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${e.customers?.name||'—'}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${e.address}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${e.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(e.sent_at)}${e.sent_to?` to ${esc(e.sent_to)}`:''}</div>`:''}${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -3346,6 +3426,7 @@ async function emailEstimate(id){
   const cust=customers.find(c=>c.id===est.customer_id)||est.customers;
   const sendTo=cust?.email||cust?.billing_email;
   if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
+  if(!confirm(`Email ${est.estimate_number} to ${sendTo}?`))return;
   toast('Preparing & sending…');
   const result=await getEstimatePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3366,8 +3447,8 @@ async function emailEstimate(id){
   </div>`;
   try{
     await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    if(est.status==='Draft')await db.from('estimates').update({status:'Sent'}).eq('id',id);
-    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name}`,'estimate',id);
+    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
+    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${sendTo}`,'estimate',id);
     await fetchEstimates();renderEstimates();renderDashboard();
     if(document.getElementById('est-detail').classList.contains('open'))openEstDetail(id);
     toast(`✓ Estimate emailed to ${sendTo}`);
@@ -3380,9 +3461,22 @@ async function emailEstimate(id){
     }else{
       const url=URL.createObjectURL(result.blob);const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
     }
-    if(est.status==='Draft')await db.from('estimates').update({status:'Sent'}).eq('id',id);
+    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
     await fetchEstimates();renderEstimates();
   }
+}
+async function stampSent(table,id,extra){
+  const full=Object.assign({sent_at:new Date().toISOString()},extra||{});
+  let res=await db.from(table).update(full).eq('id',id);
+  if(res.error&&Object.prototype.hasOwnProperty.call(full,'sent_to')){
+    const slim=Object.assign({},full);delete slim.sent_to;
+    res=await db.from(table).update(slim).eq('id',id);
+  }
+  if(res.error&&full.status){
+    res=await db.from(table).update({status:full.status}).eq('id',id);
+  }
+  if(res.error)console.error('stampSent',table,res.error);
+  return res.error;
 }
 async function createJobFromEstimate(estId){
   const existing=jobs.find(j=>j.estimate_id===estId);
@@ -3396,7 +3490,19 @@ async function createJobFromEstimate(estId){
   return{job,already:false};
 }
 async function updateEstStatus(id,status){
-  await db.from('estimates').update({status}).eq('id',id);
+  const e=estimates.find(x=>x.id===id);
+  const payload={status};
+  if((status==='Approved'||status==='Declined')&&e&&!e.client_response){
+    payload.client_response=status==='Approved'?'Accepted':'Declined';
+    payload.client_response_at=new Date().toISOString();
+  }else if((status==='Approved'||status==='Declined')&&e&&!e.client_response_at){
+    payload.client_response_at=new Date().toISOString();
+  }
+  let {error}=await db.from('estimates').update(payload).eq('id',id);
+  if(error&&(payload.client_response||payload.client_response_at)){
+    const retry=payload.client_response_at?await db.from('estimates').update({status,client_response_at:payload.client_response_at}).eq('id',id):{error};
+    if(retry.error)await db.from('estimates').update({status}).eq('id',id);
+  }
   await fetchEstimates();
   if(status==='Approved'){
     closeDetail('est');
@@ -3447,9 +3553,15 @@ function invIsOverdue(i){
   const days=(new Date()-new Date(i.sent_at))/(1000*60*60*24);
   return days>30;
 }
+function invSentLabel(i){
+  if(i.sent_at)return ' · <span style="color:var(--green)">✓ Sent</span>';
+  if(i.status==='Paid'||i.status==='Cancelled')return '';
+  return ' · <span style="color:var(--ink3)">Not sent</span>';
+}
 function renderInvoices(){
   renderBatchInvoice();
-  let list=invFilter==='all'?invoices:invFilter==='Overdue'?invoices.filter(invIsOverdue):invoices.filter(i=>i.status===invFilter);
+  const q=(document.getElementById('inv-search')?.value||'').trim().toLowerCase();
+  let list=invFilter==='all'?invoices.slice():invFilter==='Overdue'?invoices.filter(invIsOverdue):invoices.filter(i=>i.status===invFilter);
   let banner='';
   if(attnFocus==='notSent'){
     list=invoices.filter(i=>!i.sent_at&&i.status!=='Paid'&&i.status!=='Cancelled');
@@ -3459,17 +3571,19 @@ function renderInvoices(){
     list=invoices.filter(i=>{if(i.status==='Paid'||i.status==='Cancelled'||!i.sent_at)return false;return (today-new Date(i.sent_at))/(1000*60*60*24)>30;});
     banner=invAttnBanner(`${list.length} invoice${list.length!==1?'s':''} unpaid over 30 days`);
   }
+  list=sortInvoices(list);
+  if(q)list=list.filter(i=>[i.invoice_number,customerNameOf(i),i.address,i.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
   document.getElementById('invoices-list').innerHTML=banner+(list.length?list.map(i=>{
     const overdue=invIsOverdue(i);
     const displayStatus=overdue?'Overdue':i.status;
     const days=i.sent_at?Math.floor((new Date()-new Date(i.sent_at))/(1000*60*60*24)):null;
     return`
-    <div class="card" onclick="openInvDetail('${i.id}')">
-      <div class="card-top"><div><div class="card-id">${i.invoice_number}${i.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':' · <span style="color:var(--ink3)">Not sent</span>'}</div><div class="card-title">${i.customers?.name||'—'}</div></div><span class="${pClass(displayStatus)}">${displayStatus}</span></div>
-      <div class="card-meta">${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${i.address}</span>`:''}${overdue&&days?`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} ${days} days unpaid</span>`:i.due_date?`<span class="card-meta-item">${ICONS.calendar} Due ${fmtDate(i.due_date)}</span>`:''}</div>
+    <div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="openInvDetail('${i.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
+      <div class="card-meta">${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${overdue&&days?`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} ${days} days unpaid</span>`:i.due_date?`<span class="card-meta-item">${ICONS.calendar} Due ${fmtDate(i.due_date)}</span>`:''}</div>
       <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
     </div>`;}).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">No invoices</div><div class="empty-sub">Create invoices or convert approved estimates</div></div>`);
+    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">${q?'No matches':'No invoices'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create invoices or convert approved estimates'}</div></div>`);
 }
 function invAttnBanner(label){
   return `<div onclick="attnFocus=null;renderInvoices()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer">
@@ -3485,7 +3599,7 @@ function renderBatchInvoice(){
   const billable=getBillableJobs();
   if(!billable.length){el.innerHTML='';return;}
   const byClient={};
-  billable.forEach(j=>{const key=j.customer_id;if(!byClient[key])byClient[key]={name:j.customers?.name||'—',jobs:[]};byClient[key].jobs.push(j);});
+  billable.forEach(j=>{const key=j.customer_id||'none';if(!byClient[key])byClient[key]={name:j.customer_id?(customerNameOf(j)||'—'):'No client on file',jobs:[]};byClient[key].jobs.push(j);});
   el.innerHTML=`<div class="batch-card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
       <div style="font-weight:700;color:var(--ink);font-size:14px">${ICONS.receipt} Ready to Invoice</div>
@@ -3496,12 +3610,12 @@ function renderBatchInvoice(){
       const total=d.jobs.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
       return`<div class="batch-client" data-cust="${custId}">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink);cursor:pointer">
-          <input type="checkbox" class="batch-client-cb" data-cust="${custId}" checked onchange="toggleBatchClient('${custId}',this.checked)">
+          <input type="checkbox" class="batch-client-cb" data-cust="${custId}" onchange="toggleBatchClient('${custId}',this.checked)">
           ${d.name}<span style="margin-left:auto;font-weight:700;color:var(--red);font-family:'Cormorant Garamond',serif;font-size:15px">${fmt(total)}</span>
         </label>
         <div style="padding-left:24px">
           ${d.jobs.map(j=>`<label class="batch-job-row">
-            <input type="checkbox" class="batch-job-cb" data-job="${j.id}" data-cust="${custId}" checked onchange="syncBatchClientCb('${custId}')">
+            <input type="checkbox" class="batch-job-cb" data-job="${j.id}" data-cust="${custId}" onchange="syncBatchClientCb('${custId}')">
             ${j.title}${j.scheduled_date?' · '+fmtDate(j.scheduled_date):''} — ${fmt(j.client_price)}
           </label>`).join('')}
         </div>
@@ -3521,6 +3635,11 @@ function syncBatchClientCb(custId){
 async function createBatchInvoices(){
   const checked=[...document.querySelectorAll('.batch-job-cb:checked')];
   if(!checked.length){toast('Nothing selected');return;}
+  const selectedJobs=checked.map(cb=>jobs.find(j=>j.id===cb.dataset.job)).filter(Boolean);
+  const missing=selectedJobs.filter(j=>!j.customer_id);
+  if(missing.length){toast(`${ICONS.alert} ${plural(missing.length,'selected job','selected jobs')} ${missing.length===1?'has':'have'} no client — add one before invoicing`);return;}
+  const total=roundMoney(selectedJobs.reduce((s,j)=>s+moneyNum(j.client_price),0));
+  if(!confirm(`Create invoices for ${plural(selectedJobs.length,'job')} totaling ${fmt(total)}?`))return;
   // Group selected jobs by customer + address, so each property gets its own invoice
   const groups={};
   checked.forEach(cb=>{
@@ -3793,6 +3912,7 @@ async function emailInvoice(id){
   const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers;
   const sendTo=cust?.billing_email||cust?.email;
   if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
+  if(!confirm(`Email ${inv.invoice_number} to ${sendTo}?`))return;
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3805,7 +3925,7 @@ async function emailInvoice(id){
   </div>`;
   try{
     await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    await markInvoiceSent(id);
+    await markInvoiceSent(id,sendTo);
     toast(`✓ Invoice emailed to ${sendTo}`);
     openInvDetail(id);
   }catch(e){
@@ -3814,27 +3934,40 @@ async function emailInvoice(id){
     toast('Direct send failed — opening share instead');
     const file=new File([result.blob],result.filename,{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
+      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id,sendTo);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
     }
     const url=URL.createObjectURL(result.blob);
     const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-    await markInvoiceSent(id);
+    await markInvoiceSent(id,sendTo);
   }
 }
-async function markInvoiceSent(id){
+async function markInvoiceSent(id,sentTo){
   const inv=invoices.find(x=>x.id===id);
-  await db.from('invoices').update({sent_at:new Date().toISOString()}).eq('id',id);
-  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}`.trim():null,'invoice',id);
+  await stampSent('invoices',id,sentTo?{sent_to:sentTo}:{});
+  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}${sentTo?' · '+sentTo:''}`.trim():null,'invoice',id);
   await fetchInvoices();renderInvoices();
 }
 async function toggleInvoiceSent(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const newVal=inv.sent_at?null:new Date().toISOString();
-  await db.from('invoices').update({sent_at:newVal}).eq('id',id);
+  const undoing=!!inv.sent_at;
+  if(!confirm(undoing?`Mark ${inv.invoice_number} as not sent?`:`Mark ${inv.invoice_number} as sent?`))return;
+  const newVal=undoing?null:new Date().toISOString();
+  const payload={sent_at:newVal};
+  if(undoing)payload.sent_to=null;
+  let {error}=await db.from('invoices').update(payload).eq('id',id);
+  if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
+    await db.from('invoices').update({sent_at:newVal}).eq('id',id);
+  }
   await fetchInvoices();renderInvoices();openInvDetail(id);
   toast(newVal?'Marked as sent ✓':'Marked as not sent');
 }
-async function markInvPaid(id){const inv=invoices.find(x=>x.id===id);await db.from('invoices').update({status:'Paid',paid_at:new Date().toISOString()}).eq('id',id);logActivity('Invoice marked paid',inv?`${inv.invoice_number} — ${inv.customers?.name||''} · ${fmt(inv.total)}`.trim():null,'invoice',id);await fetchInvoices();renderInvoices();openInvDetail(id);toast('Invoice marked paid ✓');}
+async function markInvPaid(id){
+  const inv=invoices.find(x=>x.id===id);if(!inv)return;
+  if(!confirm(`Mark ${inv.invoice_number} paid · ${fmt(inv.total)}?`))return;
+  await db.from('invoices').update({status:'Paid',paid_at:new Date().toISOString()}).eq('id',id);
+  logActivity('Invoice marked paid',`${inv.invoice_number} — ${inv.customers?.name||''} · ${fmt(inv.total)}`.trim(),'invoice',id);
+  await fetchInvoices();renderInvoices();openInvDetail(id);toast('Invoice marked paid ✓');
+}
 async function markInvOverdue(id){await db.from('invoices').update({status:'Overdue'}).eq('id',id);await fetchInvoices();renderInvoices();openInvDetail(id);toast('Marked overdue');}
 async function deleteInv(id){if(!confirm('Delete this invoice?'))return;await db.from('invoice_items').delete().eq('invoice_id',id);const{error}=await db.from('invoices').delete().eq('id',id);if(error){toast('Could not delete: '+error.message);return;}closeDetail('inv');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();toast('Invoice deleted ✓');}
 function loadInvCustomerProps(){
@@ -4107,6 +4240,8 @@ async function confirmMarkPaid(){
   if(id==='__BULK__'){
     const ids=window._bulkPayIds||[];
     if(!ids.length){closeModal('markpaid');return;}
+    const total=roundMoney(ids.reduce((s,i)=>s+moneyNum(jobs.find(x=>x.id===i)?.sub_pay),0));
+    if(!confirm(`Mark ${plural(ids.length,'job')} paid · ${fmt(total)} via ${method} on ${fmtDate(date)}?`))return;
     const{error}=await db.from('jobs').update({payment_status:'Paid',payment_method:method,paid_at:date}).in('id',ids);
     if(error){toast('Error: '+error.message);return;}
     window._bulkPayIds=null;
@@ -4116,6 +4251,9 @@ async function confirmMarkPaid(){
     toast(`${ids.length} jobs marked paid ✓`);
     return;
   }
+  const j=jobs.find(x=>x.id===id);
+  const label=j?`${j.job_number||j.title} · sub pay ${fmt(j.sub_pay)}`:'this job';
+  if(!confirm(`Mark ${label} paid via ${method} on ${fmtDate(date)}?`))return;
   await db.from('jobs').update({payment_status:'Paid',payment_method:method,paid_at:date}).eq('id',id);
   closeModal('markpaid');
   await fetchJobs();renderAll();
@@ -4204,14 +4342,16 @@ function filterSubJobs(el,val){subJobFilter=val;document.querySelectorAll('#sub-
 // ── SAVE JOB ─────────────────────────────────────────────────────────────
 async function saveJob(){
   const title=document.getElementById('job-title').value.trim();
-  if(!title){toast(`${ICONS.alert} Job title is required`);return;}
+  if(!title){toast(`${ICONS.alert} Job title is required`);document.getElementById('job-title')?.focus();return;}
+  const custId=document.getElementById('job-customer').value;
+  if(!custId){toast(`${ICONS.alert} Select a customer`);document.getElementById('job-customer')?.focus();return;}
   const editId=document.getElementById('job-edit-id').value;
   const prevSubId=editId?(jobs.find(j=>j.id===editId)?.subcontractor_id||null):null;
   const selAddr=document.getElementById('job-prop-select').value;
   const manualAddr=document.getElementById('job-address').value.trim();
   const addr=manualAddr||(selAddr||null);
   const newSubId=document.getElementById('job-sub').value||null;
-  const payload={title,customer_id:document.getElementById('job-customer').value||null,address:addr,description:document.getElementById('job-description').value.trim()||null,scheduled_date:document.getElementById('job-date').value||null,status:document.getElementById('job-status').value,subcontractor_id:newSubId,client_price:parseFloat(document.getElementById('job-client-price').value)||0,sub_pay:parseFloat(document.getElementById('job-pay').value)||0,payment_status:document.getElementById('job-paystatus').value,notes:document.getElementById('job-notes').value.trim()||null};
+  const payload={title,customer_id:custId,address:addr,description:document.getElementById('job-description').value.trim()||null,scheduled_date:document.getElementById('job-date').value||null,status:document.getElementById('job-status').value,subcontractor_id:newSubId,client_price:roundMoney(document.getElementById('job-client-price').value),sub_pay:roundMoney(document.getElementById('job-pay').value),payment_status:document.getElementById('job-paystatus').value,notes:document.getElementById('job-notes').value.trim()||null};
   if(newSubId&&newSubId!==prevSubId)payload.accepted_at=null;
   try{
     let err,jobId=editId;
@@ -4271,7 +4411,7 @@ function updateJobMarginPreview(){
 // ── SAVE CUSTOMER ─────────────────────────────────────────────────────────
 async function saveCustomer(){
   const name=document.getElementById('cust-name').value.trim();
-  if(!name){toast(`${ICONS.alert} Name is required`);return;}
+  if(!name){toast(`${ICONS.alert} Name is required`);document.getElementById('cust-name')?.focus();return;}
   const editId=document.getElementById('cust-edit-id').value;
   const address=document.getElementById('cust-address').value.trim();
   const payload={name,phone:document.getElementById('cust-phone').value.trim()||null,email:document.getElementById('cust-email').value.trim()||null,billing_email:document.getElementById('cust-billing-email').value.trim()||null,city:document.getElementById('cust-city').value.trim()||null,notes:document.getElementById('cust-notes').value.trim()||null};
