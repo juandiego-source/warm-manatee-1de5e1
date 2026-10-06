@@ -1,0 +1,6 @@
+# History routes (/estimates/EST-0015, /jobs/SMK-97456, …) are handled in the app.
+# Serve index.html for any path that is not a real file so refresh does not 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

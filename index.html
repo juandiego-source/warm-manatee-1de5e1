@@ -74,7 +74,7 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 #notif-bell-icon svg{width:16px;height:16px;color:var(--ink2);}
 #notif-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:50px;background:var(--red);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;}
 #notif-panel{position:absolute;top:100%;right:16px;width:min(340px,calc(100% - 32px));max-height:0;overflow:hidden;background:var(--white);border:1px solid var(--glass-b);border-radius:var(--r);box-shadow:var(--gshadow-lg);transition:max-height 0.25s ease,opacity 0.2s ease;opacity:0;z-index:300;}
-#notif-panel.open{max-height:420px;opacity:1;}
+#notif-panel.open{max-height:min(420px,calc(100dvh - 160px));opacity:1;}
 #notif-panel-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 10px;font-size:13px;font-weight:700;color:var(--ink);}
 #notif-mark-all{font-size:11px;font-weight:600;color:var(--red);cursor:pointer;}
 #notif-list{max-height:360px;overflow-y:auto;padding:0 8px 8px;}
@@ -93,7 +93,7 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 
 /* CONTENT & NAV */
 #content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(80px + env(safe-area-inset-bottom));}
-#navbar{position:absolute;bottom:0;left:0;right:0;background:var(--glass-s);backdrop-filter:var(--blur);border-top:1px solid var(--glass-b);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(139,100,60,0.08);}
+#navbar{position:absolute;bottom:0;left:0;right:0;background:var(--glass-s);backdrop-filter:var(--blur);border-top:1px solid var(--glass-b);display:flex;z-index:400;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(139,100,60,0.08);}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 2px;cursor:pointer;gap:3px;min-width:0;min-height:52px;}
 .nav-icon{font-size:18px;line-height:1;color:var(--ink3);}
 .nav-icon svg{width:21px;height:21px;color:var(--ink3);}
@@ -502,7 +502,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
         <div class="attn-num" id="attn-schedule">—</div>
         <div class="attn-lbl">To schedule</div>
       </div>
-      <div class="attn-tile" onclick="showView('jobs',document.querySelectorAll('.nav-item')[1]);filterJobs(document.querySelectorAll('#view-jobs .fchip')[1],'unpaid')">
+      <div class="attn-tile" onclick="showView('invoices',document.querySelectorAll('.nav-item')[5]);filterInv(document.querySelector('#view-invoices .fchip:nth-child(2)'),'Unpaid')">
         <div class="attn-num money" id="attn-unpaid">—</div>
         <div class="attn-lbl">Unpaid</div>
       </div>
@@ -544,7 +544,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <div class="fchip" onclick="filterJobs(this,'Completed')">Completed</div>
       <div class="fchip" onclick="filterJobs(this,'Cancelled')">Cancelled</div>
     </div>
-    <div style="padding:0 14px 8px"><div style="font-size:11.5px;color:var(--ink3)">Recurring maintenance visits live in the Calendar and Maintenance tabs.</div></div>
+    <div style="padding:0 14px 8px"><input class="form-input" id="job-search" placeholder="Search by job, client, address..." oninput="renderJobs()"></div>
     <div class="page-body" id="jobs-list"></div>
   </div>
 
@@ -603,11 +603,13 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-estimates">
     <div class="page-header"><div class="page-title">Estimates</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openCostRequestModal()">Request Quote</button><button class="btn btn-red btn-sm" onclick="openModal('estimate')">+ New</button></div></div>
     <div id="cost-requests-section" style="padding:0 14px"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="est-search" placeholder="Search by number, client, address..." oninput="renderEstimates()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterEst(this,'all')">All</div>
       <div class="fchip" onclick="filterEst(this,'Draft')">Draft</div>
       <div class="fchip" onclick="filterEst(this,'Sent')">Sent</div>
       <div class="fchip" onclick="filterEst(this,'Approved')">Approved</div>
+      <div class="fchip" onclick="filterEst(this,'Declined')">Declined</div>
     </div>
     <div class="page-body" id="estimates-list"></div>
   </div>
@@ -616,6 +618,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="view" id="view-invoices">
     <div class="page-header"><div class="page-title">Invoices</div><button class="btn btn-red btn-sm" onclick="openModal('invoice')">+ New</button></div>
     <div id="batch-invoice-section" style="padding:0 14px"></div>
+    <div style="padding:0 14px 10px"><input class="form-input" id="inv-search" placeholder="Search by number, client, address..." oninput="renderInvoices()"></div>
     <div class="filters">
       <div class="fchip active" onclick="filterInv(this,'all')">All</div>
       <div class="fchip" onclick="filterInv(this,'Unpaid')">Unpaid</div>
@@ -691,7 +694,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="modal-title" id="job-modal-title">New Job</div>
     <input type="hidden" id="job-edit-id">
     <div class="form-group"><label class="form-label">Job Title *</label><input class="form-input" id="job-title" placeholder="e.g. Lawn mowing & edging"></div>
-    <div class="form-group"><label class="form-label">Customer</label><select class="form-input" id="job-customer" onchange="loadCustomerProps()"><option value="">Select customer...</option></select></div>
+    <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="job-customer" required onchange="loadCustomerProps()"><option value="">Select customer...</option></select></div>
     <div class="form-group"><label class="form-label">Property Address</label>
       <select class="form-input" id="job-prop-select" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
       <input class="form-input" id="job-address" placeholder="Or type a new address" autocomplete="off">
@@ -869,7 +872,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- JOB DETAIL -->
 <div class="detail-panel" id="job-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('job')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-job-num">Job</span>
     <span class="pill" id="detail-job-pill"></span>
   </div>
@@ -879,7 +882,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- CUSTOMER DETAIL -->
 <div class="detail-panel" id="cust-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('cust')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-cust-name">Client</span>
   </div>
   <div class="detail-scroll" id="detail-cust-body"></div>
@@ -888,7 +891,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- ESTIMATE DETAIL -->
 <div class="detail-panel" id="est-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('est')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-est-num">Estimate</span>
     <span class="pill" id="detail-est-pill"></span>
   </div>
@@ -898,7 +901,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <!-- INVOICE DETAIL -->
 <div class="detail-panel" id="inv-detail">
   <div class="detail-topbar">
-    <span class="back-btn" onclick="closeDetail('inv')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
     <span class="detail-topbar-title" id="detail-inv-num">Invoice</span>
     <span class="pill" id="detail-inv-pill"></span>
   </div>
@@ -912,16 +915,16 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="modal-title" id="cr-modal-title">Request a Quote from a Sub</div>
     <input type="hidden" id="cr-edit-id">
     <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Send a sub to look at a job and tell you what it'll cost. Once they submit it, you'll turn that into a client estimate with your markup.</div>
-    <div class="form-group"><label class="form-label">Client</label><select class="form-input" id="cr-customer" onchange="loadCrCustomerProps()"><option value="">Select client...</option></select></div>
+    <div class="form-group"><label class="form-label">Client *</label><select class="form-input" id="cr-customer" required onchange="loadCrCustomerProps()"><option value="">Select client...</option></select></div>
     <div class="form-group">
-      <label class="form-label">Property Address</label>
+      <label class="form-label">Property Address *</label>
       <select class="form-input" id="cr-prop-select" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
       <input class="form-input" id="cr-address" placeholder="Or type a new address" autocomplete="off">
       <div class="addr-suggest" id="cr-address-suggest"></div>
     </div>
-    <div class="form-group"><label class="form-label">Job Title</label><input class="form-input" id="cr-title" placeholder="e.g. Mulch replacement — front beds"></div>
+    <div class="form-group"><label class="form-label">Job Title *</label><input class="form-input" id="cr-title" required placeholder="e.g. Mulch replacement — front beds"></div>
     <div class="form-group"><label class="form-label">What to Assess</label><textarea class="form-input" id="cr-description" placeholder="Details for the sub — scope, what you want priced..."></textarea></div>
-    <div class="form-group"><label class="form-label">Send to Sub</label><select class="form-input" id="cr-sub"><option value="">Select subcontractor...</option></select></div>
+    <div class="form-group"><label class="form-label">Send to Sub *</label><select class="form-input" id="cr-sub" required><option value="">Select subcontractor...</option></select></div>
     <button class="btn btn-red btn-full" onclick="saveCostRequest()">Send Request</button>
     <button class="btn btn-full btn-full-ghost" onclick="closeModal('costreq')">Cancel</button>
   </div>
@@ -1043,7 +1046,8 @@ let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
 let attnFocus=null; // when set, a list filters to just the flagged items from the dashboard
 let currentUser=null,currentProfile=null,currentSubId=null;
-let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelected=null;
+const BIZ_TZ='America/Boise';
+let calYear=Number(bizYMD().slice(0,4)),calMonth=Number(bizYMD().slice(5,7))-1,calSelected=null;
 let currentPhotoJobId=null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
@@ -1072,14 +1076,21 @@ async function afterLogin(user){
     const{data:prof}=await db.from('profiles').select('*').eq('id',user.id).single();
     currentProfile=prof;
     clearTimeout(window._splashFailsafe);
-    if(prof?.role==='admin'){
-      showApp('admin');                 // reveal UI immediately
-      await loadAll(); renderAll();      // then load data behind it
+      if(prof?.role==='admin'){
+      showApp('admin');
+      await loadAll();
+      dataReady=true;
+      renderAll();
+      applyRoute(location.pathname);
+      history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       await initNotifications();
     }else if(prof?.subcontractor_id){
       currentSubId=prof.subcontractor_id;
       showApp('sub');
       await loadAll();
+      dataReady=true;
+      applyRoute(location.pathname);
+      history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       const sub=subs.find(s=>s.id===currentSubId);
       document.getElementById('sub-welcome-name').textContent='Hey, '+(sub?.name||'there')+'!';
       document.getElementById('user-badge').textContent='Sub';
@@ -1229,6 +1240,7 @@ function showApp(role){
   hideSplash();
   hideAuthScreen();
   document.getElementById('more-menu-btn').style.display=role==='admin'?'flex':'none';
+  routeSilent=true;
   if(role==='admin'){document.getElementById('navbar').style.display='flex';showView('dashboard',document.querySelector('.nav-item'));renderAll();}
   else if(role==='sub'){
     document.getElementById('navbar').innerHTML=`<div class="nav-item active" onclick="showView('sub-portal',this)"><div class="nav-icon">${ICONS.home}</div><div class="nav-label">My Jobs</div><div class="nav-dot"></div></div>`;
@@ -1237,6 +1249,7 @@ function showApp(role){
     document.getElementById('navbar').style.display='none';
     document.getElementById('content').innerHTML=`<div class="empty" style="padding-top:80px"><div class="empty-icon">${ICONS.hourglass}</div><div class="empty-title">Account pending</div><div class="empty-sub">Your account was created.<br>Your admin needs to link it to your profile.</div><button class="btn btn-glass btn-sm" style="margin-top:20px" onclick="doSignOut()">Sign out</button></div>`;
   }
+  routeSilent=false;
 }
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
@@ -1267,29 +1280,57 @@ function switchAuthTab(tab,el){
 
 // ── DATA ──────────────────────────────────────────────────────────────────
 async function loadAll(){await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchServices(),fetchCostRequests()]);}
-async function fetchCostRequests(){const{data}=await db.from('cost_requests').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false});costRequests=data||[];}
-async function fetchServices(){const{data}=await db.from('services').select('*').eq('active',true).order('name');services=data||[];}
-async function fetchRecurring(){const{data}=await db.from('recurring_services').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false});recurring=data||[];}
+async function fetchCostRequests(){const{data,error}=await fetchAllRows(()=>db.from('cost_requests').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchCostRequests',error);costRequests=data||[];}
+async function fetchServices(){const{data,error}=await fetchAllRows(()=>db.from('services').select('*').eq('active',true).order('name'));if(error)console.error('fetchServices',error);services=data||[];}
+async function fetchRecurring(){const{data,error}=await fetchAllRows(()=>db.from('recurring_services').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchRecurring',error);recurring=data||[];}
 async function fetchInvoicedJobIds(){
-  const{data:d1}=await db.from('invoice_items').select('job_id,invoice_id').not('job_id','is',null);
-  const{data:d2}=await db.from('invoices').select('id,job_id').not('job_id','is',null);
+  const{data:d1,error:e1}=await fetchAllRows(()=>db.from('invoice_items').select('job_id,invoice_id').not('job_id','is',null));
+  const{data:d2,error:e2}=await fetchAllRows(()=>db.from('invoices').select('id,job_id').not('job_id','is',null));
+  if(e1)console.error('fetchInvoicedJobIds items',e1);
+  if(e2)console.error('fetchInvoicedJobIds invoices',e2);
   jobInvoiceMap={};
-  (d1||[]).forEach(x=>{jobInvoiceMap[x.job_id]=x.invoice_id;});
-  (d2||[]).forEach(x=>{jobInvoiceMap[x.job_id]=x.id;});
+  (d1||[]).forEach(x=>{if(x.job_id)jobInvoiceMap[x.job_id]=x.invoice_id;});
+  (d2||[]).forEach(x=>{if(x.job_id)jobInvoiceMap[x.job_id]=x.id;});
   invoicedJobIds=new Set(Object.keys(jobInvoiceMap));
 }
 async function fetchJobs(){
   const isAdmin=currentProfile?.role==='admin';
   const source=isAdmin?'jobs':'sub_jobs';
-  const{data}=await db.from(source).select('*, customers(name), subcontractors(name)').is('deleted_at',null).order('created_at',{ascending:false});
+  const{data,error}=await fetchAllRows(()=>db.from(source).select('*, customers(name), subcontractors(name)').is('deleted_at',null).order('created_at',{ascending:false}));
+  if(error)console.error('fetchJobs',error);
   jobs=data||[];
 }
-async function fetchCustomers(){const{data}=await db.from('customers').select('*').is('deleted_at',null).order('name');customers=data||[];buildSelect('job-customer',customers,'Select customer...');buildSelect('est-customer',customers,'Select customer...');buildSelect('inv-customer',customers,'Select customer...');buildSelect('rec-customer',customers,'Select client...');buildSelect('cr-customer',customers,'Select client...');}
-async function fetchSubs(){const{data}=await db.from('subcontractors').select('*').order('name');subs=data||[];buildSelect('job-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('rec-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('cr-sub',subs.filter(s=>s.active),'Select subcontractor...');}
-async function fetchProfiles(){const{data}=await db.from('profiles').select('*');profiles=data||[];}
-async function fetchProperties(){const{data}=await db.from('properties').select('*').order('address');properties=data||[];}
-async function fetchEstimates(){const{data}=await db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false});estimates=data||[];}
-async function fetchInvoices(){const{data}=await db.from('invoices').select('*, customers(name,email,billing_email), jobs(title)').order('created_at',{ascending:false});invoices=data||[];}
+async function fetchCustomers(){const{data,error}=await fetchAllRows(()=>db.from('customers').select('*').is('deleted_at',null).order('name'));if(error)console.error('fetchCustomers',error);customers=data||[];buildSelect('job-customer',customers,'Select customer...');buildSelect('est-customer',customers,'Select customer...');buildSelect('inv-customer',customers,'Select customer...');buildSelect('rec-customer',customers,'Select client...');buildSelect('cr-customer',customers,'Select client...');}
+async function fetchSubs(){const{data,error}=await fetchAllRows(()=>db.from('subcontractors').select('*').order('name'));if(error)console.error('fetchSubs',error);subs=data||[];buildSelect('job-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('rec-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('cr-sub',subs.filter(s=>s.active),'Select subcontractor...');}
+async function fetchProfiles(){const{data,error}=await fetchAllRows(()=>db.from('profiles').select('*'));if(error)console.error('fetchProfiles',error);profiles=data||[];}
+async function fetchProperties(){const{data,error}=await fetchAllRows(()=>db.from('properties').select('*').order('address'));if(error)console.error('fetchProperties',error);properties=data||[];}
+async function fetchEstimates(){
+  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));
+  if(error){
+    console.error('fetchEstimates',error);
+    const retry=await fetchAllRows(()=>db.from('estimates').select('*').order('created_at',{ascending:false}));
+    data=retry.data;error=retry.error;
+    if(error)console.error('fetchEstimates fallback',error);
+  }
+  estimates=data||[];
+}
+async function fetchInvoices(){
+  let {data,error}=await fetchAllRows(()=>db.from('invoices').select('*, customers(name,email,billing_email), jobs(title)').order('created_at',{ascending:false}));
+  if(error){
+    console.error('fetchInvoices',error);
+    const retry=await fetchAllRows(()=>db.from('invoices').select('*').order('created_at',{ascending:false}));
+    data=retry.data;error=retry.error;
+    if(error)console.error('fetchInvoices fallback',error);
+  }
+  invoices=sortInvoices(data||[]);
+}
+function invoiceSortKey(inv){
+  const m=String(inv.invoice_number||'').match(/(\d+)\s*$/);
+  return m?parseInt(m[1],10):0;
+}
+function sortInvoices(list){
+  return list.slice().sort((a,b)=>invoiceSortKey(b)-invoiceSortKey(a)||String(b.created_at||'').localeCompare(String(a.created_at||''))||String(b.invoice_number||'').localeCompare(String(a.invoice_number||'')));
+}
 function buildSelect(id,items,ph){const el=document.getElementById(id);if(!el)return;const prev=el.value;el.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');if(prev&&items.some(i=>i.id===prev))el.value=prev;}
 function renderAll(){renderDashboard();renderJobs();renderCustomers();renderSubsList();renderPayments();renderEstimates();renderInvoices();checkUnlinked();}
 function toggleSection(key){
@@ -1319,8 +1360,96 @@ function restoreSectionStates(){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 function pClass(s){return'pill pill-'+({'Pending':'pending','In Progress':'progress','Completed':'completed','Cancelled':'cancelled','Unpaid':'unpaid','Paid':'paid','Draft':'draft','Sent':'sent','Approved':'approved','Declined':'declined','Overdue':'overdue'}[s]||'pending');}
-function fmt(n){return'$'+(parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
-function fmtDate(s){if(!s)return'—';const d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+let dataReady=false;
+function moneyNum(n){const x=typeof n==='number'?n:parseFloat(n);return Number.isFinite(x)?x:0;}
+function roundMoney(n){return Math.round((moneyNum(n)+Number.EPSILON)*100)/100;}
+function fmt(n){return '$'+roundMoney(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtQty(n){const x=moneyNum(n);if(Math.abs(x-Math.round(x))<1e-6)return String(Math.round(x));return String(roundMoney(x));}
+function lineAmounts(qty,unitPrice,storedTotal){
+  const unit=roundMoney(unitPrice);
+  const computed=roundMoney(moneyNum(qty)*unit);
+  const hasStored=storedTotal!==undefined&&storedTotal!==null&&storedTotal!=='';
+  return {unit,computed,total:hasStored?roundMoney(storedTotal):computed};
+}
+function plural(n,one,many){return n+' '+(n===1?one:(many||one+'s'));}
+function bizYMD(input){
+  const d=input instanceof Date?input:(input?new Date(input):new Date());
+  if(Number.isNaN(d.getTime()))return'';
+  return new Intl.DateTimeFormat('en-CA',{timeZone:BIZ_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+}
+function bizYM(input){const ymd=bizYMD(input);return ymd?ymd.slice(0,7):'';}
+function isDateOnly(s){return typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);}
+function fmtDate(s){
+  if(!s)return'—';
+  if(isDateOnly(s)){
+    const [y,m,d]=s.split('-').map(Number);
+    return new Date(Date.UTC(y,m-1,d)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+  }
+  const dt=new Date(s);
+  if(Number.isNaN(dt.getTime()))return'—';
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',timeZone:BIZ_TZ});
+}
+function fmtDateTime(ts){
+  if(!ts)return'';
+  const d=new Date(ts);
+  if(Number.isNaN(d.getTime()))return'';
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:BIZ_TZ})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:BIZ_TZ});
+}
+function addDaysYMD(ymd,days){
+  const [y,m,d]=ymd.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  dt.setUTCDate(dt.getUTCDate()+days);
+  return dt.toISOString().slice(0,10);
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function invoiceIsOpen(i){return !!(i&&i.status!=='Paid'&&i.status!=='Cancelled');}
+function openInvoices(){return invoices.filter(invoiceIsOpen);}
+function unpaidInvoiceTotal(){return roundMoney(openInvoices().reduce((s,i)=>s+moneyNum(i.total),0));}
+function jobNeedsInvoice(j){
+  if(!j||j.status!=='Completed')return false;
+  if(invoicedJobIds.has(j.id))return false;
+  if(roundMoney(j.client_price)<=0)return false;
+  return true;
+}
+function jobsNeedingInvoice(list){return (list||jobs).filter(jobNeedsInvoice);}
+function jobMonthKey(j){
+  if(j.scheduled_date&&/^\d{4}-\d{2}/.test(j.scheduled_date))return j.scheduled_date.slice(0,7);
+  if(j.completed_at)return bizYM(j.completed_at);
+  return null;
+}
+function customerNameOf(row){
+  const emb=row?.customers;
+  if(emb&&!Array.isArray(emb)&&emb.name)return emb.name;
+  if(Array.isArray(emb)&&emb[0]?.name)return emb[0].name;
+  const c=customers.find(x=>x.id===row?.customer_id);
+  return c?.name||'';
+}
+function jobWhenText(j){
+  if(j.scheduled_date)return fmtDate(j.scheduled_date);
+  if(j.status==='Completed'&&j.completed_at)return 'Completed '+fmtDate(j.completed_at);
+  if(j.status==='Completed')return 'Completed · no date';
+  return '';
+}
+function jobProfitText(j){
+  const price=roundMoney(j.client_price);
+  const pay=roundMoney(j.sub_pay);
+  const profit=roundMoney(price-pay);
+  if(price<=0)return fmt(profit);
+  if(pay<=0)return fmt(profit)+' · sub pay not set';
+  return `${fmt(profit)} (${Math.round((profit/price)*100)}%)`;
+}
+async function fetchAllRows(build){
+  const pageSize=1000;
+  const all=[];
+  for(let from=0;from<20000;from+=pageSize){
+    const {data,error}=await build().range(from,from+pageSize-1);
+    if(error)return {data:all,error};
+    const rows=data||[];
+    all.push(...rows);
+    if(rows.length<pageSize)return {data:all,error:null};
+  }
+  return {data:all,error:null};
+}
 function mapsUrl(addr){return`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`;}
 
 function jobCard(j,fn,showPay=true,forSub=false){
@@ -1334,17 +1463,20 @@ function jobCard(j,fn,showPay=true,forSub=false){
       <button class="btn btn-red btn-full" style="margin-top:12px" onclick="event.stopPropagation();acceptJob('${j.id}')">Accept Job</button>
     </div>`;
   }
-  const needsInvoicing=!forSub&&j.status==='Completed'&&!invoicedJobIds.has(j.id)&&(parseFloat(j.client_price)||0)>0&&j.customer_id;
-  return`<div class="card" onclick="${fn}">
-    <div class="card-top"><div><div class="card-id">${j.job_number}${j.recurring_service_id?' · 🔁':''}</div><div class="card-title">${j.title}</div></div><span class="${pClass(j.status)}">${j.status}</span></div>
+  const needsInvoicing=!forSub&&jobNeedsInvoice(j);
+  const when=jobWhenText(j);
+  const clientAmt=fmt(j.client_price);
+  const subAmt=fmt(j.sub_pay);
+  return`<div class="card" data-type="job" data-id="${j.id}" data-number="${esc(j.job_number||'')}" onclick="${fn}">
+    <div class="card-top"><div><div class="card-id">${esc(j.job_number||'')}${j.recurring_service_id?' · 🔁':''}</div><div class="card-title">${esc(j.title||'')}</div></div><span class="${pClass(j.status)}">${j.status}</span></div>
     <div class="card-meta">
-      ${j.customers?.name?`<span class="card-meta-item">${ICONS.user} ${j.customers.name}</span>`:''}
-      ${j.subcontractors?.name?`<span class="card-meta-item">${ICONS.wrench} ${j.subcontractors.name}</span>`:`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} Unassigned</span>`}
-      ${j.scheduled_date?`<span class="card-meta-item">${ICONS.calendar} ${fmtDate(j.scheduled_date)}</span>`:''}
+      ${customerNameOf(j)?`<span class="card-meta-item">${ICONS.user} ${esc(customerNameOf(j))}</span>`:''}
+      ${j.subcontractors?.name?`<span class="card-meta-item">${ICONS.wrench} ${esc(j.subcontractors.name)}</span>`:`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} Unassigned</span>`}
+      ${when?`<span class="card-meta-item">${ICONS.calendar} ${when}</span>`:''}
     </div>
-    ${addr?`<a class="dir-link" href="${mapsUrl(addr)}" onclick="event.stopPropagation()">${ICONS.mapPin} ${addr} — Directions</a>`:''}
-    ${needsInvoicing?`<div style="margin-top:8px;padding:6px 10px;background:rgba(200,160,60,0.12);border-radius:var(--rxs);font-size:11px;font-weight:600;color:var(--gold);display:inline-block">🧾 Requires invoicing · ${fmt(j.client_price)}</div>`:''}
-    ${showPay?`<div class="card-footer"><div class="card-amount">${fmt(j.sub_pay)}</div><span class="${pClass(j.payment_status)}">${j.payment_status}</span></div>`:''}
+    ${addr?`<a class="dir-link" href="${mapsUrl(addr)}" onclick="event.stopPropagation()">${ICONS.mapPin} ${esc(addr)} — Directions</a>`:''}
+    ${needsInvoicing?`<div style="margin-top:8px;padding:6px 10px;background:rgba(200,160,60,0.12);border-radius:var(--rxs);font-size:11px;font-weight:600;color:var(--gold);display:inline-block">🧾 Requires invoicing · ${clientAmt}${j.customer_id?'':' · no client'}</div>`:''}
+    ${showPay?`<div class="card-footer"><div><div class="card-amount">${clientAmt}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Client charge · sub ${subAmt}</div></div><span class="${pClass(j.payment_status)}">${j.payment_status}</span></div>`:''}
   </div>`;
 }
 async function acceptJob(id){
@@ -1364,11 +1496,11 @@ function focusAttention(kind){
     jobFilter='all';showView('jobs',document.querySelectorAll('.nav-item')[1]);attnFocus='needInvoice';renderJobs();
     setTimeout(()=>document.getElementById('jobs-list')?.scrollIntoView({behavior:'smooth',block:'start'}),150);
   }else if(kind==='notSent'){
-    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[4]);attnFocus='notSent';renderInvoices();
+    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[5]);attnFocus='notSent';renderInvoices();
   }else if(kind==='overdue'){
-    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[4]);attnFocus='overdue';renderInvoices();
+    invFilter='all';showView('invoices',document.querySelectorAll('.nav-item')[5]);attnFocus='overdue';renderInvoices();
   }else if(kind==='staleEst'){
-    estFilter='all';showView('estimates',document.querySelectorAll('.nav-item')[5]);attnFocus='staleEst';renderEstimates();
+    estFilter='all';showView('estimates',document.querySelectorAll('.nav-item')[4]);attnFocus='staleEst';renderEstimates();
   }else if(kind==='unassigned'){
     jobFilter='all';showView('jobs',document.querySelectorAll('.nav-item')[1]);attnFocus='unassigned';renderJobs();
   }
@@ -1377,15 +1509,19 @@ function clearAttnFocus(){if(attnFocus){attnFocus=null;}}
 function renderAttentionList(){
   const el=document.getElementById('attention-list');
   if(!el)return;
-  const today=new Date();today.setHours(0,0,0,0);
-  const todayStr=today.toISOString().slice(0,10);
+  if(!dataReady){
+    el.innerHTML=`<div class="attn-list-wrap"><div class="attn-all-clear"><div class="big">Loading…</div><div class="sub">Pulling jobs, invoices, and estimates</div></div></div>`;
+    return;
+  }
+  const todayStr=bizYMD();
+  const today=new Date(todayStr+'T12:00:00');
   const items=[];
 
-  // 1. Jobs completed but NOT invoiced (the "Requires Invoicing" gap)
-  const needInvoice=jobs.filter(j=>j.status==='Completed'&&!invoicedJobIds.has(j.id)&&(parseFloat(j.client_price)||0)>0&&j.customer_id);
+  // 1. Jobs completed but NOT invoiced — same set as Ready to Invoice and Reports
+  const needInvoice=jobsNeedingInvoice();
   if(needInvoice.length){
-    const total=needInvoice.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
-    items.push({cls:'',icon:'🧾',bg:'rgba(224,87,74,0.14)',title:`${needInvoice.length} completed job${needInvoice.length!==1?'s':''} not invoiced`,sub:`${fmt(total)} of work ready to bill`,count:needInvoice.length,action:`focusAttention('needInvoice')`});
+    const total=needInvoice.reduce((s,j)=>s+moneyNum(j.client_price),0);
+    items.push({cls:'',icon:'🧾',bg:'rgba(224,87,74,0.14)',title:`${plural(needInvoice.length,'completed job','completed jobs')} not invoiced`,sub:`${fmt(total)} of work ready to bill`,count:needInvoice.length,action:`focusAttention('needInvoice')`});
   }
 
   // 2. Invoices created but NOT sent
@@ -1419,7 +1555,8 @@ function renderAttentionList(){
   // 5. Jobs missing a sub or a date (can't happen / won't get done)
   const unassigned=jobs.filter(j=>j.status!=='Completed'&&j.status!=='Cancelled'&&(!j.subcontractor_id||!j.scheduled_date));
   if(unassigned.length){
-    items.push({cls:'',icon:'🗓️',bg:'rgba(224,87,74,0.14)',title:`${unassigned.length} job${unassigned.length!==1?'s':''} need a sub or a date`,sub:`Won't get done until assigned & scheduled`,count:unassigned.length,action:`focusAttention('unassigned')`});
+    const subWord=unassigned.length===1?'needs':'need';
+    items.push({cls:'',icon:'🗓️',bg:'rgba(224,87,74,0.14)',title:`${plural(unassigned.length,'job')} ${subWord} a sub or a date`,sub:`Won't get done until assigned and scheduled`,count:unassigned.length,action:`focusAttention('unassigned')`});
   }
 
   // 6. Site reports flagged with an issue (Watch/Problem) — needs your eyes
@@ -1448,24 +1585,29 @@ function renderAttentionList(){
 }
 function renderDashboard(){
   renderAttentionList();
-  const _today=new Date();_today.setHours(0,0,0,0);
-  const todayStr=_today.toISOString().slice(0,10);
-  const _weekEnd=new Date(_today);_weekEnd.setDate(_weekEnd.getDate()+7);
+  if(!dataReady){
+    document.getElementById('attn-estimates').textContent='—';
+    document.getElementById('attn-schedule').textContent='—';
+    document.getElementById('attn-unpaid').textContent='—';
+    ['w-estimates','w-schedule','w-week'].forEach(id=>{const n=document.getElementById(id);if(n)n.innerHTML='<div class="widget-empty">Loading…</div>';});
+    return;
+  }
+  const todayStr=bizYMD();
+  const weekEndStr=addDaysYMD(todayStr,7);
 
   // ── Attention strip numbers ──
   const estAwaiting=estimates.filter(e=>e.status==='Sent');
   const needsSchedule=jobs.filter(j=>j.status!=='Completed'&&j.status!=='Cancelled'&&(!j.scheduled_date||!j.subcontractor_id));
-  const unpaidAmt=jobs.filter(j=>j.payment_status==='Unpaid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
   document.getElementById('attn-estimates').textContent=estAwaiting.length;
   document.getElementById('attn-schedule').textContent=needsSchedule.length;
-  document.getElementById('attn-unpaid').textContent=fmt(unpaidAmt);
+  document.getElementById('attn-unpaid').textContent=fmt(unpaidInvoiceTotal());
 
   // ── Widget 1: Estimates awaiting a client reply ──
   const estList=estimates.filter(e=>e.status==='Sent').sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
   document.getElementById('w-estimates').innerHTML=estList.length?estList.map(e=>`
     <div class="mini-row" onclick="showView('estimates',document.querySelectorAll('.nav-item')[5]);openEstDetail('${e.id}')">
       <div class="mini-main">
-        <div class="mini-title">${e.customers?.name||'—'}</div>
+        <div class="mini-title">${esc(customerNameOf(e)||'—')}</div>
         <div class="mini-sub">${e.estimate_number}${e.valid_until?` · valid to ${fmtDate(e.valid_until)}`:''}</div>
       </div>
       <div class="mini-right"><div class="mini-amt">${fmt(e.total)}</div><span class="pill pill-sent mini-pill">Sent</span></div>
@@ -1487,8 +1629,7 @@ function renderDashboard(){
   const weekAll=jobs.filter(j=>{
     if(j.status==='Completed'||j.status==='Cancelled')return false;
     if(!j.scheduled_date)return false;
-    const d=new Date(j.scheduled_date+'T00:00:00');
-    return d>=_today&&d<=_weekEnd;
+    return j.scheduled_date>=todayStr&&j.scheduled_date<=weekEndStr;
   }).sort((a,b)=>(a.scheduled_date||'').localeCompare(b.scheduled_date||''));
   const weekReal=weekAll.filter(j=>!j.recurring_service_id);
   const weekRec=weekAll.filter(j=>j.recurring_service_id);
@@ -1513,15 +1654,20 @@ function renderDashboard(){
 
 // ── JOBS ──────────────────────────────────────────────────────────────────
 function renderJobs(){
+  const q=(document.getElementById('job-search')?.value||'').trim().toLowerCase();
   const base=jobs.filter(j=>!j.recurring_service_id);
   let list=jobFilter==='all'?base:jobFilter==='unpaid'?base.filter(j=>j.payment_status==='Unpaid'):base.filter(j=>j.status===jobFilter);
   let banner='';
   if(attnFocus==='needInvoice'){
-    list=base.filter(j=>j.status==='Completed'&&!invoicedJobIds.has(j.id)&&(parseFloat(j.client_price)||0)>0&&j.customer_id);
-    banner=attnBanner(`${list.length} completed job${list.length!==1?'s':''} ready to invoice`);
+    list=jobsNeedingInvoice();
+    const total=list.reduce((s,j)=>s+moneyNum(j.client_price),0);
+    banner=attnBanner(`${plural(list.length,'completed job','completed jobs')} ready to invoice · ${fmt(total)}`);
   }else if(attnFocus==='unassigned'){
     list=base.filter(j=>j.status!=='Completed'&&j.status!=='Cancelled'&&(!j.subcontractor_id||!j.scheduled_date));
-    banner=attnBanner(`${list.length} job${list.length!==1?'s':''} missing a sub or date`);
+    banner=attnBanner(`${plural(list.length,'job')} missing a sub or a date`);
+  }
+  if(q){
+    list=list.filter(j=>[j.job_number,j.title,j.address,j.status,customerNameOf(j),j.subcontractors?.name].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
   }
   document.getElementById('jobs-list').innerHTML=banner+(list.length?list.map(j=>jobCard(j,`openJobDetail('${j.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.jobs}</div><div class="empty-title">${jobFilter==='unpaid'?'Nothing unpaid':'No jobs'}</div>${jobFilter==='unpaid'?'<div class="empty-sub">Every sub is paid up ✓</div>':'<div class="empty-sub">One-off jobs show here</div>'}</div>`);
@@ -1629,8 +1775,7 @@ function renderCalendar(){
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
   const daysInPrev=new Date(calYear,calMonth,0).getDate();
-  const today=new Date();
-  const todayStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr=bizYMD();
   const jobMap={};jobs.forEach(j=>{if(j.scheduled_date){if(!jobMap[j.scheduled_date])jobMap[j.scheduled_date]=[];jobMap[j.scheduled_date].push(j);}});
   const recMap=projectRecurringOccurrences(calYear,calMonth);
   let html='';
@@ -1657,7 +1802,7 @@ function renderCalDay(ds){
   // (Jobs are generated up front now, so a real job normally exists — the projection would just be a duplicate.)
   const realRecIds=new Set(dj.filter(j=>j.recurring_service_id).map(j=>j.recurring_service_id));
   const dr=(recMap[ds]||[]).filter(r=>!realRecIds.has(r.id));
-  const lbl=dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const lbl=new Date(ds+'T00:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
   const el=document.getElementById('cal-day-jobs');el.style.display='block';
   const recHtml=dr.map(r=>`<div class="card" style="opacity:0.75;border-style:dashed" onclick="closeDetail('cust');showView('customers',document.querySelectorAll('.nav-item')[3])"><div class="card-top"><div><div class="card-id">${ICONS.calendar} Recurring · ${freqLabel(r.frequency)}</div><div class="card-title">${r.title}</div></div></div><div class="card-meta"><span class="card-meta-item">${ICONS.user} ${r.customerName}</span>${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${r.address}</span>`:''}</div><div style="font-size:10.5px;color:var(--ink3);margin-top:4px">Upcoming — not yet scheduled</div></div>`).join('');
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="cal-day-title">${lbl}</div><button class="btn btn-red btn-sm" onclick="openModalWithDate('${ds}')">+ Job</button></div>`+
@@ -1718,7 +1863,7 @@ function renderCustomers(){
   const q=(document.getElementById('cust-search')?.value||'').trim().toLowerCase();
   const list=q?customers.filter(c=>[c.name,c.phone,c.email,c.city].filter(Boolean).some(v=>v.toLowerCase().includes(q))):customers;
   document.getElementById('customers-list').innerHTML=list.length
-    ?list.map(c=>`<div class="card" onclick="openCustDetail('${c.id}')">
+    ?list.map(c=>`<div class="card" data-type="client" data-id="${c.id}" onclick="openCustDetail('${c.id}')">
       <div class="card-top">
         <div><div class="card-title">${c.name}</div>
           <div class="card-meta" style="margin-top:6px">
@@ -1727,8 +1872,8 @@ function renderCustomers(){
           </div>
         </div>
         <div style="text-align:right;font-size:12px;color:var(--ink3)">
-          <div>${jobs.filter(j=>j.customer_id===c.id).length} jobs</div>
-          <div>${properties.filter(p=>p.customer_id===c.id).length} properties</div>
+          <div>${plural(jobs.filter(j=>j.customer_id===c.id).length,'job')}</div>
+          <div>${plural(properties.filter(p=>p.customer_id===c.id).length,'property','properties')}</div>
         </div>
       </div>
       ${c.email?`<div style="font-size:12px;color:var(--ink3);margin-top:4px">${ICONS.mail} ${c.email}</div>`:''}
@@ -1740,6 +1885,8 @@ function openCustDetail(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   const cj=jobs.filter(j=>j.customer_id===id);
   const cProps=properties.filter(p=>p.customer_id===id);
+  const cEst=estimates.filter(e=>e.customer_id===id);
+  const cInv=sortInvoices(invoices.filter(i=>i.customer_id===id));
   document.getElementById('detail-cust-name').textContent=c.name;
   document.getElementById('detail-cust-body').innerHTML=`
     <div class="detail-card">
@@ -1775,12 +1922,22 @@ function openCustDetail(id){
       <button class="btn btn-red btn-sm" onclick="newJobForCustomer('${id}')">+ New Job</button>
     </div>
     ${cj.map(j=>jobCard(j,`closeDetail('cust');openJobDetail('${j.id}')`)).join('')||'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No jobs yet</div>'}
+    <div class="section-lbl" style="margin-top:16px">Estimates (${cEst.length})</div>
+    ${cEst.length?cEst.map(e=>`<div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="closeDetail('cust');openEstDetail('${e.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}</div><div class="card-title">${esc(e.address||'No address')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+      <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No estimates yet</div>'}
+    <div class="section-lbl" style="margin-top:16px">Invoices (${cInv.length})</div>
+    ${cInv.length?cInv.map(i=>`<div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="closeDetail('cust');openInvDetail('${i.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}</div><div class="card-title">${esc(i.address||i.status||'')}</div></div><span class="${pClass(i.status)}">${esc(i.status||'')}</span></div>
+      <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
+    </div>`).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No invoices yet</div>'}
     <div class="action-row" style="margin-top:12px">
       <button class="action-btn ab-glass" onclick="editCustFromDetail('${id}')">${ICONS.pencil} Edit Client</button>
       <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
     </div>`;
   wireAddressAutocomplete(`new-prop-${id}`,`new-prop-suggest-${id}`);
-  document.getElementById('cust-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('cust-detail').classList.add('open');syncRecordUrl('cust',c);
 }
 
 async function addProp(custId){
@@ -1854,7 +2011,7 @@ function openRecModal(id,custId){
       document.getElementById('rec-customer').value=custId||'';
       document.getElementById('rec-sub').value='';
       document.getElementById('rec-frequency').value='monthly';
-      document.getElementById('rec-start').value=new Date().toISOString().slice(0,10);
+      document.getElementById('rec-start').value=bizYMD();
       document.getElementById('rec-end').value='';
       loadRecCustomerProps();
     }
@@ -1919,7 +2076,8 @@ async function saveCostRequest(){
   if(!subId){toast(`${ICONS.alert} Select who to send this to`);return;}
   const selAddr=document.getElementById('cr-prop-select').value;
   const manualAddr=document.getElementById('cr-address').value.trim();
-  const addr=manualAddr||selAddr||null;
+  const addr=manualAddr||selAddr||'';
+  if(!addr){toast(`${ICONS.alert} Property address is required`);document.getElementById('cr-address')?.focus();return;}
   const payload={customer_id:custId,address:addr,title,description:document.getElementById('cr-description').value.trim()||null,subcontractor_id:subId};
   if(editId){
     const prevSubId=costRequests.find(r=>r.id===editId)?.subcontractor_id;
@@ -1943,8 +2101,10 @@ function renderCostRequestsSection(){
   const el=document.getElementById('cost-requests-section');
   if(!el)return;
   const open=costRequests.filter(r=>r.status==='Requested'||r.status==='Submitted');
-  if(!open.length){el.innerHTML='';return;}
-  el.innerHTML=`<div class="batch-card" style="border-color:var(--blue);background:var(--blue-bg)">
+  const past=costRequests.filter(r=>r.status!=='Requested'&&r.status!=='Submitted');
+  let html='';
+  if(open.length){
+  html+=`<div class="batch-card" style="border-color:var(--blue);background:var(--blue-bg)">
     <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:10px">${ICONS.send} Quote Requests</div>
     ${open.map(r=>`
       <div class="batch-client">
@@ -1972,6 +2132,26 @@ function renderCostRequestsSection(){
           </div>`}
       </div>`).join('')}
   </div>`;
+  }
+  if(past.length){
+    html+=`<div class="batch-card" style="margin-top:${open.length?10:0}px">
+      <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:4px">Quote request history</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">Submitted requests that were turned into estimates, archived, or cancelled</div>
+      ${past.map(r=>`<div class="batch-client" data-type="cost_request" data-id="${r.id}" data-status="${esc(r.status||'')}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.title||'')}</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(customerNameOf(r)||'—')}${r.address?' · '+esc(r.address):''}${r.submitted_at?' · '+fmtDate(r.submitted_at):''}</div>
+          </div>
+          <div style="text-align:right">
+            <span class="pill ${r.status==='Converted'?'pill-approved':r.status==='Cancelled'?'pill-cancelled':'pill-pending'}">${esc(r.status||'')}</span>
+            ${r.submitted_cost!=null&&r.submitted_cost!==''?`<div style="font-weight:700;color:var(--red);margin-top:4px;font-family:'Cormorant Garamond',serif">${fmt(r.submitted_cost)}</div>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+  }
+  el.innerHTML=html;
 }
 function convertCostRequestToEstimate(id){
   const r=costRequests.find(x=>x.id===id);if(!r)return;
@@ -2104,7 +2284,7 @@ async function saveRecService(){
     sub_pay:parseFloat(document.getElementById('rec-sub-pay').value)||0,
     subcontractor_id:document.getElementById('rec-sub').value||null,
     frequency:document.getElementById('rec-frequency').value,
-    next_run_date:document.getElementById('rec-start').value||new Date().toISOString().slice(0,10),
+    next_run_date:document.getElementById('rec-start').value||bizYMD(),
     end_date:endVal,
     active:true
   };
@@ -2138,7 +2318,7 @@ async function toggleRecService(id,active,custId){
   await db.from('recurring_services').update({active}).eq('id',id);
   if(!active){
     // Pausing/cancelling: remove future un-started jobs from this service, keep past/completed ones
-    const today=new Date().toISOString().slice(0,10);
+    const today=bizYMD();
     await db.from('jobs').update({deleted_at:new Date().toISOString()}).eq('recurring_service_id',id).eq('status','Pending').gte('scheduled_date',today);
   }
   await fetchRecurring();await fetchJobs();renderAll();refreshRecurringViews(custId);
@@ -2146,7 +2326,7 @@ async function toggleRecService(id,active,custId){
 }
 async function deleteRecService(id,custId){
   if(!confirm('Delete this recurring service? Upcoming un-started visits will be removed; completed ones stay for your records.'))return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   await db.from('jobs').update({deleted_at:new Date().toISOString()}).eq('recurring_service_id',id).eq('status','Pending').gte('scheduled_date',today);
   await db.from('recurring_services').delete().eq('id',id);
   await fetchRecurring();await fetchJobs();renderAll();refreshRecurringViews(custId);
@@ -2164,7 +2344,7 @@ function renderRecurringView(){
   if(recViewFilter==='paused')list=list.filter(r=>!r.active);
   else if(recViewFilter!=='all')list=list.filter(r=>r.frequency===recViewFilter&&r.active);
   else list=list.filter(r=>r.active);
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   document.getElementById('recurring-view-list').innerHTML=list.length?list.map(r=>{
     const visits=jobs.filter(j=>j.recurring_service_id===r.id);
     const upcoming=visits.filter(j=>j.scheduled_date>=today&&j.status!=='Completed'&&j.status!=='Cancelled');
@@ -2190,7 +2370,7 @@ function renderRecurringView(){
 }
 function openRecDetail(id){
   const r=recurring.find(x=>x.id===id);if(!r)return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=bizYMD();
   const visits=jobs.filter(j=>j.recurring_service_id===id).sort((a,b)=>(a.scheduled_date||'').localeCompare(b.scheduled_date||''));
   const upcoming=visits.filter(j=>j.scheduled_date>=today&&j.status!=='Completed'&&j.status!=='Cancelled');
   const done=visits.filter(j=>j.status==='Completed').length;
@@ -2266,19 +2446,36 @@ async function logActivity(action,detail,entityType,entityId){
     });
   }catch(e){/* logging must never block the real action */}
 }
+function closeActivity(){const o=document.getElementById('activity-overlay');if(o)o.style.display='none';}
+function activityRecord(a){
+  const id=a?.entity_id;if(!id)return null;
+  const t=a.entity_type;
+  if(t==='job'){const j=jobs.find(x=>x.id===id);return j?{label:j.job_number,type:'job',id}:null;}
+  if(t==='estimate'){const e=estimates.find(x=>x.id===id);return e?{label:e.estimate_number,type:'estimate',id}:null;}
+  if(t==='invoice'){const i=invoices.find(x=>x.id===id);return i?{label:i.invoice_number,type:'invoice',id}:null;}
+  if(t==='customer'||t==='client'){const c=customers.find(x=>x.id===id);return c?{label:c.name,type:'customer',id}:null;}
+  return null;
+}
+function openActivityRecord(type,id){
+  closeActivity();
+  if(type==='job')openJobDetail(id);
+  else if(type==='estimate')openEstDetail(id);
+  else if(type==='invoice')openInvDetail(id);
+  else if(type==='customer')openCustDetail(id);
+}
 async function openActivityLog(){
-  let overlay=document.getElementById('trash-overlay');
+  let overlay=document.getElementById('activity-overlay');
   if(!overlay){
     overlay=document.createElement('div');
-    overlay.id='trash-overlay';
+    overlay.id='activity-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)closeActivity();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:80vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeActivity()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">A record of everything that's happened — for looking back if a question ever comes up.</div>
-    <input class="form-input" id="activity-search" placeholder="Search by client, job, sub..." oninput="renderActivityLog()" style="margin-bottom:12px">
+    <input class="form-input" id="activity-search" placeholder="Search by client, job, sub, or number..." oninput="renderActivityLog()" style="margin-bottom:12px">
     <div id="activity-log-list" style="font-size:12.5px;color:var(--ink3)">Loading…</div>
   </div>`;
   overlay.style.display='flex';
@@ -2289,16 +2486,20 @@ async function openActivityLog(){
 function renderActivityLog(){
   const q=(document.getElementById('activity-search')?.value||'').trim().toLowerCase();
   let list=window._activityLog||[];
-  if(q)list=list.filter(a=>[a.action,a.detail,a.actor_name].filter(Boolean).some(v=>v.toLowerCase().includes(q)));
+  if(q)list=list.filter(a=>{
+    const rec=activityRecord(a);
+    return [a.action,a.detail,a.actor_name,rec?.label].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
+  });
   const el=document.getElementById('activity-log-list');
   if(!el)return;
   el.innerHTML=list.length?list.map(a=>{
-    const dt=new Date(a.created_at);
-    const when=dt.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const when=fmtDateTime(a.created_at);
+    const rec=activityRecord(a);
+    const num=rec?`<button type="button" style="margin-left:6px;border:none;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;padding:0" onclick="openActivityRecord('${rec.type}','${rec.id}')">${esc(rec.label)}</button>`:'';
     return`<div style="padding:9px 0;border-bottom:1px solid var(--line)">
-      <div style="color:var(--ink);font-weight:600">${a.action}</div>
-      ${a.detail?`<div style="color:var(--ink2);margin-top:2px">${a.detail}</div>`:''}
-      <div style="color:var(--ink3);font-size:10.5px;margin-top:3px">${a.actor_name||a.actor_role} · ${when}</div>
+      <div style="color:var(--ink);font-weight:600">${esc(a.action||'')}${num}</div>
+      ${a.detail?`<div style="color:var(--ink2);margin-top:2px">${esc(a.detail)}</div>`:''}
+      <div style="color:var(--ink3);font-size:10.5px;margin-top:3px">${esc(a.actor_name||a.actor_role||'')} · ${when}</div>
     </div>`;
   }).join(''):`<div style="padding:16px 0;text-align:center">${q?'No matching activity':'No activity recorded yet'}</div>`;
 }
@@ -2320,7 +2521,7 @@ function openNotifDiagnostics(){
     <div class="detail-row"><span class="detail-label">This device supports it</span><span class="detail-value" style="color:${supported?'var(--green)':'var(--rose)'}">${supported?'Yes':'No'}</span></div>
     <div class="detail-row"><span class="detail-label">Permission</span><span class="detail-value" style="color:${permission==='granted'?'var(--green)':permission==='denied'?'var(--rose)':'var(--amber)'}">${permissionLabel}</span></div>
     ${dismissed?'<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">You (or someone) tapped "Not now" on this device before, so it stopped asking automatically.</div>':''}
-    ${permission==='denied'?`<div style="font-size:11.5px;color:var(--rose);margin-top:10px;padding:10px;background:var(--rose-bg);border-radius:var(--rxs)">iOS is blocking this. Go to iPhone Settings → scroll down to find this app in the list → Notifications → turn Allow Notifications on. Then come back here and tap the button below.</div>`:''}
+    ${permission==='denied'?`<div style="font-size:11.5px;color:var(--rose);margin-top:10px;padding:10px;background:var(--rose-bg);border-radius:var(--rxs)">${(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))?`iOS is blocking this. Go to iPhone Settings → scroll down to find this app in the list → Notifications → turn Allow Notifications on. Then come back here and tap the button below.`:`This browser is blocking notifications. Click the lock or tune icon in the address bar → Site settings → Notifications → Allow. Then come back here and tap the button below.`}</div>`:''}
     <button class="btn btn-red btn-full" style="margin-top:16px" onclick="localStorage.removeItem('sumak_push_dismissed');closeTrash();enablePushNotifications();">Enable Notifications Now</button>
     <button class="btn btn-glass btn-full" style="margin-top:8px" onclick="testLocalNotification()">Test #1 — Show a notification now</button>
     <button class="btn btn-glass btn-full" style="margin-top:8px" onclick="testServerPush()">Test #2 — Send a real push from the server</button>
@@ -2470,10 +2671,12 @@ async function linkSubAccount(profileId){
 // ── PAYMENTS ─────────────────────────────────────────────────────────────
 function renderPayments(){
   const monthInput=document.getElementById('report-month');
-  if(!monthInput.value)monthInput.value=new Date().toISOString().slice(0,7);
+  if(!monthInput.value)monthInput.value=bizYM();
   const ym=monthInput.value;
-  const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
+  const inMonth=j=>jobMonthKey(j)===ym;
   const monthJobs=jobs.filter(inMonth);
+  const unbilledAll=jobsNeedingInvoice();
+  const unbilledAllValue=unbilledAll.reduce((s,j)=>s+moneyNum(j.client_price),0);
   const paid=monthJobs.filter(j=>j.payment_status==='Paid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
   const unpaid=monthJobs.filter(j=>j.payment_status==='Unpaid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
   const revenue=monthJobs.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
@@ -2495,16 +2698,14 @@ function renderPayments(){
     if(j.status==='Completed')bsm[key].completed++;
     if(j.payment_status==='Paid')bsm[key].paid+=parseFloat(j.sub_pay)||0;else bsm[key].unpaid+=parseFloat(j.sub_pay)||0;
     // The reconciliation gap: is this job billed to a CLIENT yet?
-    const billed=invoicedJobIds.has(j.id);
-    if(j.status==='Completed'&&(parseFloat(j.client_price)||0)>0){
-      if(billed)bsm[key].billedToClient++;
-      else{bsm[key].notBilledToClient++;bsm[key].notBilledValue+=parseFloat(j.client_price)||0;}
-    }
+    if(jobNeedsInvoice(j)){bsm[key].notBilledToClient++;bsm[key].notBilledValue+=moneyNum(j.client_price);}
+    else if(j.status==='Completed'&&roundMoney(j.client_price)>0&&invoicedJobIds.has(j.id))bsm[key].billedToClient++;
   });
-  document.getElementById('pay-by-sub').innerHTML=
+  const allTimeNote=`<div style="font-size:12.5px;color:var(--ink2);padding:4px 2px 12px">${unbilledAll.length?`${plural(unbilledAll.length,'completed job','completed jobs')} not invoiced across every month · ${fmt(unbilledAllValue)}`:'Every completed job with a client charge is invoiced.'} <span style="color:var(--red);font-weight:600;cursor:pointer" onclick="focusAttention('needInvoice')">Review</span></div>`;
+  document.getElementById('pay-by-sub').innerHTML=allTimeNote+
     (Object.entries(bsm).map(([key,d])=>{
       const p=d.revenue-d.total;
-      const gapWarn=d.notBilledToClient>0?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">⚠ ${d.notBilledToClient} job${d.notBilledToClient!==1?'s':''} not billed to client (${fmt(d.notBilledValue)})</div>`:`<div style="font-size:11px;color:var(--green);margin-top:3px">✓ all completed work billed</div>`;
+      const gapWarn=d.notBilledToClient>0?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">⚠ ${plural(d.notBilledToClient,'job')} not billed to client (${fmt(d.notBilledValue)})</div>`:(d.completed>0?`<div style="font-size:11px;color:var(--green);margin-top:3px">✓ completed work this month is billed</div>`:`<div style="font-size:11px;color:var(--ink3);margin-top:3px">No completed jobs this month</div>`);
       return`<div class="detail-row" style="cursor:pointer" onclick="openSubReconcile('${key}','${ym}')">
         <div><div style="font-weight:600;color:var(--ink);font-size:14px">${d.name}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.jobs} job${d.jobs!==1?'s':''} · ${d.completed} completed</div>${gapWarn}</div>
         <div style="text-align:right;display:flex;align-items:center;gap:10px">
@@ -2521,12 +2722,13 @@ function openSubReconcile(subKey,ym){
   const subName=subJobs[0]?.subcontractors?.name||(subKey==='unassigned'?'Unassigned':'Sub');
   const owedToSub=subJobs.filter(j=>j.payment_status==='Unpaid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
   const totalCost=subJobs.reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const completed=subJobs.filter(j=>j.status==='Completed'&&(parseFloat(j.client_price)||0)>0);
-  const unbilled=completed.filter(j=>!invoicedJobIds.has(j.id));
+  const completed=subJobs.filter(j=>j.status==='Completed'&&roundMoney(j.client_price)>0);
+  const unbilled=subJobs.filter(jobNeedsInvoice);
   const unbilledValue=unbilled.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
   let overlay=document.getElementById('trash-overlay');
   if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
-  const monthLbl=new Date(ym+'-01T00:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  const [ymY,ymM]=ym.split('-').map(Number);
+  const monthLbl=new Date(Date.UTC(ymY,ymM-1,1)).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
       <div><div style="font-size:11px;color:var(--ink3)">${monthLbl} · reconciliation</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${subName}</div></div>
@@ -2543,7 +2745,7 @@ function openSubReconcile(subKey,ym){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3)">Jobs this month (${subJobs.length})</div>${subJobs.some(j=>j.payment_status==='Unpaid')?`<span style="font-size:11px;color:var(--red);font-weight:600;cursor:pointer" onclick="bulkPaySelectAll('${subKey}')">Select all unpaid</span>`:''}</div>
     <div>${subJobs.map(j=>{
       const billed=invoicedJobIds.has(j.id);
-      const isCompleteBillable=j.status==='Completed'&&(parseFloat(j.client_price)||0)>0;
+      const isCompleteBillable=j.status==='Completed'&&roundMoney(j.client_price)>0;
       const unpaid=j.payment_status==='Unpaid';
       return`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)">
         <div style="display:flex;align-items:center;gap:9px;min-width:0;flex:1">
@@ -2567,20 +2769,22 @@ function openSubReconcile(subKey,ym){
 // ── ESTIMATES ─────────────────────────────────────────────────────────────
 function renderEstimates(){
   renderCostRequestsSection();
-  let list=estFilter==='all'?estimates:estimates.filter(e=>e.status===estFilter);
+  const q=(document.getElementById('est-search')?.value||'').trim().toLowerCase();
+  let list=estFilter==='all'?estimates.slice():estimates.filter(e=>e.status===estFilter);
   let banner='';
   if(attnFocus==='staleEst'){
     const today=new Date();
     list=estimates.filter(e=>{if(e.status!=='Sent')return false;return (today-new Date(e.created_at))/(1000*60*60*24)>7;});
     banner=`<div onclick="attnFocus=null;renderEstimates()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer"><div style="font-size:12.5px;font-weight:600;color:var(--ink)">⚑ Showing: ${list.length} estimate${list.length!==1?'s':''} awaiting a reply</div><div style="font-size:11px;color:var(--rose);font-weight:600;white-space:nowrap">✕ Show all</div></div>`;
   }
+  if(q)list=list.filter(e=>[e.estimate_number,customerNameOf(e),e.address,e.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
   document.getElementById('estimates-list').innerHTML=banner+(list.length?list.map(e=>`
-    <div class="card" onclick="openEstDetail('${e.id}')">
-      <div class="card-top"><div><div class="card-id">${e.estimate_number}</div><div class="card-title">${e.customers?.name||'—'}</div></div><span class="${pClass(e.status)}">${e.status}</span></div>
-      <div class="card-meta">${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
+    <div class="card" data-type="estimate" data-id="${e.id}" data-number="${esc(e.estimate_number||'')}" onclick="openEstDetail('${e.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+      <div class="card-meta">${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
       <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
     </div>`).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">No estimates</div><div class="empty-sub">Create estimates for new clients</div></div>`);
+    :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">${q?'No matches':'No estimates'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create estimates for new clients'}</div></div>`);
 }
 function filterEst(el,val){estFilter=val;document.querySelectorAll('#view-estimates .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderEstimates();}
 
@@ -2596,11 +2800,11 @@ function addInvLineItem(){
   renderInvLineItems();
 }
 function calcLineItemPrice(item){
-  const cost=parseFloat(item.cost)||0;
-  if(cost<=0)return parseFloat(item.price)||0;
-  const pct=Math.min(parseFloat(item.marginPct)||0,95);
-  if(item.mode==='markup')return cost*(1+pct/100);
-  return cost/(1-pct/100);
+  const cost=moneyNum(item.cost);
+  if(cost<=0)return roundMoney(item.price);
+  const pct=Math.min(moneyNum(item.marginPct),95);
+  const raw=item.mode==='markup'?cost*(1+pct/100):cost/(1-pct/100);
+  return roundMoney(raw);
 }
 function calcLineMargin(item){
   const cost=parseFloat(item.cost)||0;
@@ -2612,7 +2816,8 @@ function calcLineMargin(item){
   return{marginPct,markupPct,profit};
 }
 function lineItemCardHTML(item,i,arr){
-  const lineTotal=fmt((item.qty||0)*(item.price||0));
+  const amounts=lineAmounts(item.qty,item.price,item._recalc?null:item.storedTotal);
+  const lineTotal=fmt(amounts.total);
   const m=calcLineMargin(item);
   const list=arr==='est'?estLineItems:invLineItems;
   const marginBadge=m?`<div style="font-size:11px;padding:5px 9px;border-radius:var(--rxs);margin-top:8px;background:${m.marginPct<40?'rgba(224,87,74,0.12)':'rgba(74,180,120,0.12)'};color:${m.marginPct<40?'var(--rose)':'var(--green)'};font-weight:600">${m.marginPct<40?'⚠ ':''}Margin ${m.marginPct.toFixed(0)}% · Markup ${m.markupPct.toFixed(0)}% · Profit ${fmt(m.profit)}${m.marginPct<40?' (below 40% floor)':''}</div>`:'';
@@ -2639,7 +2844,7 @@ function lineItemCardHTML(item,i,arr){
         <div class="li-field li-pct"><input class="li-num" type="number" placeholder="0" value="${item.marginPct||''}" oninput="updateLineItemField('${arr}',${i},'marginPct',this.value)"><span class="li-pct-sign">%</span></div>
       </div>
       <div class="li-bottom" style="margin-top:8px">
-        <div class="li-field li-price" style="flex:1"><label>Client Price ($)</label><span class="li-price-sign">$</span><input class="li-num with-sign" type="number" id="${arr}-li-price-${i}" value="${item.price||''}" oninput="updateLineItemField('${arr}',${i},'price',this.value)"></div>
+        <div class="li-field li-price" style="flex:1"><label>Client Price ($)</label><span class="li-price-sign">$</span><input class="li-num with-sign" type="number" step="0.01" id="${arr}-li-price-${i}" value="${item.price===0||item.price?roundMoney(item.price).toFixed(2):''}" oninput="updateLineItemField('${arr}',${i},'price',this.value)"></div>
         <div class="li-field li-linetotal"><label>Line Total</label><div class="li-linetotal-val" id="${arr}-li-total-${i}">${lineTotal}</div></div>
       </div>
       <div id="${arr}-li-margin-${i}">${marginBadge}</div>
@@ -2676,10 +2881,12 @@ function updateLineItemField(arr,i,field,rawValue){
   if(field==='qty'||field==='cost'||field==='marginPct'||field==='price')item[field]=parseFloat(rawValue)||0;
   else item[field]=rawValue;
   if(field!=='price')item.price=calcLineItemPrice(item);
+  else item.price=roundMoney(item.price);
+  item._recalc=true;
   const totalEl=document.getElementById(`${arr}-li-total-${i}`);
-  if(totalEl)totalEl.textContent=fmt((item.qty||0)*(item.price||0));
+  if(totalEl)totalEl.textContent=fmt(lineAmounts(item.qty,item.price,null).total);
   const priceEl=document.getElementById(`${arr}-li-price-${i}`);
-  if(priceEl&&field!=='price')priceEl.value=item.price||'';
+  if(priceEl&&field!=='price')priceEl.value=roundMoney(item.price).toFixed(2);
   // Live-update the margin/markup badge
   const marginEl=document.getElementById(`${arr}-li-margin-${i}`);
   if(marginEl){
@@ -2693,6 +2900,7 @@ function setLineItemMode(arr,i,mode){
   const item=list[i];if(!item)return;
   item.mode=mode;
   item.price=calcLineItemPrice(item);
+  item._recalc=true;
   if(arr==='est')renderEstLineItems();else renderInvLineItems();
 }
 function removeLineItem(arr,i){
@@ -2707,16 +2915,19 @@ function renderInvLineItems(){
   document.getElementById('inv-line-items').innerHTML=invLineItems.map((item,i)=>lineItemCardHTML(item,i,'inv')).join('');
   calcInvTotal();
 }
+function lineItemsSubtotal(items){
+  return roundMoney(items.reduce((s,i)=>s+lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal).total,0));
+}
 function calcEstTotal(){
   const tax=parseFloat(document.getElementById('est-tax')?.value)||0;
-  const sub=estLineItems.reduce((s,i)=>s+(i.qty*i.price),0);
-  const total=sub*(1+tax/100);
+  const sub=lineItemsSubtotal(estLineItems);
+  const total=roundMoney(sub*(1+tax/100));
   document.getElementById('est-total-display').textContent=fmt(total);
 }
 function calcInvTotal(){
   const tax=parseFloat(document.getElementById('inv-tax')?.value)||0;
-  const sub=invLineItems.reduce((s,i)=>s+(i.qty*i.price),0);
-  const total=sub*(1+tax/100);
+  const sub=lineItemsSubtotal(invLineItems);
+  const total=roundMoney(sub*(1+tax/100));
   document.getElementById('inv-total-display').textContent=fmt(total);
 }
 
@@ -2725,9 +2936,9 @@ async function saveEstimate(sendNow){
   if(!custId){toast(`${ICONS.alert} Select a customer`);return;}
   if(estLineItems.length===0){toast(`${ICONS.alert} Add at least one line item`);return;}
   const tax=parseFloat(document.getElementById('est-tax').value)||0;
-  const sub=estLineItems.reduce((s,i)=>s+(i.qty*i.price),0);
-  const taxAmt=sub*(tax/100);
-  const total=sub+taxAmt;
+  const sub=lineItemsSubtotal(estLineItems);
+  const taxAmt=roundMoney(sub*(tax/100));
+  const total=roundMoney(sub+taxAmt);
   const editId=document.getElementById('est-edit-id').value;
   const selAddr=document.getElementById('est-prop-select').value;
   const manualAddr=document.getElementById('est-address').value.trim();
@@ -2751,7 +2962,7 @@ async function saveEstimate(sendNow){
       if(error){toast('Error: '+error.message);return;}
       estId=data.id;
     }
-    const{error:eiErr}=await db.from('estimate_items').insert(estLineItems.map(i=>({estimate_id:estId,title:i.title||null,description:i.desc||i.title||' ',quantity:i.qty,unit_price:i.price,total:i.qty*i.price,cost:i.cost||0,margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin',is_optional:!!i.isOptional,selected_by_default:i.selectedByDefault!==false})));
+    const{error:eiErr}=await db.from('estimate_items').insert(estLineItems.map(i=>{const a=lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal);return {estimate_id:estId,title:i.title||null,description:i.desc||i.title||' ',quantity:moneyNum(i.qty)||0,unit_price:a.unit,total:a.total,cost:roundMoney(i.cost||0),margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin',is_optional:!!i.isOptional,selected_by_default:i.selectedByDefault!==false};}));
     if(eiErr){toast('Error saving line items: '+eiErr.message);console.error('estimate_items',eiErr);}
     if(manualAddr&&!selAddr)await ensurePropertySaved(custId,manualAddr);
     if(window._pendingCostRequestId){
@@ -2786,11 +2997,12 @@ async function handleEstimateApproval(estId){
   const est=estimates.find(x=>x.id===estId)||(await db.from('estimates').select('*').eq('id',estId).single()).data;
   if(est&&est.is_recurring){
     // Recurring: generate the whole season, with a confirmation first
-    const start=est.rec_start_date||new Date().toISOString().slice(0,10);
+    const start=est.rec_start_date||bizYMD();
     const end=est.rec_end_date?new Date(est.rec_end_date+'T00:00:00'):seasonEndDate(start);
     const dates=buildRecurringJobDates(start,est.rec_frequency||'weekly',end);
     const freqWord={weekly:'weekly',biweekly:'every-2-week',monthly:'monthly'}[est.rec_frequency]||'recurring';
-    if(!confirm(`This will schedule ${dates.length} ${freqWord} visits from ${fmtDate(start)} through ${fmtDate(end.toISOString().slice(0,10))}. Set them up now?`)){
+    const endYmd=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;
+    if(!confirm(`This will schedule ${dates.length} ${freqWord} visits from ${fmtDate(start)} through ${fmtDate(endYmd)}. Set them up now?`)){
       toast('Approved — no visits scheduled yet');
       return;
     }
@@ -2821,7 +3033,7 @@ async function handleEstimateApproval(estId){
   }
 }
 
-function tlTime(ts){if(!ts)return '';const d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+function tlTime(ts){return fmtDateTime(ts);}
 function estimateTimelineHTML(e){
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(e.created_at),icon:'✎'});
@@ -2847,11 +3059,11 @@ async function openEstDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${e.estimate_number}</div><div>Status: ${e.status}</div>${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${e.customers?.name||'—'}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${e.address}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${e.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(e.sent_at)}${e.sent_to?` to ${esc(e.sent_to)}`:''}</div>`:''}${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-        <tbody>${(items||[]).map(i=>`<tr><td><div style="font-weight:600">${i.title||i.description||''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${i.description}</div>`:''}</td><td>${i.quantity}</td><td>${fmt(i.unit_price)}</td><td>${fmt(i.total)}</td></tr>`).join('')}</tbody>
+        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
       </table>
       <div class="inv-totals">
         <div class="inv-total-row"><span>Subtotal</span><span>${fmt(e.subtotal)}</span></div>
@@ -2864,7 +3076,7 @@ async function openEstDetail(id){
     <div class="action-row">
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
-      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDate(e.client_response_at.slice(0,10))}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
+      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
       <button class="action-btn ab-glass" onclick="printEstimate('${id}')">${ICONS.printer} Print / Save PDF</button>
       <button class="action-btn ab-glass" onclick="shareEstimatePdf('${id}')">${ICONS.send} Share / Text PDF</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-green" onclick="updateEstStatus('${id}','Approved')">${ICONS.check} Mark Approved</button>`:''}
@@ -2874,7 +3086,7 @@ async function openEstDetail(id){
       <button class="action-btn ab-glass" onclick="editEst('${id}')">${ICONS.pencil} Edit Estimate</button>
       <button class="action-btn ab-danger" onclick="deleteEst('${id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('est-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('est-detail').classList.add('open');syncRecordUrl('est',e);
 }
 function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
@@ -2893,7 +3105,7 @@ function estimateDocHTML(est,items,cust){
   <div class="doc-meta">
     <div class="doc-title">Estimate</div>
     <div class="doc-num">${est.estimate_number}</div>
-    <div class="doc-date">Issued ${fmtDate(est.created_at?est.created_at.slice(0,10):new Date().toISOString().slice(0,10))}</div>
+    <div class="doc-date">Issued ${fmtDate(est.created_at||bizYMD())}</div>
     ${est.valid_until?`<div class="doc-date">Valid until ${fmtDate(est.valid_until)}</div>`:''}
     <div class="status-pill" style="color:${statusColor};background:${statusBg}">${est.status}</div>
   </div>
@@ -2973,7 +3185,7 @@ function subPayoutDocHTML(sub,ym,subJobs){
 }
 function printSubPayout(subId){
   const sub=subs.find(s=>s.id===subId);if(!sub)return;
-  const ym=document.getElementById('report-month').value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('report-month').value||bizYM();
   const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
   const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
   const w=window.open('','_blank');
@@ -2991,7 +3203,7 @@ function printSubPayout(subId){
 }
 async function getSubPayoutPdf(subId){
   const sub=subs.find(s=>s.id===subId);if(!sub)return null;
-  const ym=document.getElementById('report-month')?.value||new Date().toISOString().slice(0,7);
+  const ym=document.getElementById('report-month')?.value||bizYM();
   const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
   const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
   const container=document.createElement('div');
@@ -3026,7 +3238,7 @@ async function openTrash(){
   const{data:djobs}=await db.from('jobs').select('*, customers(name)').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const{data:dcust}=await db.from('customers').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const items=[...(djobs||[]).map(j=>({type:'job',id:j.id,label:j.title,sub:j.customers?.name||'',deleted_at:j.deleted_at})),...(dcust||[]).map(c=>({type:'customer',id:c.id,label:c.name,sub:c.city||'',deleted_at:c.deleted_at}))].sort((a,b)=>(b.deleted_at||'').localeCompare(a.deleted_at||''));
-  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${i.label}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+i.sub:''} · deleted ${fmtDate((i.deleted_at||'').slice(0,10))}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
+  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${i.label}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+i.sub:''} · deleted ${fmtDate(i.deleted_at)}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
   let overlay=document.getElementById('trash-overlay');
   if(!overlay){
     overlay=document.createElement('div');
@@ -3214,6 +3426,7 @@ async function emailEstimate(id){
   const cust=customers.find(c=>c.id===est.customer_id)||est.customers;
   const sendTo=cust?.email||cust?.billing_email;
   if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
+  if(!confirm(`Email ${est.estimate_number} to ${sendTo}?`))return;
   toast('Preparing & sending…');
   const result=await getEstimatePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3234,8 +3447,8 @@ async function emailEstimate(id){
   </div>`;
   try{
     await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    if(est.status==='Draft')await db.from('estimates').update({status:'Sent'}).eq('id',id);
-    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name}`,'estimate',id);
+    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
+    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${sendTo}`,'estimate',id);
     await fetchEstimates();renderEstimates();renderDashboard();
     if(document.getElementById('est-detail').classList.contains('open'))openEstDetail(id);
     toast(`✓ Estimate emailed to ${sendTo}`);
@@ -3248,9 +3461,22 @@ async function emailEstimate(id){
     }else{
       const url=URL.createObjectURL(result.blob);const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
     }
-    if(est.status==='Draft')await db.from('estimates').update({status:'Sent'}).eq('id',id);
+    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
     await fetchEstimates();renderEstimates();
   }
+}
+async function stampSent(table,id,extra){
+  const full=Object.assign({sent_at:new Date().toISOString()},extra||{});
+  let res=await db.from(table).update(full).eq('id',id);
+  if(res.error&&Object.prototype.hasOwnProperty.call(full,'sent_to')){
+    const slim=Object.assign({},full);delete slim.sent_to;
+    res=await db.from(table).update(slim).eq('id',id);
+  }
+  if(res.error&&full.status){
+    res=await db.from(table).update({status:full.status}).eq('id',id);
+  }
+  if(res.error)console.error('stampSent',table,res.error);
+  return res.error;
 }
 async function createJobFromEstimate(estId){
   const existing=jobs.find(j=>j.estimate_id===estId);
@@ -3264,7 +3490,19 @@ async function createJobFromEstimate(estId){
   return{job,already:false};
 }
 async function updateEstStatus(id,status){
-  await db.from('estimates').update({status}).eq('id',id);
+  const e=estimates.find(x=>x.id===id);
+  const payload={status};
+  if((status==='Approved'||status==='Declined')&&e&&!e.client_response){
+    payload.client_response=status==='Approved'?'Accepted':'Declined';
+    payload.client_response_at=new Date().toISOString();
+  }else if((status==='Approved'||status==='Declined')&&e&&!e.client_response_at){
+    payload.client_response_at=new Date().toISOString();
+  }
+  let {error}=await db.from('estimates').update(payload).eq('id',id);
+  if(error&&(payload.client_response||payload.client_response_at)){
+    const retry=payload.client_response_at?await db.from('estimates').update({status,client_response_at:payload.client_response_at}).eq('id',id):{error};
+    if(retry.error)await db.from('estimates').update({status}).eq('id',id);
+  }
   await fetchEstimates();
   if(status==='Approved'){
     closeDetail('est');
@@ -3278,8 +3516,8 @@ async function deleteEst(id){if(!confirm('Delete this estimate?'))return;await d
 async function convertEstToInvoice(estId){
   const e=estimates.find(x=>x.id===estId);if(!e)return;
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
-  const now=new Date();const due=new Date(now.setDate(now.getDate()+30));
-  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:e.subtotal,tax_rate:e.tax_rate,tax_amount:e.tax_amount,total:e.total,due_date:due.toISOString().split('T')[0],notes:e.notes}).select().single();
+  const due=addDaysYMD(bizYMD(),30);
+  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:e.subtotal,tax_rate:e.tax_rate,tax_amount:e.tax_amount,total:e.total,due_date:due,notes:e.notes}).select().single();
   if(error){toast('Error: '+error.message);return;}
   const{error:eiErr}=await db.from('invoice_items').insert((items||[]).map(i=>({invoice_id:inv.id,title:i.title||null,description:i.description||i.title||' ',quantity:i.quantity,unit_price:i.unit_price,total:i.total,cost:i.cost||0,margin_pct:i.margin_pct||0,pricing_mode:i.pricing_mode||'margin'})));
   if(eiErr){toast('Error copying line items: '+eiErr.message);return;}
@@ -3291,7 +3529,7 @@ async function editEst(id){
   closeDetail('est');openModal('estimate');
   document.getElementById('est-modal-title').textContent='Edit Estimate';
   document.getElementById('est-edit-id').value=id;
-  estLineItems=(items||[]).map(i=>({title:i.title||i.description||'',desc:i.title?i.description||'':'',qty:i.quantity,price:i.unit_price,cost:i.cost||0,marginPct:i.margin_pct||0,mode:i.pricing_mode||'margin',isOptional:!!i.is_optional,selectedByDefault:i.selected_by_default!==false}));
+  estLineItems=(items||[]).map(i=>({title:i.title||i.description||'',desc:i.title?i.description||'':'',qty:i.quantity,price:i.unit_price,storedTotal:i.total,cost:i.cost||0,marginPct:i.margin_pct||0,mode:i.pricing_mode||'margin',isOptional:!!i.is_optional,selectedByDefault:i.selected_by_default!==false}));
   setTimeout(()=>{
     document.getElementById('est-customer').value=e.customer_id||'';
     loadEstCustomerProps();
@@ -3315,9 +3553,15 @@ function invIsOverdue(i){
   const days=(new Date()-new Date(i.sent_at))/(1000*60*60*24);
   return days>30;
 }
+function invSentLabel(i){
+  if(i.sent_at)return ' · <span style="color:var(--green)">✓ Sent</span>';
+  if(i.status==='Paid'||i.status==='Cancelled')return '';
+  return ' · <span style="color:var(--ink3)">Not sent</span>';
+}
 function renderInvoices(){
   renderBatchInvoice();
-  let list=invFilter==='all'?invoices:invFilter==='Overdue'?invoices.filter(invIsOverdue):invoices.filter(i=>i.status===invFilter);
+  const q=(document.getElementById('inv-search')?.value||'').trim().toLowerCase();
+  let list=invFilter==='all'?invoices.slice():invFilter==='Overdue'?invoices.filter(invIsOverdue):invoices.filter(i=>i.status===invFilter);
   let banner='';
   if(attnFocus==='notSent'){
     list=invoices.filter(i=>!i.sent_at&&i.status!=='Paid'&&i.status!=='Cancelled');
@@ -3327,17 +3571,19 @@ function renderInvoices(){
     list=invoices.filter(i=>{if(i.status==='Paid'||i.status==='Cancelled'||!i.sent_at)return false;return (today-new Date(i.sent_at))/(1000*60*60*24)>30;});
     banner=invAttnBanner(`${list.length} invoice${list.length!==1?'s':''} unpaid over 30 days`);
   }
+  list=sortInvoices(list);
+  if(q)list=list.filter(i=>[i.invoice_number,customerNameOf(i),i.address,i.status].filter(Boolean).some(v=>String(v).toLowerCase().includes(q)));
   document.getElementById('invoices-list').innerHTML=banner+(list.length?list.map(i=>{
     const overdue=invIsOverdue(i);
     const displayStatus=overdue?'Overdue':i.status;
     const days=i.sent_at?Math.floor((new Date()-new Date(i.sent_at))/(1000*60*60*24)):null;
     return`
-    <div class="card" onclick="openInvDetail('${i.id}')">
-      <div class="card-top"><div><div class="card-id">${i.invoice_number}${i.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':' · <span style="color:var(--ink3)">Not sent</span>'}</div><div class="card-title">${i.customers?.name||'—'}</div></div><span class="${pClass(displayStatus)}">${displayStatus}</span></div>
-      <div class="card-meta">${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${i.address}</span>`:''}${overdue&&days?`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} ${days} days unpaid</span>`:i.due_date?`<span class="card-meta-item">${ICONS.calendar} Due ${fmtDate(i.due_date)}</span>`:''}</div>
+    <div class="card" data-type="invoice" data-id="${i.id}" data-number="${esc(i.invoice_number||'')}" onclick="openInvDetail('${i.id}')">
+      <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
+      <div class="card-meta">${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${overdue&&days?`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} ${days} days unpaid</span>`:i.due_date?`<span class="card-meta-item">${ICONS.calendar} Due ${fmtDate(i.due_date)}</span>`:''}</div>
       <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
     </div>`;}).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">No invoices</div><div class="empty-sub">Create invoices or convert approved estimates</div></div>`);
+    :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">${q?'No matches':'No invoices'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create invoices or convert approved estimates'}</div></div>`);
 }
 function invAttnBanner(label){
   return `<div onclick="attnFocus=null;renderInvoices()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer">
@@ -3346,14 +3592,14 @@ function invAttnBanner(label){
   </div>`;
 }
 function getBillableJobs(){
-  return jobs.filter(j=>j.status==='Completed'&&!invoicedJobIds.has(j.id)&&(parseFloat(j.client_price)||0)>0&&j.customer_id);
+  return jobsNeedingInvoice();
 }
 function renderBatchInvoice(){
   const el=document.getElementById('batch-invoice-section');
   const billable=getBillableJobs();
   if(!billable.length){el.innerHTML='';return;}
   const byClient={};
-  billable.forEach(j=>{const key=j.customer_id;if(!byClient[key])byClient[key]={name:j.customers?.name||'—',jobs:[]};byClient[key].jobs.push(j);});
+  billable.forEach(j=>{const key=j.customer_id||'none';if(!byClient[key])byClient[key]={name:j.customer_id?(customerNameOf(j)||'—'):'No client on file',jobs:[]};byClient[key].jobs.push(j);});
   el.innerHTML=`<div class="batch-card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
       <div style="font-weight:700;color:var(--ink);font-size:14px">${ICONS.receipt} Ready to Invoice</div>
@@ -3364,12 +3610,12 @@ function renderBatchInvoice(){
       const total=d.jobs.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
       return`<div class="batch-client" data-cust="${custId}">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink);cursor:pointer">
-          <input type="checkbox" class="batch-client-cb" data-cust="${custId}" checked onchange="toggleBatchClient('${custId}',this.checked)">
+          <input type="checkbox" class="batch-client-cb" data-cust="${custId}" onchange="toggleBatchClient('${custId}',this.checked)">
           ${d.name}<span style="margin-left:auto;font-weight:700;color:var(--red);font-family:'Cormorant Garamond',serif;font-size:15px">${fmt(total)}</span>
         </label>
         <div style="padding-left:24px">
           ${d.jobs.map(j=>`<label class="batch-job-row">
-            <input type="checkbox" class="batch-job-cb" data-job="${j.id}" data-cust="${custId}" checked onchange="syncBatchClientCb('${custId}')">
+            <input type="checkbox" class="batch-job-cb" data-job="${j.id}" data-cust="${custId}" onchange="syncBatchClientCb('${custId}')">
             ${j.title}${j.scheduled_date?' · '+fmtDate(j.scheduled_date):''} — ${fmt(j.client_price)}
           </label>`).join('')}
         </div>
@@ -3389,6 +3635,11 @@ function syncBatchClientCb(custId){
 async function createBatchInvoices(){
   const checked=[...document.querySelectorAll('.batch-job-cb:checked')];
   if(!checked.length){toast('Nothing selected');return;}
+  const selectedJobs=checked.map(cb=>jobs.find(j=>j.id===cb.dataset.job)).filter(Boolean);
+  const missing=selectedJobs.filter(j=>!j.customer_id);
+  if(missing.length){toast(`${ICONS.alert} ${plural(missing.length,'selected job','selected jobs')} ${missing.length===1?'has':'have'} no client — add one before invoicing`);return;}
+  const total=roundMoney(selectedJobs.reduce((s,j)=>s+moneyNum(j.client_price),0));
+  if(!confirm(`Create invoices for ${plural(selectedJobs.length,'job')} totaling ${fmt(total)}?`))return;
   // Group selected jobs by customer + address, so each property gets its own invoice
   const groups={};
   checked.forEach(cb=>{
@@ -3444,11 +3695,11 @@ async function openInvDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${inv.invoice_number}</div><div>Status: ${inv.status}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDate(inv.sent_at.slice(0,10))}</div>`:`<div style="color:var(--ink3)">Not sent yet</div>`}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${inv.customers?.name||'—'}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${inv.address}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${inv.invoice_number}</div><div>Status: ${inv.status}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(inv.sent_at)}${inv.sent_to?` to ${esc(inv.sent_to)}`:''}</div>`:(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${inv.customers?.name||'—'}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${inv.address}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-        <tbody>${(items||[]).map(i=>`<tr><td><div style="font-weight:600">${i.title||i.description||''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${i.description}</div>`:''}</td><td>${i.quantity}</td><td>${fmt(i.unit_price)}</td><td>${fmt(i.total)}</td></tr>`).join('')}</tbody>
+        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
       </table>
       <div class="inv-totals">
         <div class="inv-total-row"><span>Subtotal</span><span>${fmt(inv.subtotal)}</span></div>
@@ -3468,7 +3719,7 @@ async function openInvDetail(id){
       <button class="action-btn ab-glass" onclick="editInv('${id}')">${ICONS.pencil} Edit Invoice</button>
       <button class="action-btn ab-danger" onclick="deleteInv('${id}')">${ICONS.trash} Delete</button>
     </div>`;
-  document.getElementById('inv-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('inv-detail').classList.add('open');syncRecordUrl('inv',inv);
 }
 function invoiceCSS(){
   return `
@@ -3534,7 +3785,7 @@ function invoiceDocHTML(inv,items,cust){
   <div class="doc-meta">
     <div class="doc-title">Invoice</div>
     <div class="doc-num">${inv.invoice_number}</div>
-    <div class="doc-date">Issued ${fmtDate(inv.created_at?inv.created_at.slice(0,10):new Date().toISOString().slice(0,10))}</div>
+    <div class="doc-date">Issued ${fmtDate(inv.created_at||bizYMD())}</div>
     ${inv.due_date?`<div class="doc-date">Due ${fmtDate(inv.due_date)}</div>`:''}
     <div class="status-pill" style="color:${statusColor};background:${statusBg}">${inv.status}</div>
   </div>
@@ -3661,6 +3912,7 @@ async function emailInvoice(id){
   const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers;
   const sendTo=cust?.billing_email||cust?.email;
   if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
+  if(!confirm(`Email ${inv.invoice_number} to ${sendTo}?`))return;
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3673,7 +3925,7 @@ async function emailInvoice(id){
   </div>`;
   try{
     await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    await markInvoiceSent(id);
+    await markInvoiceSent(id,sendTo);
     toast(`✓ Invoice emailed to ${sendTo}`);
     openInvDetail(id);
   }catch(e){
@@ -3682,27 +3934,40 @@ async function emailInvoice(id){
     toast('Direct send failed — opening share instead');
     const file=new File([result.blob],result.filename,{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
+      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id,sendTo);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
     }
     const url=URL.createObjectURL(result.blob);
     const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-    await markInvoiceSent(id);
+    await markInvoiceSent(id,sendTo);
   }
 }
-async function markInvoiceSent(id){
+async function markInvoiceSent(id,sentTo){
   const inv=invoices.find(x=>x.id===id);
-  await db.from('invoices').update({sent_at:new Date().toISOString()}).eq('id',id);
-  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}`.trim():null,'invoice',id);
+  await stampSent('invoices',id,sentTo?{sent_to:sentTo}:{});
+  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}${sentTo?' · '+sentTo:''}`.trim():null,'invoice',id);
   await fetchInvoices();renderInvoices();
 }
 async function toggleInvoiceSent(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const newVal=inv.sent_at?null:new Date().toISOString();
-  await db.from('invoices').update({sent_at:newVal}).eq('id',id);
+  const undoing=!!inv.sent_at;
+  if(!confirm(undoing?`Mark ${inv.invoice_number} as not sent?`:`Mark ${inv.invoice_number} as sent?`))return;
+  const newVal=undoing?null:new Date().toISOString();
+  const payload={sent_at:newVal};
+  if(undoing)payload.sent_to=null;
+  let {error}=await db.from('invoices').update(payload).eq('id',id);
+  if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
+    await db.from('invoices').update({sent_at:newVal}).eq('id',id);
+  }
   await fetchInvoices();renderInvoices();openInvDetail(id);
   toast(newVal?'Marked as sent ✓':'Marked as not sent');
 }
-async function markInvPaid(id){const inv=invoices.find(x=>x.id===id);await db.from('invoices').update({status:'Paid',paid_at:new Date().toISOString()}).eq('id',id);logActivity('Invoice marked paid',inv?`${inv.invoice_number} — ${inv.customers?.name||''} · ${fmt(inv.total)}`.trim():null,'invoice',id);await fetchInvoices();renderInvoices();openInvDetail(id);toast('Invoice marked paid ✓');}
+async function markInvPaid(id){
+  const inv=invoices.find(x=>x.id===id);if(!inv)return;
+  if(!confirm(`Mark ${inv.invoice_number} paid · ${fmt(inv.total)}?`))return;
+  await db.from('invoices').update({status:'Paid',paid_at:new Date().toISOString()}).eq('id',id);
+  logActivity('Invoice marked paid',`${inv.invoice_number} — ${inv.customers?.name||''} · ${fmt(inv.total)}`.trim(),'invoice',id);
+  await fetchInvoices();renderInvoices();openInvDetail(id);toast('Invoice marked paid ✓');
+}
 async function markInvOverdue(id){await db.from('invoices').update({status:'Overdue'}).eq('id',id);await fetchInvoices();renderInvoices();openInvDetail(id);toast('Marked overdue');}
 async function deleteInv(id){if(!confirm('Delete this invoice?'))return;await db.from('invoice_items').delete().eq('invoice_id',id);const{error}=await db.from('invoices').delete().eq('id',id);if(error){toast('Could not delete: '+error.message);return;}closeDetail('inv');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();toast('Invoice deleted ✓');}
 function loadInvCustomerProps(){
@@ -3724,8 +3989,8 @@ async function saveInvoice(sendNow){
   if(!custId){toast(`${ICONS.alert} Select a customer`);return;}
   if(invLineItems.length===0){toast(`${ICONS.alert} Add at least one line item`);return;}
   const tax=parseFloat(document.getElementById('inv-tax').value)||0;
-  const sub=invLineItems.reduce((s,i)=>s+(i.qty*i.price),0);
-  const taxAmt=sub*(tax/100);const total=sub+taxAmt;
+  const sub=lineItemsSubtotal(invLineItems);
+  const taxAmt=roundMoney(sub*(tax/100));const total=roundMoney(sub+taxAmt);
   const editId=document.getElementById('inv-edit-id').value;
   const selAddr=document.getElementById('inv-prop-select').value;
   const manualAddr=document.getElementById('inv-address').value.trim();
@@ -3736,7 +4001,7 @@ async function saveInvoice(sendNow){
     let invId=editId;
     if(editId){const{error}=await db.from('invoices').update(payload).eq('id',editId);if(error){toast('Error: '+error.message);return;}await db.from('invoice_items').delete().eq('invoice_id',editId);}
     else{const{data,error}=await db.from('invoices').insert(payload).select().single();if(error){toast('Error: '+error.message);return;}invId=data.id;}
-    const{error:iiErr}=await db.from('invoice_items').insert(invLineItems.map(i=>({invoice_id:invId,job_id:i.jobId||document.getElementById('inv-job').value||null,title:i.title||null,description:i.desc||i.title||' ',quantity:i.qty,unit_price:i.price,total:i.qty*i.price,cost:i.cost||0,margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin'})));
+    const{error:iiErr}=await db.from('invoice_items').insert(invLineItems.map(i=>{const a=lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal);return {invoice_id:invId,job_id:i.jobId||document.getElementById('inv-job').value||null,title:i.title||null,description:i.desc||i.title||' ',quantity:moneyNum(i.qty)||0,unit_price:a.unit,total:a.total,cost:roundMoney(i.cost||0),margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin'};}));
     if(iiErr){toast('Error saving line items: '+iiErr.message);console.error('invoice_items',iiErr);}
     logActivity(editId?'Invoice edited':'Invoice created',`${customers.find(c=>c.id===custId)?.name||''} · ${fmt(total)}`.trim(),'invoice',invId);
     closeModal('invoice');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();
@@ -3750,7 +4015,7 @@ async function editInv(id){
   closeDetail('inv');openModal('invoice');
   document.getElementById('inv-modal-title').textContent='Edit Invoice';
   document.getElementById('inv-edit-id').value=id;
-  invLineItems=(items||[]).map(i=>({title:i.title||i.description||'',desc:i.title?i.description||'':'',qty:i.quantity,price:i.unit_price,cost:i.cost||0,marginPct:i.margin_pct||0,mode:i.pricing_mode||'margin',jobId:i.job_id||null}));
+  invLineItems=(items||[]).map(i=>({title:i.title||i.description||'',desc:i.title?i.description||'':'',qty:i.quantity,price:i.unit_price,storedTotal:i.total,cost:i.cost||0,marginPct:i.margin_pct||0,mode:i.pricing_mode||'margin',jobId:i.job_id||null}));
   setTimeout(()=>{
     document.getElementById('inv-customer').value=inv.customer_id||'';
     loadInvCustomerProps();
@@ -3812,7 +4077,7 @@ function renderSiteReport(job){
       const st=report.items?.[item]||'—';
       return`<div class="detail-row"><span class="detail-label">${item}</span><span class="detail-value" style="color:${stateColor[st]||'var(--ink2)'};font-weight:600">${st}</span></div>`;
     }).join('')+(report.notes?`<div style="margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:var(--rxs);font-size:12.5px;color:var(--ink2)">${report.notes}</div>`:'')+
-    (report.submitted_at?`<div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Submitted ${new Date(report.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>`:'');
+    (report.submitted_at?`<div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Submitted ${fmtDate(report.submitted_at)}</div>`:'');
     return;
   }
   // SUB view — fill out / edit the report
@@ -3903,10 +4168,11 @@ async function openJobDetail(id){
       <div class="detail-row"><span class="detail-label">Customer</span><span class="detail-value">${j.customers?.name||'—'}</span></div>
       ${addr?`<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value" style="max-width:55%"><a href="${mapsUrl(addr)}" style="color:var(--blue)">${addr}</a></span></div>`:''}
       ${j.description?`<div class="detail-row"><span class="detail-label">Scope</span><span class="detail-value" style="max-width:55%">${j.description}</span></div>`:''}
-      <div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${fmtDate(j.scheduled_date)}</span></div>
+      <div class="detail-row"><span class="detail-label">Scheduled</span><span class="detail-value">${j.scheduled_date?fmtDate(j.scheduled_date):'Not scheduled'}</span></div>
+      ${j.completed_at?`<div class="detail-row"><span class="detail-label">Completed</span><span class="detail-value">${fmtDate(j.completed_at)}</span></div>`:''}
       <div class="detail-row"><span class="detail-label">Assigned to</span><span class="detail-value">${j.subcontractors?.name||'<span style="color:var(--rose)">Unassigned</span>'}</span></div>
       ${j.estimate_id&&estimates.find(x=>x.id===j.estimate_id)?`<div class="detail-row"><span class="detail-label">From Estimate</span><span class="detail-value">${estimates.find(x=>x.id===j.estimate_id).estimate_number}</span></div>`:''}
-      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${fmt(j.client_price-j.sub_pay)}${j.client_price>0?` (${(((j.client_price-j.sub_pay)/j.client_price)*100).toFixed(0)}%)`:''}</span></div><div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(j.payment_status)}">${j.payment_status}</span></span></div>${j.payment_status==='Paid'&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${j.payment_method}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}`:''}
+      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${jobProfitText(j)}</span></div><div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(j.payment_status)}">${j.payment_status}</span></span></div>${j.payment_status==='Paid'&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${j.payment_method}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}`:''}
       ${j.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${j.notes}</span></div>`:''}
     </div>
     ${addr?`<a class="dir-link" href="${mapsUrl(addr)}">${ICONS.mapPin} Get Directions</a><br><br>`:''}
@@ -3927,7 +4193,7 @@ async function openJobDetail(id){
       ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${id}')">${ICONS.send} Notify Sub</button>`:''}
       ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${id}')">${ICONS.trash} Delete Job</button>`:''}
     </div>`;
-  document.getElementById('job-detail').classList.add('open');pushHistoryState('detail');
+  document.getElementById('job-detail').classList.add('open');syncRecordUrl('job',j);
   await renderJobPhotos(id);
   renderSiteReport(j);
 }
@@ -3963,7 +4229,7 @@ async function convertJobToInvoice(jobId){
 function markPaidDetail(id){
   document.getElementById('mp-job-id').value=id;
   document.getElementById('mp-method').value='Cash';
-  document.getElementById('mp-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('mp-date').value=bizYMD();
   document.getElementById('mp-title').textContent='Mark as Paid';
   openModal('markpaid');
 }
@@ -3974,6 +4240,8 @@ async function confirmMarkPaid(){
   if(id==='__BULK__'){
     const ids=window._bulkPayIds||[];
     if(!ids.length){closeModal('markpaid');return;}
+    const total=roundMoney(ids.reduce((s,i)=>s+moneyNum(jobs.find(x=>x.id===i)?.sub_pay),0));
+    if(!confirm(`Mark ${plural(ids.length,'job')} paid · ${fmt(total)} via ${method} on ${fmtDate(date)}?`))return;
     const{error}=await db.from('jobs').update({payment_status:'Paid',payment_method:method,paid_at:date}).in('id',ids);
     if(error){toast('Error: '+error.message);return;}
     window._bulkPayIds=null;
@@ -3983,6 +4251,9 @@ async function confirmMarkPaid(){
     toast(`${ids.length} jobs marked paid ✓`);
     return;
   }
+  const j=jobs.find(x=>x.id===id);
+  const label=j?`${j.job_number||j.title} · sub pay ${fmt(j.sub_pay)}`:'this job';
+  if(!confirm(`Mark ${label} paid via ${method} on ${fmtDate(date)}?`))return;
   await db.from('jobs').update({payment_status:'Paid',payment_method:method,paid_at:date}).eq('id',id);
   closeModal('markpaid');
   await fetchJobs();renderAll();
@@ -4011,7 +4282,7 @@ function bulkMarkPaid(){
   let total=0;ids.forEach(i=>{const j=jobs.find(x=>x.id===i);total+=parseFloat(j?.sub_pay)||0;});
   document.getElementById('mp-job-id').value='__BULK__';
   document.getElementById('mp-method').value='Cash';
-  document.getElementById('mp-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('mp-date').value=bizYMD();
   document.getElementById('mp-title').textContent=`Mark ${ids.length} jobs paid · ${fmt(total)}`;
   const mpOverlay=document.getElementById('modal-markpaid');
   if(mpOverlay){mpOverlay.style.zIndex='1000';mpOverlay.style.position='fixed';}
@@ -4050,14 +4321,13 @@ function renderSubPortal(){
   // and anything still needing accept, so nothing important gets hidden). "all" shows everything.
   let timed=myJobs;
   if(subTimeframe==='week'){
-    const today=new Date();today.setHours(0,0,0,0);
-    const weekEnd=new Date(today);weekEnd.setDate(weekEnd.getDate()+7);
+    const todayStr=bizYMD();
+    const weekEnd=addDaysYMD(todayStr,7);
     timed=myJobs.filter(j=>{
-      if(!j.accepted_at)return true;                 // always show anything awaiting accept
-      if(j.status==='In Progress')return true;        // always show active work
-      if(!j.scheduled_date)return true;               // undated → show it
-      const d=new Date(j.scheduled_date+'T00:00:00');
-      return d<=weekEnd;                              // scheduled within the next 7 days (or overdue)
+      if(!j.accepted_at)return true;
+      if(j.status==='In Progress')return true;
+      if(!j.scheduled_date)return true;
+      return j.scheduled_date<=weekEnd;
     });
   }
   const filtered=subJobFilter==='all'?timed:timed.filter(j=>j.status===subJobFilter);
@@ -4072,14 +4342,16 @@ function filterSubJobs(el,val){subJobFilter=val;document.querySelectorAll('#sub-
 // ── SAVE JOB ─────────────────────────────────────────────────────────────
 async function saveJob(){
   const title=document.getElementById('job-title').value.trim();
-  if(!title){toast(`${ICONS.alert} Job title is required`);return;}
+  if(!title){toast(`${ICONS.alert} Job title is required`);document.getElementById('job-title')?.focus();return;}
+  const custId=document.getElementById('job-customer').value;
+  if(!custId){toast(`${ICONS.alert} Select a customer`);document.getElementById('job-customer')?.focus();return;}
   const editId=document.getElementById('job-edit-id').value;
   const prevSubId=editId?(jobs.find(j=>j.id===editId)?.subcontractor_id||null):null;
   const selAddr=document.getElementById('job-prop-select').value;
   const manualAddr=document.getElementById('job-address').value.trim();
   const addr=manualAddr||(selAddr||null);
   const newSubId=document.getElementById('job-sub').value||null;
-  const payload={title,customer_id:document.getElementById('job-customer').value||null,address:addr,description:document.getElementById('job-description').value.trim()||null,scheduled_date:document.getElementById('job-date').value||null,status:document.getElementById('job-status').value,subcontractor_id:newSubId,client_price:parseFloat(document.getElementById('job-client-price').value)||0,sub_pay:parseFloat(document.getElementById('job-pay').value)||0,payment_status:document.getElementById('job-paystatus').value,notes:document.getElementById('job-notes').value.trim()||null};
+  const payload={title,customer_id:custId,address:addr,description:document.getElementById('job-description').value.trim()||null,scheduled_date:document.getElementById('job-date').value||null,status:document.getElementById('job-status').value,subcontractor_id:newSubId,client_price:roundMoney(document.getElementById('job-client-price').value),sub_pay:roundMoney(document.getElementById('job-pay').value),payment_status:document.getElementById('job-paystatus').value,notes:document.getElementById('job-notes').value.trim()||null};
   if(newSubId&&newSubId!==prevSubId)payload.accepted_at=null;
   try{
     let err,jobId=editId;
@@ -4139,7 +4411,7 @@ function updateJobMarginPreview(){
 // ── SAVE CUSTOMER ─────────────────────────────────────────────────────────
 async function saveCustomer(){
   const name=document.getElementById('cust-name').value.trim();
-  if(!name){toast(`${ICONS.alert} Name is required`);return;}
+  if(!name){toast(`${ICONS.alert} Name is required`);document.getElementById('cust-name')?.focus();return;}
   const editId=document.getElementById('cust-edit-id').value;
   const address=document.getElementById('cust-address').value.trim();
   const payload={name,phone:document.getElementById('cust-phone').value.trim()||null,email:document.getElementById('cust-email').value.trim()||null,billing_email:document.getElementById('cust-billing-email').value.trim()||null,city:document.getElementById('cust-city').value.trim()||null,notes:document.getElementById('cust-notes').value.trim()||null};
@@ -4304,67 +4576,192 @@ function closeDetail(type){
   const el=document.getElementById(map[type]);if(el)el.classList.remove('open');
 }
 const NAV_ORDER=['dashboard','jobs','calendar','customers','estimates','invoices'];
-// ── BACK BUTTON / HISTORY HANDLING ──
-// Push a history entry whenever we open something, so the phone's back button/gesture
-// closes it (or returns to the dashboard) instead of exiting the app.
+// ── REAL URLS ──
+// History routes (/jobs/SMK-97456, /estimates/EST-0015, …) plus a Netlify
+// SPA rewrite so refresh and the back button stay on the same record.
+let routeSilent=false;
+const VIEW_PATH={dashboard:'/',jobs:'/jobs',calendar:'/calendar',customers:'/clients',estimates:'/estimates',invoices:'/invoices',subs:'/subs',payments:'/reports',recurring:'/maintenance','sub-portal':'/my-jobs'};
+const PATH_VIEW={'':'dashboard',jobs:'jobs',calendar:'calendar',clients:'customers',estimates:'estimates',invoices:'invoices',subs:'subs',reports:'payments',maintenance:'recurring',quotes:'estimates','my-jobs':'sub-portal'};
+function currentUrl(){return location.pathname+location.search;}
+function pushUrl(path,replace){
+  if(routeSilent||!path)return;
+  if(currentUrl()===path)return;
+  const state={sumak:true,path};
+  if(!replace)state.from=currentUrl();
+  try{if(replace)history.replaceState(state,'',path);else history.pushState(state,'',path);}catch(e){}
+}
+function viewPath(name){return VIEW_PATH[name]||'/';}
+function recordPath(kind,rec){
+  if(!rec)return null;
+  if(kind==='job')return '/jobs/'+encodeURIComponent(rec.job_number||rec.id);
+  if(kind==='est')return '/estimates/'+encodeURIComponent(rec.estimate_number||rec.id);
+  if(kind==='inv')return '/invoices/'+encodeURIComponent(rec.invoice_number||rec.id);
+  if(kind==='cust')return '/clients/'+encodeURIComponent(rec.id);
+  return null;
+}
+function syncRecordUrl(kind,rec){
+  const path=recordPath(kind,rec);
+  if(!path)return;
+  pushUrl(path);
+  const label=rec.job_number||rec.estimate_number||rec.invoice_number||rec.name||'';
+  document.title=label?label+' · Sumak Ops':'Sumak Ops';
+  document.body.dataset.route=path;
+}
+function resetListFilters(){
+  jobFilter='all';estFilter='all';invFilter='all';
+  ['job-search','est-search','inv-search'].forEach(id=>{const n=document.getElementById(id);if(n)n.value='';});
+  ['#view-jobs','#view-estimates','#view-invoices'].forEach(sel=>{
+    const chips=[...document.querySelectorAll(sel+' .filters .fchip')];
+    chips.forEach((c,i)=>c.classList.toggle('active',i===0));
+  });
+}
+function closeAllOverlays(){
+  document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');const modal=m.querySelector('.modal');if(modal)modal.style.transform='';});
+  ['job','cust','est','inv'].forEach(closeDetail);
+  const trash=document.getElementById('trash-overlay');if(trash)trash.style.display='none';
+  const activity=document.getElementById('activity-overlay');if(activity)activity.style.display='none';
+  const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
+}
+function applyRoute(pathname){
+  const path=pathname||location.pathname;
+  const parts=path.split('/').filter(Boolean).map(decodeURIComponent);
+  const head=parts[0]||'';
+  const slug=parts[1]||null;
+  if(currentProfile?.role==='sub'){
+    routeSilent=true;
+    showView('sub-portal',document.querySelector('.nav-item'));
+    routeSilent=false;
+    document.title='My Jobs · Sumak Ops';
+    if(head==='jobs'&&slug&&dataReady){
+      const j=jobs.find(x=>x.job_number===slug||x.id===slug);
+      if(j)openJobDetail(j.id);else toast('Job not found');
+    }
+    return;
+  }
+  const page=PATH_VIEW[head]||'dashboard';
+  routeSilent=true;
+  closeAllOverlays();
+  showView(page,null);
+  if(page==='calendar'&&typeof renderCalendar==='function')renderCalendar();
+  if(page==='payments'&&typeof renderPayments==='function')renderPayments();
+  if(page==='recurring'&&typeof renderRecurringView==='function')renderRecurringView();
+  if(page==='subs'&&typeof renderSubsList==='function')renderSubsList();
+  if(page==='jobs')renderJobs();
+  if(page==='estimates')renderEstimates();
+  if(page==='invoices')renderInvoices();
+  if(page==='customers')renderCustomers();
+  routeSilent=false;
+  document.body.dataset.route=path;
+  document.title='Sumak Ops';
+  if(!slug||!dataReady)return;
+  if(page==='jobs'){
+    const j=jobs.find(x=>x.job_number===slug||x.id===slug);
+    if(j)openJobDetail(j.id);else toast('Job not found');
+  }else if(page==='estimates'){
+    const e=estimates.find(x=>x.estimate_number===slug||x.id===slug);
+    if(e)openEstDetail(e.id);else toast('Estimate not found');
+  }else if(page==='invoices'){
+    const inv=invoices.find(x=>x.invoice_number===slug||x.id===slug);
+    if(inv)openInvDetail(inv.id);else toast('Invoice not found');
+  }else if(page==='customers'){
+    const c=customers.find(x=>x.id===slug);
+    if(c)openCustDetail(c.id);else toast('Client not found');
+  }
+}
+function historyBack(){
+  if(history.state&&history.state.from){history.back();return;}
+  const parts=location.pathname.split('/').filter(Boolean);
+  const page=PATH_VIEW[parts[0]||'']||'dashboard';
+  closeAllOverlays();
+  routeSilent=true;
+  showView(page,null);
+  routeSilent=false;
+  pushUrl(viewPath(page),true);
+  document.title='Sumak Ops';
+  if(page==='jobs')renderJobs();
+  else if(page==='estimates')renderEstimates();
+  else if(page==='invoices')renderInvoices();
+  else if(page==='customers')renderCustomers();
+  else if(page==='dashboard')renderDashboard();
+  else if(page==='calendar')renderCalendar();
+  else if(page==='payments')renderPayments();
+  else if(page==='recurring')renderRecurringView();
+}
 function pushHistoryState(kind){
-  try{history.pushState({sumak:true,kind,t:Date.now()},'');}catch(e){}
+  if(routeSilent)return;
+  try{history.pushState({sumak:true,kind,path:currentUrl()},'',currentUrl());}catch(e){}
 }
 function anyOverlayOpen(){
   return document.querySelector('.modal-overlay.open')
-    ||document.querySelector('.detail.open')
     ||document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open')
-    ||document.getElementById('trash-overlay')?.style.display==='flex';
+    ||document.getElementById('trash-overlay')?.style.display==='flex'
+    ||document.getElementById('activity-overlay')?.style.display==='flex';
 }
 function closeTopOverlay(){
-  // Close whatever's on top, in priority order. Returns true if something closed.
+  const activity=document.getElementById('activity-overlay');
+  if(activity&&activity.style.display==='flex'){activity.style.display='none';return true;}
   const trash=document.getElementById('trash-overlay');
   if(trash&&trash.style.display==='flex'){trash.style.display='none';return true;}
   const notifPanel=document.getElementById('notif-panel');
   if(notifPanel&&notifPanel.classList.contains('open')){notifPanel.classList.remove('open');return true;}
-  const openModal=document.querySelector('.modal-overlay.open');
-  if(openModal){openModal.classList.remove('open');return true;}
+  const openModalEl=document.querySelector('.modal-overlay.open');
+  if(openModalEl){openModalEl.classList.remove('open');return true;}
   const openDetail=document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
   if(openDetail){openDetail.classList.remove('open');return true;}
   return false;
 }
-window.addEventListener('popstate',(e)=>{
-  // Back button pressed. Close any open overlay first.
-  if(closeTopOverlay()){
-    pushHistoryState('overlay-guard'); // re-arm so the next back press has something to consume
+window.addEventListener('popstate',()=>{
+  if(document.getElementById('public-quote-host'))return;
+  const modalOpen=document.querySelector('.modal-overlay.open');
+  const trash=document.getElementById('trash-overlay');
+  const activity=document.getElementById('activity-overlay');
+  const notif=document.getElementById('notif-panel');
+  const sheetOpen=(trash&&trash.style.display==='flex')||(activity&&activity.style.display==='flex')||(notif&&notif.classList.contains('open'));
+  if(modalOpen||sheetOpen){
+    if(modalOpen){modalOpen.classList.remove('open');const modal=modalOpen.querySelector('.modal');if(modal)modal.style.transform='';}
+    if(trash)trash.style.display='none';
+    if(activity)activity.style.display='none';
+    if(notif)notif.classList.remove('open');
+    if(location.pathname.split('/').filter(Boolean).length<2){['job','cust','est','inv'].forEach(closeDetail);}
     return;
   }
-  // No overlay — if we're not on the dashboard, go there instead of exiting.
-  const activeView=document.querySelector('.view.active');
-  const activeName=activeView?activeView.id.replace('view-',''):'dashboard';
-  if(currentProfile?.role==='admin'&&activeName!=='dashboard'){
-    showView('dashboard',document.querySelector('.nav-item'));
-    pushHistoryState('view-guard');
-    return;
-  }
-  if(currentProfile?.role==='sub'){
-    // subs have one view; keep them in the app
-    pushHistoryState('sub-guard');
-    return;
-  }
-  // On dashboard with nothing open — allow the app to actually close/leave.
+  applyRoute(location.pathname);
 });
 function showView(name,el){
+  const fromNav=!routeSilent;
   attnFocus=null;
+  if(fromNav){
+    closeDetail('job');closeDetail('cust');closeDetail('est');closeDetail('inv');
+    resetListFilters();
+  }
+  const viewEl=document.getElementById('view-'+name);
+  if(!viewEl)return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
+  viewEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const highlightName=name==='recurring'?'jobs':name;
   const idx=NAV_ORDER.indexOf(highlightName);
   const navItems=document.querySelectorAll('.nav-item');
   if(idx>=0&&navItems[idx])navItems[idx].classList.add('active');
   else if(el)el.classList.add('active');
-  // Keep the Jobs/Maintenance toggle in sync with the actual view being shown
   if(name==='jobs'&&typeof setJobsToggle==='function')setJobsToggle('jobs');
   else if(name==='recurring'&&typeof setJobsToggle==='function')setJobsToggle('maintenance');
   try{sessionStorage.setItem('sumak_last_view',name);}catch(e){}
-  // Arm a history entry when navigating away from dashboard so back returns here
-  if(name!=='dashboard')pushHistoryState('view-'+name);
+  if(fromNav){
+    pushUrl(viewPath(name));
+    document.title='Sumak Ops';
+    document.body.dataset.route=viewPath(name);
+    if(name==='jobs')renderJobs();
+    else if(name==='estimates')renderEstimates();
+    else if(name==='invoices')renderInvoices();
+    else if(name==='customers')renderCustomers();
+    else if(name==='calendar')renderCalendar();
+    else if(name==='payments')renderPayments();
+    else if(name==='recurring')renderRecurringView();
+    else if(name==='subs')renderSubsList();
+    else if(name==='dashboard')renderDashboard();
+  }
+  const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
 }
 function toast(msg,actionFn,actionArg,actionLabel){
   const t=document.getElementById('toast');
@@ -4452,7 +4849,7 @@ async function maybeRenderPublicQuote(){
   return true;
 }
 function renderPublicQuote(host,token,q){
-  const money=(n)=>'$'+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+  const money=(n)=>fmt(n);
   const already=q.client_response;
   const items=q.items||[];
   // compute total live from selected items
