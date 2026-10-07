@@ -92,18 +92,19 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 #push-banner-actions{display:flex;gap:8px;}
 
 /* CONTENT & NAV */
-#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(80px + env(safe-area-inset-bottom));}
+#stage{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden;}
+#content{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(80px + env(safe-area-inset-bottom));}
 #navbar{position:absolute;bottom:0;left:0;right:0;background:var(--glass-s);backdrop-filter:var(--blur);border-top:1px solid var(--glass-b);display:flex;z-index:400;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -4px 20px rgba(139,100,60,0.08);}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 2px;cursor:pointer;gap:3px;min-width:0;min-height:52px;}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px;cursor:pointer;gap:2px;min-width:0;min-height:52px;}
 .nav-icon{font-size:18px;line-height:1;color:var(--ink3);}
-.nav-icon svg{width:21px;height:21px;color:var(--ink3);}
+.nav-icon svg{width:20px;height:20px;color:var(--ink3);}
 .nav-item.active .nav-icon svg{color:var(--red);}
 .icon-inline{width:14px;height:14px;flex-shrink:0;vertical-align:-2px;}
 .icon-btn{width:16px;height:16px;flex-shrink:0;}
 .empty-icon svg{width:44px;height:44px;opacity:0.35;}
 .auth-logo svg{width:32px;height:32px;color:var(--red);}
-.nav-label{font-size:9px;color:var(--red);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:none;}
-.nav-item.active .nav-label{display:block;}
+.nav-label{font-size:10px;color:var(--ink2);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;line-height:1.1;}
+.nav-item.active .nav-label{color:var(--red);font-weight:700;}
 .nav-dot{width:4px;height:4px;border-radius:50%;background:var(--red);opacity:0;transition:opacity 0.2s;margin-top:0;}
 .nav-item.active .nav-dot{opacity:0;}
 .jobs-mode-btn.active-mode,.sub-mode-btn.active-mode{background:var(--red);color:#fff;}
@@ -210,6 +211,7 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 
 /* CARDS */
 .card{background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--r);padding:16px;margin-bottom:10px;cursor:pointer;backdrop-filter:var(--blur);box-shadow:var(--gshadow);transition:all 0.18s;position:relative;overflow:hidden;}
+.card.card-current{border-color:var(--red);box-shadow:0 0 0 1px var(--red),var(--gshadow);}
 .card:active{transform:scale(0.99);box-shadow:var(--gshadow-lg);}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px;}
 .card-id{font-size:10px;font-weight:700;letter-spacing:0.07em;color:var(--ink3);margin-bottom:4px;text-transform:uppercase;}
@@ -417,6 +419,28 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 .addr-suggest-item{background:var(--sand);border:1px solid var(--glass-b);border-top:none;padding:9px 12px;font-size:12.5px;color:var(--ink2);cursor:pointer;}
 .addr-suggest-item:hover{background:var(--red-l);color:var(--ink);}
 .addr-suggest-item:last-child{border-radius:0 0 var(--rxs) var(--rxs);}
+.pane-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:44px;background:none;border:none;color:var(--ink);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;padding:0;}
+.pane-toggle span{font-size:12px;font-weight:600;color:var(--red);white-space:nowrap;}
+
+@media (min-width:900px){
+  #app{max-width:1200px;width:min(1200px,calc(100vw - 40px));margin:20px auto;height:calc(100dvh - 40px);display:grid;grid-template-columns:208px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);grid-template-areas:"side top" "side banner" "side main";border:1px solid var(--glass-b);border-radius:22px;box-shadow:var(--gshadow-lg);background:rgba(28,22,19,0.72);}
+  #navbar{grid-area:side;position:relative;inset:auto;width:auto;height:auto;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;padding:18px 10px;border-top:none;border-right:1px solid var(--glass-b);border-radius:22px 0 0 22px;z-index:5;box-shadow:none;overflow-y:auto;}
+  .nav-item{flex:0 0 auto;flex-direction:row;justify-content:flex-start;align-items:center;gap:10px;min-height:44px;padding:10px 12px;border-radius:12px;}
+  .nav-label{font-size:14px;text-align:left;}
+  .nav-item.active{background:var(--red-l);}
+  #topbar{grid-area:top;border-radius:0 22px 0 0;}
+  #push-banner{grid-area:banner;}
+  #stage{grid-area:main;display:block;height:100%;min-height:0;min-width:0;overflow:hidden;}
+  #content{height:100%;max-height:100%;padding-bottom:28px;min-width:0;}
+  #app.desk-split #content{width:46%;border-right:1px solid var(--glass-b);}
+  .detail-panel{top:0;bottom:0;right:0;left:auto;width:54%;border-left:1px solid var(--glass-b);border-radius:0 0 22px 0;box-shadow:-16px 0 40px rgba(0,0,0,0.28);}
+  #toast{left:228px;right:24px;bottom:24px;}
+  #auth-screen .auth-card,#auth-screen .auth-note{max-width:420px;}
+  #view-dashboard.active{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;align-content:start;}
+  #attention-list,#view-dashboard .attn-strip,#view-dashboard>div:last-child{grid-column:1 / -1;}
+  #view-dashboard .widget{margin:12px 8px 0;min-width:0;}
+  #view-payments .stats-grid{grid-template-columns:repeat(4,1fr);}
+}
 </style>
 </head>
 <body>
@@ -486,7 +510,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <button class="btn btn-glass btn-sm" onclick="dismissPushBanner()">Not now</button>
   </div>
 </div>
-<div id="content">
+<div id="stage"><div id="content">
   <!-- DASHBOARD -->
   <div class="view active" id="view-dashboard">
     <!-- NEEDS ATTENTION — the single most important view: what needs you, right now -->
@@ -672,6 +696,47 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="page-body" id="sub-jobs-list"></div>
     <div class="page-body" id="sub-quotes-list" style="display:none"></div>
   </div>
+</div>
+
+<!-- JOB DETAIL -->
+<div class="detail-panel" id="job-detail">
+  <div class="detail-topbar">
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="detail-topbar-title" id="detail-job-num">Job</span>
+    <span class="pill" id="detail-job-pill"></span>
+  </div>
+  <div class="detail-scroll" id="detail-job-body"></div>
+</div>
+
+<!-- CUSTOMER DETAIL -->
+<div class="detail-panel" id="cust-detail">
+  <div class="detail-topbar">
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="detail-topbar-title" id="detail-cust-name">Client</span>
+  </div>
+  <div class="detail-scroll" id="detail-cust-body"></div>
+</div>
+
+<!-- ESTIMATE DETAIL -->
+<div class="detail-panel" id="est-detail">
+  <div class="detail-topbar">
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="detail-topbar-title" id="detail-est-num">Estimate</span>
+    <span class="pill" id="detail-est-pill"></span>
+  </div>
+  <div class="detail-scroll" id="detail-est-body"></div>
+</div>
+
+<!-- INVOICE DETAIL -->
+<div class="detail-panel" id="inv-detail">
+  <div class="detail-topbar">
+    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
+    <span class="detail-topbar-title" id="detail-inv-num">Invoice</span>
+    <span class="pill" id="detail-inv-pill"></span>
+  </div>
+  <div class="detail-scroll" id="detail-inv-body"></div>
+</div>
+
 </div>
 
 <!-- NAVBAR -->
@@ -869,45 +934,6 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   </div>
 </div>
 
-<!-- JOB DETAIL -->
-<div class="detail-panel" id="job-detail">
-  <div class="detail-topbar">
-    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
-    <span class="detail-topbar-title" id="detail-job-num">Job</span>
-    <span class="pill" id="detail-job-pill"></span>
-  </div>
-  <div class="detail-scroll" id="detail-job-body"></div>
-</div>
-
-<!-- CUSTOMER DETAIL -->
-<div class="detail-panel" id="cust-detail">
-  <div class="detail-topbar">
-    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
-    <span class="detail-topbar-title" id="detail-cust-name">Client</span>
-  </div>
-  <div class="detail-scroll" id="detail-cust-body"></div>
-</div>
-
-<!-- ESTIMATE DETAIL -->
-<div class="detail-panel" id="est-detail">
-  <div class="detail-topbar">
-    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
-    <span class="detail-topbar-title" id="detail-est-num">Estimate</span>
-    <span class="pill" id="detail-est-pill"></span>
-  </div>
-  <div class="detail-scroll" id="detail-est-body"></div>
-</div>
-
-<!-- INVOICE DETAIL -->
-<div class="detail-panel" id="inv-detail">
-  <div class="detail-topbar">
-    <span class="back-btn" onclick="historyBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></svg></span>
-    <span class="detail-topbar-title" id="detail-inv-num">Invoice</span>
-    <span class="pill" id="detail-inv-pill"></span>
-  </div>
-  <div class="detail-scroll" id="detail-inv-body"></div>
-</div>
-
 <!-- COST REQUEST MODAL -->
 <div class="modal-overlay" id="modal-costreq" onclick="overlayClose(event,'costreq')">
   <div class="modal">
@@ -1045,6 +1071,7 @@ const inviteSubId=new URLSearchParams(window.location.search).get('invite');
 let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
 let attnFocus=null; // when set, a list filters to just the flagged items from the dashboard
+let readyInvoiceOpen=false,quoteHistoryOpen=false;
 let currentUser=null,currentProfile=null,currentSubId=null;
 const BIZ_TZ='America/Boise';
 let calYear=Number(bizYMD().slice(0,4)),calMonth=Number(bizYMD().slice(5,7))-1,calSelected=null;
@@ -1460,21 +1487,42 @@ function recordMatchesQuery(q,fields,sources){
   }
   return false;
 }
+function coerceTimestamp(v){
+  if(v==null)return '';
+  if(v instanceof Date)return Number.isNaN(v.getTime())?'':v.toISOString();
+  const s=String(v).trim();
+  if(!s||s==='null'||s==='undefined')return '';
+  return s;
+}
 function shortBizDate(s){
-  if(!s)return '';
-  if(isDateOnly(s)){
-    const [y,m,d]=s.split('-').map(Number);
+  if(s instanceof Date){
+    if(Number.isNaN(s.getTime()))return '';
+    return s.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:BIZ_TZ});
+  }
+  const raw=coerceTimestamp(s);
+  if(!raw)return '';
+  if(isDateOnly(raw)){
+    const [y,m,d]=raw.split('-').map(Number);
     return new Date(Date.UTC(y,m-1,d)).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
   }
-  const dt=new Date(s);
+  let dt=new Date(raw);
+  if(Number.isNaN(dt.getTime()))dt=new Date(raw.replace(' ','T'));
   if(Number.isNaN(dt.getTime()))return '';
   return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:BIZ_TZ});
 }
 function sentOrCreatedLabel(row){
   if(!row)return '';
-  if(row.sent_at){const d=shortBizDate(row.sent_at);return d?'Sent '+d:'';}
+  const sent=coerceTimestamp(row.sent_at);
+  if(sent){const d=shortBizDate(sent);return d?'Sent '+d:'Sent';}
   if(row.created_at){const d=shortBizDate(row.created_at);return d?'Created '+d:'';}
   return '';
+}
+function estimateDateLabel(e){
+  if(!e)return '';
+  const sent=coerceTimestamp(e.sent_at);
+  if(sent){const d=shortBizDate(sent);return d?'Sent '+d:'Sent';}
+  if(e.status==='Sent'||e.status==='Approved'||e.status==='Declined')return 'Sent';
+  return sentOrCreatedLabel(e);
 }
 function invoiceAnchorYMD(i){
   const raw=i&&(i.sent_at||i.created_at);
@@ -1756,6 +1804,7 @@ function renderJobs(){
   }
   document.getElementById('jobs-list').innerHTML=banner+(list.length?list.map(j=>jobCard(j,`openJobDetail('${j.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.jobs}</div><div class="empty-title">${jobFilter==='unpaid'?'Nothing unpaid':'No jobs'}</div>${jobFilter==='unpaid'?'<div class="empty-sub">Every sub is paid up ✓</div>':'<div class="empty-sub">One-off jobs show here</div>'}</div>`);
+  syncDeskChrome();
 }
 function attnBanner(label){
   return `<div onclick="attnFocus=null;renderJobs();renderInvoices();renderEstimates()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer">
@@ -1964,6 +2013,7 @@ function renderCustomers(){
       ${c.email?`<div style="font-size:12px;color:var(--ink3);margin-top:4px">${ICONS.mail} ${c.email}</div>`:''}
     </div>`).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.users}</div><div class="empty-title">${q?'No matches':'No clients yet'}</div>${q?`<div class="empty-sub">Nothing found for "${q}"</div>`:''}</div>`;
+  syncDeskChrome();
 }
 
 function openCustDetail(id){
@@ -2179,11 +2229,26 @@ async function saveCostRequest(){
     toast('Quote request sent ✓');
   }
 }
+function costRequestMatches(r,q){
+  if(!q)return true;
+  return recordMatchesQuery(q,[r.title,r.address,r.status,r.description,r.submitted_notes,customerNameOf(r),r.subcontractors?.name],clientSources(r));
+}
+let quoteHistoryQueryClosed=false;
+function toggleQuoteHistory(){
+  const q=(document.getElementById('est-search')?.value||'').trim();
+  if(q)quoteHistoryQueryClosed=!quoteHistoryQueryClosed;
+  else quoteHistoryOpen=!quoteHistoryOpen;
+  renderCostRequestsSection();
+}
 function renderCostRequestsSection(){
   const el=document.getElementById('cost-requests-section');
   if(!el)return;
-  const open=costRequests.filter(r=>r.status==='Requested'||r.status==='Submitted');
-  const past=costRequests.filter(r=>r.status!=='Requested'&&r.status!=='Submitted');
+  const q=(document.getElementById('est-search')?.value||'').trim();
+  const open=costRequests.filter(r=>(r.status==='Requested'||r.status==='Submitted')&&costRequestMatches(r,q));
+  const pastAll=costRequests.filter(r=>r.status!=='Requested'&&r.status!=='Submitted');
+  const past=pastAll.filter(r=>costRequestMatches(r,q));
+  if(q!==renderCostRequestsSection._q){quoteHistoryQueryClosed=false;renderCostRequestsSection._q=q;}
+  const showHistory=q?(past.length>0&&!quoteHistoryQueryClosed):quoteHistoryOpen;
   let html='';
   if(open.length){
   html+=`<div class="batch-card" style="border-color:var(--blue);background:var(--blue-bg)">
@@ -2215,11 +2280,12 @@ function renderCostRequestsSection(){
       </div>`).join('')}
   </div>`;
   }
-  if(past.length){
+  if(pastAll.length){
     html+=`<div class="batch-card" style="margin-top:${open.length?10:0}px">
-      <div style="font-weight:700;color:var(--ink);font-size:14px;margin-bottom:4px">Quote request history</div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:10px">Submitted requests that were turned into estimates, archived, or cancelled</div>
-      ${past.map(r=>`<div class="batch-client" data-type="cost_request" data-id="${r.id}" data-status="${esc(r.status||'')}">
+      <button type="button" class="pane-toggle" onclick="toggleQuoteHistory()">${ICONS.fileText} Quote request history (${past.length}${q&&past.length!==pastAll.length?' of '+pastAll.length:''})<span>${showHistory?'Hide':'Show'}</span></button>
+      <div id="quote-history-body" ${showHistory?'':'hidden'} style="margin-top:8px">
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">Submitted requests that were turned into estimates, archived, or cancelled</div>
+      ${past.length?past.map(r=>`<div class="batch-client" data-type="cost_request" data-id="${r.id}" data-status="${esc(r.status||'')}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
             <div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.title||'')}</div>
@@ -2230,7 +2296,8 @@ function renderCostRequestsSection(){
             ${r.submitted_cost!=null&&r.submitted_cost!==''?`<div style="font-weight:700;color:var(--red);margin-top:4px;font-family:'Cormorant Garamond',serif">${fmt(r.submitted_cost)}</div>`:''}
           </div>
         </div>
-      </div>`).join('')}
+      </div>`).join(''):`<div style="font-size:12px;color:var(--ink3);padding:4px 0 2px">${q?'No matching quote requests':'Nothing in history yet'}</div>`}
+      </div>
     </div>`;
   }
   el.innerHTML=html;
@@ -2862,6 +2929,7 @@ function renderEstimates(){
   if(q)list=list.filter(e=>recordMatchesQuery(q,[e.estimate_number,customerNameOf(e),e.address,e.status],clientSources(e)));
   document.getElementById('estimates-list').innerHTML=banner+(list.length?list.map(e=>estimateListCard(e,`openEstDetail('${e.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.fileText}</div><div class="empty-title">${q?'No matches':'No estimates'}</div><div class="empty-sub">${q?'Try a number, client, or address':'Create estimates for new clients'}</div></div>`);
+  syncDeskChrome();
 }
 function filterEst(el,val){estFilter=val;document.querySelectorAll('#view-estimates .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderEstimates();}
 
@@ -3671,7 +3739,7 @@ function invoiceDueCue(i){
 function estimateListCard(e,onclick){
   return `<div class="card" data-type="estimate" data-id="${esc(e.id)}" data-number="${esc(e.estimate_number||'')}" onclick="${onclick}">
     <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||e.address||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
-    <div class="card-meta">${cardWhenHTML(e)}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
+    <div class="card-meta">${estimateDateLabel(e)?`<span class="card-meta-item">${ICONS.calendar} ${esc(estimateDateLabel(e))}</span>`:''}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
     <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
   </div>`;
 }
@@ -3723,6 +3791,7 @@ function renderInvoices(){
   const summary=unpaidView&&!attnFocus?unpaidAuditHTML():'';
   document.getElementById('invoices-list').innerHTML=summary+banner+(list.length?list.map(i=>invoiceListCard(i,`openInvDetail('${i.id}')`)).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.receipt}</div><div class="empty-title">${q?'No matches':'No invoices'}</div><div class="empty-sub">${q?'Try a number, client, initials, or address':'Create invoices or convert approved estimates'}</div></div>`);
+  syncDeskChrome();
 }
 function invAttnBanner(label){
   return `<div onclick="attnFocus=null;renderInvoices()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(224,87,74,0.12);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 14px;margin-bottom:12px;cursor:pointer">
@@ -3733,18 +3802,24 @@ function invAttnBanner(label){
 function getBillableJobs(){
   return jobsNeedingInvoice();
 }
+function toggleReadyInvoice(){
+  readyInvoiceOpen=!readyInvoiceOpen;
+  renderBatchInvoice();
+}
 function renderBatchInvoice(){
   const el=document.getElementById('batch-invoice-section');
   const billable=getBillableJobs();
   if(!billable.length){el.innerHTML='';return;}
   const byClient={};
   billable.forEach(j=>{const key=j.customer_id||'none';if(!byClient[key])byClient[key]={name:j.customer_id?(customerNameOf(j)||'—'):'No client on file',jobs:[]};byClient[key].jobs.push(j);});
+  const total=roundMoney(billable.reduce((s,j)=>s+moneyNum(j.client_price),0));
   el.innerHTML=`<div class="batch-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-      <div style="font-weight:700;color:var(--ink);font-size:14px">${ICONS.receipt} Ready to Invoice</div>
+    <button type="button" class="pane-toggle" onclick="toggleReadyInvoice()">${ICONS.receipt} Ready to invoice · ${plural(billable.length,'job')} · ${fmt(total)}<span>${readyInvoiceOpen?'Hide':'Show'}</span></button>
+    <div id="ready-invoice-body" ${readyInvoiceOpen?'':'hidden'} style="margin-top:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="font-size:11px;color:var(--ink3)">Completed jobs not yet billed — grouped by client</div>
       <button class="btn btn-red btn-sm" onclick="createBatchInvoices()">Create Selected</button>
     </div>
-    <div style="font-size:11px;color:var(--ink3);margin-bottom:2px">Completed jobs not yet billed — grouped by client</div>
     ${Object.entries(byClient).map(([custId,d])=>{
       const total=d.jobs.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
       return`<div class="batch-client" data-cust="${custId}">
@@ -3760,6 +3835,7 @@ function renderBatchInvoice(){
         </div>
       </div>`;
     }).join('')}
+    </div>
   </div>`;
 }
 function toggleBatchClient(custId,checked){
@@ -4770,6 +4846,27 @@ function syncRecordUrl(kind,rec){
   const label=rec.job_number||rec.estimate_number||rec.invoice_number||rec.name||'';
   document.title=label?label+' · Sumak Ops':'Sumak Ops';
   document.body.dataset.route=path;
+  if(rec.id)document.body.dataset.recordId=rec.id;
+  syncDeskChrome();
+}
+function syncDeskChrome(){
+  const app=document.getElementById('app');
+  if(!app)return;
+  const open=document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
+  app.classList.toggle('desk-split',!!open);
+  document.querySelectorAll('.card.card-current').forEach(c=>c.classList.remove('card-current'));
+  const id=open?(document.body.dataset.recordId||''):'';
+  if(!open)return;
+  if(!id)return;
+  document.querySelectorAll('.card[data-id]').forEach(c=>{if(c.dataset.id===id)c.classList.add('card-current');});
+}
+function watchDeskSplit(){
+  ['job-detail','cust-detail','est-detail','inv-detail'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    new MutationObserver(()=>syncDeskChrome()).observe(el,{attributes:true,attributeFilter:['class']});
+  });
+  syncDeskChrome();
 }
 function resetListFilters(){
   jobFilter='all';estFilter='all';invFilter='all';
@@ -4993,6 +5090,7 @@ wireAddressAutocomplete('rec-address-manual','rec-address-manual-suggest');
 wireAddressAutocomplete('rec-new-address','rec-new-address-suggest');
 wireAddressAutocomplete('cr-address','cr-address-suggest');
 wireModalSwipeDismiss();
+watchDeskSplit();
 if(inviteSubId){
   document.getElementById('invite-banner').style.display='block';
   switchAuthTab('register',document.querySelectorAll('.auth-tab')[1]);
