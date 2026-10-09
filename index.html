@@ -875,6 +875,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
       </div>
     </div>
     <div class="estimate-total-row"><span class="estimate-total-lbl">Total</span><span class="estimate-total-val" id="est-total-display">$0</span></div>
+    <div id="est-optional-note" style="display:none;font-size:12px;color:var(--ink3);margin:-4px 0 10px;text-align:right"></div>
     <div class="form-group" style="margin-top:14px;background:rgba(111,168,232,0.08);border:1px solid var(--blue);border-radius:var(--rsm);padding:12px">
       <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
         <input type="checkbox" id="est-recurring" onchange="toggleEstRecurringFields()" style="width:18px;height:18px;accent-color:var(--red)">
@@ -1027,11 +1028,28 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title" id="sendto-title">Send to</div>
-    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Choose who gets this email. A one-off address is used for this send only and is not saved on the client.</p>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Check every To address that should get this email. Type extra addresses separated by commas. CC is separate. A typed address is used for this send only and is not saved on the client.</p>
+    <div class="form-label">To</div>
     <div id="sendto-choices"></div>
-    <div class="form-group" style="margin-top:12px"><label class="form-label">One-off email</label><input class="form-input" id="sendto-custom" type="email" placeholder="name@example.com" autocomplete="off"></div>
+    <div class="form-group" style="margin-top:12px"><label class="form-label">Also send to</label><input class="form-input" id="sendto-custom" type="text" placeholder="name@example.com, other@example.com" autocomplete="off"></div>
+    <div class="form-label">CC</div>
+    <div id="sendto-cc-choices"></div>
+    <div class="form-group" style="margin-top:12px"><label class="form-label">CC addresses</label><input class="form-input" id="sendto-cc" type="text" placeholder="cc@example.com, other@example.com" autocomplete="off"></div>
     <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
     <button class="btn btn-full btn-full-ghost" onclick="cancelSendTo()">Cancel</button>
+  </div>
+</div>
+
+<!-- MARK ESTIMATE SENT -->
+<div class="modal-overlay" id="modal-marksent" onclick="overlayClose(event,'marksent')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="marksent-title">Mark as sent</div>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Use this when the estimate went out another way (Gmail, text, a vendor portal). Both fields are optional.</p>
+    <div class="form-group"><label class="form-label">Sent to</label><input class="form-input" id="marksent-to" type="text" placeholder="judy@example.com, francine@example.com" autocomplete="off"></div>
+    <div class="form-group"><label class="form-label">Note</label><input class="form-input" id="marksent-note" type="text" placeholder="sent via Gmail" autocomplete="off"></div>
+    <button class="btn btn-red btn-full" onclick="confirmMarkEstimateSent()">Mark as Sent</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('marksent')">Cancel</button>
   </div>
 </div>
 
@@ -1360,12 +1378,17 @@ async function fetchSubs(){const{data,error}=await fetchAllRows(()=>db.from('sub
 async function fetchProfiles(){const{data,error}=await fetchAllRows(()=>db.from('profiles').select('*'));if(error)console.error('fetchProfiles',error);profiles=data||[];}
 async function fetchProperties(){const{data,error}=await fetchAllRows(()=>db.from('properties').select('*').order('address'));if(error)console.error('fetchProperties',error);properties=data||[];}
 async function fetchEstimates(){
-  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));
+  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name), estimate_items(quantity, unit_price, total, is_optional)').order('created_at',{ascending:false}));
   if(error){
     console.error('fetchEstimates',error);
-    const retry=await fetchAllRows(()=>db.from('estimates').select('*').order('created_at',{ascending:false}));
+    const retry=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));
     data=retry.data;error=retry.error;
-    if(error)console.error('fetchEstimates fallback',error);
+    if(error){
+      console.error('fetchEstimates fallback',error);
+      const plain=await fetchAllRows(()=>db.from('estimates').select('*').order('created_at',{ascending:false}));
+      data=plain.data;error=plain.error;
+      if(error)console.error('fetchEstimates plain',error);
+    }
   }
   estimates=data||[];
 }
@@ -1425,6 +1448,26 @@ function lineAmounts(qty,unitPrice,storedTotal){
   const computed=roundMoney(moneyNum(qty)*unit);
   const hasStored=storedTotal!==undefined&&storedTotal!==null&&storedTotal!=='';
   return {unit,computed,total:hasStored?roundMoney(storedTotal):computed};
+}
+function lineIsOptional(item){return !!(item&&(item.isOptional||item.is_optional));}
+function itemLineTotal(item){
+  if(!item)return 0;
+  const qty=item.qty!=null?item.qty:item.quantity;
+  const price=item.price!=null?item.price:item.unit_price;
+  const stored=Object.prototype.hasOwnProperty.call(item,'storedTotal')?item.storedTotal:item.total;
+  return lineAmounts(qty,price,item._recalc?null:stored).total;
+}
+function estimateMoneyFromItems(items,taxRate){
+  const list=items||[];
+  const sub=roundMoney(list.reduce((s,i)=>s+(lineIsOptional(i)?0:itemLineTotal(i)),0));
+  const optional=roundMoney(list.reduce((s,i)=>s+(lineIsOptional(i)?itemLineTotal(i):0),0));
+  const tax=roundMoney(sub*(moneyNum(taxRate)/100));
+  return {sub,tax,total:roundMoney(sub+tax),optional};
+}
+function estimateDisplayMoney(est,items){
+  const lines=items!=null?items:(est&&est.estimate_items);
+  if(est&&Array.isArray(lines)&&lines.length)return estimateMoneyFromItems(lines,est.tax_rate);
+  return {sub:moneyNum(est&&est.subtotal),tax:moneyNum(est&&est.tax_amount),total:moneyNum(est&&est.total),optional:0};
 }
 function plural(n,one,many){return n+' '+(n===1?one:(many||one+'s'));}
 function bizYMD(input){
@@ -1816,7 +1859,7 @@ function renderDashboard(){
         <div class="mini-title">${esc(customerNameOf(e)||'—')}</div>
         <div class="mini-sub">${e.estimate_number}${e.valid_until?` · valid to ${fmtDate(e.valid_until)}`:''}</div>
       </div>
-      <div class="mini-right"><div class="mini-amt">${fmt(e.total)}</div><span class="pill pill-sent mini-pill">Sent</span></div>
+      <div class="mini-right"><div class="mini-amt">${fmt(estimateDisplayMoney(e).total)}</div><span class="pill pill-sent mini-pill">Sent</span></div>
     </div>`).join(''):`<div class="widget-empty">No estimates waiting on a reply ✓</div>`;
 
   // ── Widget 2: Jobs needing scheduling or a sub ──
@@ -3067,10 +3110,10 @@ function lineItemCardHTML(item,i,arr){
       </div>
       <div class="li-bottom" style="margin-top:8px">
         <div class="li-field li-price" style="flex:1"><label>Client Price ($)</label><span class="li-price-sign">$</span><input class="li-num with-sign" type="number" step="0.01" id="${arr}-li-price-${i}" value="${item.price===0||item.price?roundMoney(item.price).toFixed(2):''}" oninput="updateLineItemField('${arr}',${i},'price',this.value)"></div>
-        <div class="li-field li-linetotal"><label>Line Total</label><div class="li-linetotal-val" id="${arr}-li-total-${i}">${lineTotal}</div></div>
+        <div class="li-field li-linetotal"><label>${arr==='est'&&item.isOptional?'Optional':'Line Total'}</label><div class="li-linetotal-val" id="${arr}-li-total-${i}">${lineTotal}</div></div>
       </div>
       <div id="${arr}-li-margin-${i}">${marginBadge}</div>
-      ${arr==='est'?`<label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:var(--ink2);cursor:pointer"><input type="checkbox" ${item.isOptional?'checked':''} onchange="updateLineItemField('est',${i},'isOptional',this.checked)" style="width:15px;height:15px;accent-color:var(--red)"> Optional item (client can choose to include it)</label>`:''}
+      ${arr==='est'?`<label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:var(--ink2);cursor:pointer"><input type="checkbox" ${item.isOptional?'checked':''} onchange="updateLineItemField('est',${i},'isOptional',this.checked)" style="width:15px;height:15px;accent-color:var(--red)"> Optional${item.isOptional?` · ${lineTotal} is not in the total`:''}</label>`:''}
       <button class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="saveLineItemToCatalog('${arr}',${i})">+ Save to Catalog</button>
     </div>`;
 }
@@ -3101,7 +3144,10 @@ function updateLineItemField(arr,i,field,rawValue){
   const list=arr==='est'?estLineItems:invLineItems;
   const item=list[i];if(!item)return;
   if(field==='qty'||field==='cost'||field==='marginPct'||field==='price')item[field]=parseFloat(rawValue)||0;
-  else if(field==='isOptional')item.isOptional=!!rawValue;
+  else if(field==='isOptional'){
+    item.isOptional=!!rawValue;
+    if(arr==='est'){renderEstLineItems();return;}
+  }
   else item[field]=rawValue;
   // Title, description (visit date), and qty keep the client price.
   // Price is recalculated only when cost, margin, or the pricing mode changes.
@@ -3146,9 +3192,15 @@ function lineItemsSubtotal(items){
 }
 function calcEstTotal(){
   const tax=parseFloat(document.getElementById('est-tax')?.value)||0;
-  const sub=lineItemsSubtotal(estLineItems);
-  const total=roundMoney(sub*(1+tax/100));
-  document.getElementById('est-total-display').textContent=fmt(total);
+  const money=estimateMoneyFromItems(estLineItems,tax);
+  const el=document.getElementById('est-total-display');
+  if(el)el.textContent=fmt(money.total);
+  const note=document.getElementById('est-optional-note');
+  if(note){
+    const n=(estLineItems||[]).filter(lineIsOptional).length;
+    if(n){note.style.display='block';note.textContent='Optional not in total · '+fmt(money.optional);}
+    else note.style.display='none';
+  }
 }
 function calcInvTotal(){
   const tax=parseFloat(document.getElementById('inv-tax')?.value)||0;
@@ -3162,9 +3214,10 @@ async function saveEstimate(sendNow){
   if(!custId){toast(`${ICONS.alert} Select a customer`);return;}
   if(estLineItems.length===0){toast(`${ICONS.alert} Add at least one line item`);return;}
   const tax=parseFloat(document.getElementById('est-tax').value)||0;
-  const sub=lineItemsSubtotal(estLineItems);
-  const taxAmt=roundMoney(sub*(tax/100));
-  const total=roundMoney(sub+taxAmt);
+  const priced=estimateMoneyFromItems(estLineItems,tax);
+  const sub=priced.sub;
+  const taxAmt=priced.tax;
+  const total=priced.total;
   const editId=document.getElementById('est-edit-id').value;
   const selAddr=document.getElementById('est-prop-select').value;
   const manualAddr=document.getElementById('est-address').value.trim();
@@ -3236,7 +3289,7 @@ async function handleEstimateApproval(estId){
     const{data:firstItem}=await db.from('estimate_items').select('title,description').eq('estimate_id',estId).limit(1).single();
     const{data:rec,error}=await db.from('recurring_services').insert({
       customer_id:est.customer_id,address:est.address,title:(firstItem?.title)||'Maintenance',
-      description:est.notes||null,client_price:est.total,sub_pay:0,subcontractor_id:null,
+      description:est.notes||null,client_price:estimateDisplayMoney(est).total,sub_pay:0,subcontractor_id:null,
       frequency:recFreq,next_run_date:start,active:true
     }).select().single();
     if(error){toast('Error scheduling: '+error.message);return;}
@@ -3265,7 +3318,7 @@ function estimateTimelineHTML(e){
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(e.created_at),icon:'✎'});
   const sent=e.sent_at||(e.status!=='Draft'?e.created_at:null);
-  const sentWho=e.sent_to?`Sent to ${esc(e.sent_to)}`:'Sent to client';
+  const sentWho=sentTimelineLabel(e.sent_to);
   steps.push({label:sentWho,done:!!sent||e.status==='Sent'||e.status==='Approved'||e.status==='Declined',time:tlTime(e.sent_at),icon:'📤'});
   steps.push({label:e.viewed_at?`Viewed by client${e.view_count>1?` (${e.view_count}×)`:''}`:'Viewed by client',done:!!e.viewed_at,time:tlTime(e.viewed_at),icon:'👁'});
   const respLabel=e.client_response||(e.status==='Approved'?'Accepted':e.status==='Declined'?'Declined':'Response');
@@ -3300,22 +3353,24 @@ async function openEstDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${e.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(e.sent_at)}${e.sent_to?` to ${esc(e.sent_to)}`:''}</div>`:''}${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${sentHeaderHTML(e)}${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
+        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);const opt=lineIsOptional(i);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}${opt?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#8a6d3b">OPTIONAL</span>':''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
       </table>
       <div class="inv-totals">
-        <div class="inv-total-row"><span>Subtotal</span><span>${fmt(e.subtotal)}</span></div>
-        ${e.tax_rate>0?`<div class="inv-total-row"><span>Tax (${e.tax_rate}%)</span><span>${fmt(e.tax_amount)}</span></div>`:''}
-        <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(e.total)}</span></div>
+        ${(()=>{const money=estimateDisplayMoney(e,items);return `<div class="inv-total-row"><span>Subtotal</span><span>${fmt(money.sub)}</span></div>
+        ${e.tax_rate>0?`<div class="inv-total-row"><span>Tax (${e.tax_rate}%)</span><span>${fmt(money.tax)}</span></div>`:''}
+        ${money.optional>0?`<div class="inv-total-row"><span>Optional (not included)</span><span>${fmt(money.optional)}</span></div>`:''}
+        <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(money.total)}</span></div>`;})()}
       </div>
       ${e.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${e.notes}</div>`:''}
     </div>
     ${estimateTimelineHTML(e)}
     <div class="action-row">
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${e.id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
+      <button class="action-btn ab-glass" onclick="openMarkEstimateSent('${e.id}')">${e.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${e.id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
       ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
       <button class="action-btn ab-glass" onclick="printEstimate('${e.id}')">${ICONS.printer} Print / Save PDF</button>
@@ -3329,13 +3384,14 @@ async function openEstDetail(id){
     </div>`;
   }catch(err){
     console.error('openEstDetail',err);
-    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(e)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(e.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(e.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded.</div></div>`;
+    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(e)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(estimateDisplayMoney(e).total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(e.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded.</div></div>`;
   }
 }
 function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
   const statusBg={Approved:'#eaf3de',Sent:'#e6f1fb',Draft:'#faeeda',Declined:'#fcebeb'}[est.status]||'#faeeda';
-  const rows=(items||[]).map(i=>`<tr><td><div class="item-title">${i.title||i.description||''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`).join('');
+  const money=estimateDisplayMoney(est,items);
+  const rows=(items||[]).map(i=>{const opt=lineIsOptional(i);return `<tr><td><div class="item-title">${i.title||i.description||''}${opt?' · Optional':''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`;}).join('');
   return `<div class="pdf-doc">
 <div class="letterhead">
   <div class="brand">
@@ -3367,9 +3423,10 @@ function estimateDocHTML(est,items,cust){
   <tbody>${rows}</tbody>
 </table>
 <div class="totals">
-  <div class="trow"><span>Subtotal</span><span>${fmt(est.subtotal)}</span></div>
-  ${est.tax_rate>0?`<div class="trow"><span>Tax (${est.tax_rate}%)</span><span>${fmt(est.tax_amount)}</span></div>`:''}
-  <div class="grand"><span class="grand-lbl">Estimated Total</span><span class="grand-val">${fmt(est.total)}</span></div>
+  <div class="trow"><span>Subtotal</span><span>${fmt(money.sub)}</span></div>
+  ${est.tax_rate>0?`<div class="trow"><span>Tax (${est.tax_rate}%)</span><span>${fmt(money.tax)}</span></div>`:''}
+  ${money.optional>0?`<div class="trow"><span>Optional (not included)</span><span>${fmt(money.optional)}</span></div>`:''}
+  <div class="grand"><span class="grand-lbl">Estimated Total</span><span class="grand-val">${fmt(money.total)}</span></div>
 </div>
 ${est.notes?`<div class="notes"><strong>Notes:</strong> ${est.notes}</div>`:''}
 <div class="footer">
@@ -3666,6 +3723,64 @@ async function copyQuoteLink(id){
   logActivity('Quote link shared',est?`${est.estimate_number} — ${est.customers?.name||''}`.trim():null,'estimate',id);
 }
 function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim());}
+function parseAddressList(raw){
+  return String(raw||'').split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean);
+}
+function dedupeEmails(list){
+  const out=[];const seen=new Set();
+  (list||[]).forEach(raw=>{
+    const e=String(raw||'').trim();
+    const k=e.toLowerCase();
+    if(!k||seen.has(k))return;
+    seen.add(k);out.push(e);
+  });
+  return out;
+}
+function encodeSentTo(rec){
+  const to=dedupeEmails(rec&&rec.to||[]);
+  const cc=dedupeEmails(rec&&rec.cc||[]).filter(e=>!to.some(t=>t.toLowerCase()===e.toLowerCase()));
+  const note=String(rec&&rec.note||'').trim();
+  if(!to.length&&!cc.length&&!note)return null;
+  return JSON.stringify({to,cc,note});
+}
+function parseSentTo(raw){
+  const empty={to:[],cc:[],note:''};
+  if(raw==null||raw==='')return empty;
+  if(typeof raw==='object')return {to:dedupeEmails(raw.to||[]),cc:dedupeEmails(raw.cc||[]),note:String(raw.note||'').trim()};
+  const s=String(raw).trim();
+  if(s.startsWith('{')){
+    try{
+      const o=JSON.parse(s);
+      if(o&&typeof o==='object'&&(o.to||o.cc||o.note))return {to:dedupeEmails(o.to||[]),cc:dedupeEmails(o.cc||[]),note:String(o.note||'').trim()};
+    }catch(e){}
+  }
+  const parts=parseAddressList(s);
+  const emails=parts.filter(validEmail);
+  if(emails.length&&emails.length===parts.length)return {to:dedupeEmails(emails),cc:[],note:''};
+  if(emails.length)return {to:dedupeEmails(emails),cc:[],note:s};
+  return {to:[],cc:[],note:s};
+}
+function sentRecipientsPhrase(raw){
+  const rec=parseSentTo(raw);
+  const bits=[];
+  if(rec.to.length)bits.push(rec.to.join(', '));
+  if(rec.cc.length)bits.push('(cc '+rec.cc.join(', ')+')');
+  let s=bits.join(' ');
+  if(rec.note)s=s?s+' — '+rec.note:rec.note;
+  return s;
+}
+function sentTimelineLabel(raw){
+  const phrase=sentRecipientsPhrase(raw);
+  if(!phrase)return 'Sent to client';
+  const rec=parseSentTo(raw);
+  if(!rec.to.length&&!rec.cc.length)return 'Sent — '+esc(phrase);
+  return 'Sent to '+esc(phrase);
+}
+function sentHeaderHTML(row){
+  if(!row||!row.sent_at)return '';
+  const phrase=sentRecipientsPhrase(row.sent_to);
+  return `<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(row.sent_at)}${phrase?' · '+esc(phrase):''}</div>`;
+}
 function parseContacts(raw){
   let extra=raw;
   if(typeof extra==='string'){try{extra=JSON.parse(extra);}catch(e){extra=[];}}
@@ -3694,41 +3809,53 @@ function preferredSendEmail(cust,kind){
   return validEmail(pick)?pick:'';
 }
 let _sendPick=null;
+function sendChoiceHTML(c,inputName,checked){
+  const who=c.name?esc(c.name)+' · ':'';
+  const kindLbl=c.kind==='billing'?'Billing email':c.kind==='main'?'Main email':'Saved contact';
+  return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px">
+    <input type="checkbox" name="${inputName}" value="${escapeAttr(c.email)}" ${checked?'checked':''} style="margin-top:4px;width:18px;height:18px;accent-color:var(--red)">
+    <span><span style="font-weight:600;color:var(--ink)">${who}${esc(c.email)}</span><br><span style="font-size:11px;color:var(--ink3)">${kindLbl}</span></span>
+  </label>`;
+}
 function pickSendRecipient(cust,kind,docLabel){
   const contacts=clientContactList(cust);
   const preferred=preferredSendEmail(cust,kind).toLowerCase();
   return new Promise(resolve=>{
     _sendPick={resolve};
     const box=document.getElementById('sendto-choices');
-    box.innerHTML=contacts.length?contacts.map(c=>{
-      const checked=c.email.toLowerCase()===preferred;
-      const who=c.name?esc(c.name)+' · ':'';
-      const kindLbl=c.kind==='billing'?'Billing email':c.kind==='main'?'Main email':'Saved contact';
-      return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px">
-        <input type="radio" name="sendto-pick" value="${escapeAttr(c.email)}" ${checked?'checked':''} style="margin-top:4px">
-        <span><span style="font-weight:600;color:var(--ink)">${who}${esc(c.email)}</span><br><span style="font-size:11px;color:var(--ink3)">${kindLbl}</span></span>
-      </label>`;
-    }).join(''):'<div style="font-size:12.5px;color:var(--ink3);padding:6px 0 10px">No saved emails yet. Type one below — it is used for this send only.</div>';
-    if(preferred&&!box.querySelector('input[name="sendto-pick"]:checked')){
-      const first=box.querySelector('input[name="sendto-pick"]');
-      if(first)first.checked=true;
-    }
+    const ccBox=document.getElementById('sendto-cc-choices');
+    const empty='<div style="font-size:12.5px;color:var(--ink3);padding:6px 0 10px">No saved emails yet. Type one below — it is used for this send only.</div>';
+    box.innerHTML=contacts.length?contacts.map(c=>sendChoiceHTML(c,'sendto-to',c.email.toLowerCase()===preferred)).join(''):empty;
+    if(ccBox)ccBox.innerHTML=contacts.length?contacts.map(c=>sendChoiceHTML(c,'sendto-cc',false)).join(''):'<div style="font-size:12.5px;color:var(--ink3);padding:6px 0 10px">Type CC addresses below, or leave this blank.</div>';
     const custom=document.getElementById('sendto-custom');
     if(custom)custom.value='';
+    const cc=document.getElementById('sendto-cc');
+    if(cc)cc.value='';
     const title=document.getElementById('sendto-title');
     if(title)title.textContent='Send '+(docLabel||'');
     openModal('sendto');
   });
 }
+function collectSendChoice(){
+  const customParts=parseAddressList(document.getElementById('sendto-custom')?.value||'');
+  const ccTyped=parseAddressList(document.getElementById('sendto-cc')?.value||'');
+  const toChecked=[...document.querySelectorAll('input[name="sendto-to"]:checked')].map(el=>el.value);
+  const ccChecked=[...document.querySelectorAll('input[name="sendto-cc"]:checked')].map(el=>el.value);
+  const bad=[...customParts,...ccTyped].filter(e=>!validEmail(e));
+  if(bad.length)return {error:'Check these addresses: '+bad.join(', ')};
+  const to=dedupeEmails([...toChecked,...customParts]);
+  const toKeys=new Set(to.map(e=>e.toLowerCase()));
+  const cc=dedupeEmails([...ccChecked,...ccTyped]).filter(e=>!toKeys.has(e.toLowerCase()));
+  if(!to.length)return {error:'Choose at least one To address'};
+  return {to,cc,oneOff:customParts.length>0||ccTyped.length>0};
+}
 function confirmSendTo(){
-  const custom=document.getElementById('sendto-custom')?.value.trim()||'';
-  const picked=document.querySelector('input[name="sendto-pick"]:checked');
-  const email=custom||(picked?picked.value:'');
-  if(!validEmail(email)){toast('Enter a valid email');return;}
+  const choice=collectSendChoice();
+  if(choice.error){toast(choice.error);return;}
   const resolve=_sendPick&&_sendPick.resolve;
   _sendPick=null;
   closeModal('sendto');
-  if(resolve)resolve({email,oneOff:!!custom});
+  if(resolve)resolve(choice);
 }
 function cancelSendTo(){
   const resolve=_sendPick&&_sendPick.resolve;
@@ -3740,8 +3867,9 @@ async function emailEstimate(id){
   const est=estimates.find(x=>x.id===id);if(!est)return;
   const cust=customers.find(c=>c.id===est.customer_id)||est.customers||{};
   const choice=await pickSendRecipient(cust,'estimate',est.estimate_number);
-  if(!choice)return;
-  const sendTo=choice.email;
+  if(!choice||!choice.to||!choice.to.length)return;
+  const sentRecord=encodeSentTo(choice);
+  const who=sentRecipientsPhrase(sentRecord);
   toast('Preparing & sending…');
   const result=await getEstimatePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3752,7 +3880,7 @@ async function emailEstimate(id){
   const subject=`Estimate ${est.estimate_number} from Sumak Lawncare`;
   const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6;max-width:520px">
     <p>Hi ${cust.name},</p>
-    <p>Thank you for the opportunity! Your estimate <strong>${est.estimate_number}</strong> comes to <strong>${fmt(est.total)}</strong>${est.valid_until?`, valid until ${fmtDate(est.valid_until)}`:''}. The full details are attached as a PDF for your records.</p>
+    <p>Thank you for the opportunity! Your estimate <strong>${est.estimate_number}</strong> comes to <strong>${fmt(estimateDisplayMoney(est).total)}</strong>${est.valid_until?`, valid until ${fmtDate(est.valid_until)}`:''}. The full details are attached as a PDF for your records.</p>
     ${quoteUrl?`<p>You can review and respond to your quote online with one tap:</p>
     <p style="text-align:center;margin:26px 0">
       <a href="${quoteUrl}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">View &amp; Respond to Your Quote</a>
@@ -3761,12 +3889,12 @@ async function emailEstimate(id){
     <p style="margin-top:24px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
   try{
-    await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
-    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${sendTo}`,'estimate',id);
+    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc);
+    await stampSent('estimates',id,Object.assign(sentRecord?{sent_to:sentRecord}:{},est.status==='Draft'?{status:'Sent'}:{}));
+    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${who}`,'estimate',id);
     await fetchEstimates();renderEstimates();renderDashboard();
     if(document.getElementById('est-detail').classList.contains('open'))openEstDetail(id);
-    toast(`✓ Estimate emailed to ${sendTo}`);
+    toast(`✓ Estimate emailed to ${who}`);
   }catch(e){
     console.error('resend',e);
     toast('Direct send failed — opening share instead');
@@ -3776,7 +3904,7 @@ async function emailEstimate(id){
     }else{
       const url=URL.createObjectURL(result.blob);const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
     }
-    await stampSent('estimates',id,Object.assign({sent_to:sendTo},est.status==='Draft'?{status:'Sent'}:{}));
+    await stampSent('estimates',id,Object.assign(sentRecord?{sent_to:sentRecord}:{},est.status==='Draft'?{status:'Sent'}:{}));
     await fetchEstimates();renderEstimates();
   }
 }
@@ -3793,13 +3921,70 @@ async function stampSent(table,id,extra){
   if(res.error)console.error('stampSent',table,res.error);
   return res.error;
 }
+let _markSentId=null;
+function openMarkEstimateSent(id){
+  const est=estimates.find(x=>x.id===id);if(!est)return;
+  if(est.sent_at){undoMarkEstimateSent(id);return;}
+  _markSentId=id;
+  const toEl=document.getElementById('marksent-to');
+  const noteEl=document.getElementById('marksent-note');
+  if(toEl)toEl.value='';
+  if(noteEl)noteEl.value='';
+  const title=document.getElementById('marksent-title');
+  if(title)title.textContent='Mark '+(est.estimate_number||'estimate')+' as sent';
+  openModal('marksent');
+}
+function confirmMarkEstimateSent(){
+  const id=_markSentId;if(!id)return;
+  const parts=parseAddressList(document.getElementById('marksent-to')?.value||'');
+  const note=String(document.getElementById('marksent-note')?.value||'').trim();
+  const bad=parts.filter(e=>!validEmail(e));
+  if(bad.length){toast('Check these addresses: '+bad.join(', '));return;}
+  const est=estimates.find(x=>x.id===id);
+  _markSentId=null;
+  closeModal('marksent');
+  return applyMarkEstimateSent(id,parts,note,est);
+}
+async function applyMarkEstimateSent(id,toList,note,est){
+  const sentRecord=encodeSentTo({to:toList,note});
+  const extra={};
+  if(sentRecord)extra.sent_to=sentRecord;
+  if(est&&est.status==='Draft')extra.status='Sent';
+  const err=await stampSent('estimates',id,extra);
+  if(err){toast('Could not mark sent: '+(err.message||'update failed'));return;}
+  const phrase=sentRecipientsPhrase(sentRecord)||'';
+  logActivity('Estimate marked sent',`${est?.estimate_number||''}${phrase?' — '+phrase:''}`.trim(),'estimate',id);
+  await fetchEstimates();renderEstimates();renderDashboard();
+  if(document.getElementById('est-detail')?.classList.contains('open'))openEstDetail(id);
+  toast(phrase?'Marked as sent · '+phrase:'Marked as sent ✓');
+}
+async function undoMarkEstimateSent(id){
+  const est=estimates.find(x=>x.id===id);if(!est)return;
+  if(!confirm(`Mark ${est.estimate_number||'this estimate'} as not sent?`))return;
+  const payload={sent_at:null,sent_to:null};
+  if(est.status==='Sent')payload.status='Draft';
+  let {error}=await db.from('estimates').update(payload).eq('id',id);
+  if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
+    const slim={sent_at:null};
+    if(payload.status)slim.status=payload.status;
+    ({error}=await db.from('estimates').update(slim).eq('id',id));
+  }
+  if(error&&payload.status){
+    ({error}=await db.from('estimates').update({sent_at:null,status:'Draft'}).eq('id',id));
+  }
+  if(error){toast('Could not update: '+error.message);return;}
+  logActivity('Estimate marked not sent',est.estimate_number||'','estimate',id);
+  await fetchEstimates();renderEstimates();renderDashboard();
+  openEstDetail(id);
+  toast('Marked as not sent');
+}
 async function createJobFromEstimate(estId){
   const existing=jobs.find(j=>j.estimate_id===estId);
   if(existing)return{job:existing,already:true};
   const e=estimates.find(x=>x.id===estId);if(!e)return null;
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
   const title=(items&&items[0]?.description)?items[0].description.slice(0,80):`Work for ${e.customers?.name||'client'}`;
-  const payload={job_number:'SMK-'+String(Date.now()).slice(-5),title,customer_id:e.customer_id,address:e.address||null,status:'Pending',subcontractor_id:null,client_price:e.total||0,sub_pay:0,payment_status:'Unpaid',notes:e.notes||null,estimate_id:estId};
+  const payload={job_number:'SMK-'+String(Date.now()).slice(-5),title,customer_id:e.customer_id,address:e.address||null,status:'Pending',subcontractor_id:null,client_price:estimateDisplayMoney(e,items).total||0,sub_pay:0,payment_status:'Unpaid',notes:e.notes||null,estimate_id:estId};
   const{data:job,error}=await db.from('jobs').insert(payload).select().single();
   if(error){toast('Error creating job: '+error.message);return null;}
   return{job,already:false};
@@ -3831,12 +4016,17 @@ async function deleteEst(id){if(!confirm('Delete this estimate?'))return;await d
 async function convertEstToInvoice(estId){
   const e=estimates.find(x=>x.id===estId);if(!e)return;
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
+  const source=Array.isArray(items)?items:[];
+  const billable=source.filter(i=>!lineIsOptional(i));
+  if(source.length&&!billable.length){toast('Optional lines are not included. Add a required line before invoicing.');return;}
+  const money=source.length?estimateMoneyFromItems(billable,e.tax_rate):estimateDisplayMoney(e);
   const due=addDaysYMD(bizYMD(),30);
-  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:e.subtotal,tax_rate:e.tax_rate,tax_amount:e.tax_amount,total:e.total,due_date:due,notes:e.notes}).select().single();
+  const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:money.sub,tax_rate:e.tax_rate,tax_amount:money.tax,total:money.total,due_date:due,notes:e.notes}).select().single();
   if(error){toast('Error: '+error.message);return;}
-  const{error:eiErr}=await db.from('invoice_items').insert((items||[]).map(i=>({invoice_id:inv.id,title:i.title||null,description:i.description||i.title||' ',quantity:i.quantity,unit_price:i.unit_price,total:i.total,cost:i.cost||0,margin_pct:i.margin_pct||0,pricing_mode:i.pricing_mode||'margin'})));
+  const{error:eiErr}=await db.from('invoice_items').insert(billable.map(i=>({invoice_id:inv.id,title:i.title||null,description:i.description||i.title||' ',quantity:i.quantity,unit_price:i.unit_price,total:i.total,cost:i.cost||0,margin_pct:i.margin_pct||0,pricing_mode:i.pricing_mode||'margin'})));
   if(eiErr){toast('Error copying line items: '+eiErr.message);return;}
-  closeDetail('est');await fetchInvoices();renderInvoices();showView('invoices',document.querySelectorAll('.nav-item')[5]);toast('Invoice created ✓');
+  closeDetail('est');await fetchInvoices();renderInvoices();showView('invoices',document.querySelectorAll('.nav-item')[5]);
+  toast(source.length>billable.length?'Invoice created · optional lines left off':'Invoice created ✓');
 }
 async function editEst(id){
   const e=estimates.find(x=>x.id===id);if(!e)return;
@@ -3894,7 +4084,7 @@ function estimateListCard(e,onclick){
   return `<div class="card" data-type="estimate" data-id="${esc(e.id)}" data-number="${esc(e.estimate_number||'')}" onclick="${onclick}">
     <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||e.address||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
     <div class="card-meta">${estimateDateLabel(e)?`<span class="card-meta-item">${ICONS.calendar} ${esc(estimateDateLabel(e))}</span>`:''}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
-    <div class="card-footer"><div class="card-amount">${fmt(e.total)}</div></div>
+    <div class="card-footer"><div class="card-amount">${fmt(estimateDisplayMoney(e).total)}</div></div>
   </div>`;
 }
 function invoiceListCard(i,onclick){
@@ -4042,7 +4232,7 @@ function invoiceTimelineHTML(inv){
   const overdue=(typeof invIsOverdue==='function')&&invIsOverdue(inv);
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(inv.created_at),icon:'✎'});
-  steps.push({label:inv.sent_to?`Sent to ${esc(inv.sent_to)}`:'Sent to client',done:!!inv.sent_at,time:inv.sent_at?tlTime(inv.sent_at):'',icon:'📤'});
+  steps.push({label:sentTimelineLabel(inv.sent_to),done:!!inv.sent_at,time:inv.sent_at?tlTime(inv.sent_at):'',icon:'📤'});
   if(overdue&&inv.status!=='Paid'){
     steps.push({label:'Overdue (30+ days)',done:true,time:'',icon:'!',overdue:true});
   }
@@ -4078,7 +4268,7 @@ async function openInvDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${inv.sent_at?`<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(inv.sent_at)}${inv.sent_to?` to ${esc(inv.sent_to)}`:''}</div>`:(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${inv.sent_at?sentHeaderHTML(inv):(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -4284,11 +4474,13 @@ async function blobToBase64(blob){
     r.readAsDataURL(blob);
   });
 }
-async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename){
+async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc){
   const pdfBase64=pdfBlob?await blobToBase64(pdfBlob):null;
-  const{data,error}=await db.functions.invoke('send-email',{
-    body:{to,subject,html:htmlBody,pdfBase64,pdfFilename}
-  });
+  const toList=dedupeEmails(Array.isArray(to)?to:parseAddressList(to));
+  const ccList=dedupeEmails(Array.isArray(cc)?cc:parseAddressList(cc)).filter(e=>!toList.some(t=>t.toLowerCase()===e.toLowerCase()));
+  const body={to:toList,subject,html:htmlBody,pdfBase64,pdfFilename};
+  if(ccList.length)body.cc=ccList;
+  const{data,error}=await db.functions.invoke('send-email',{body});
   if(error)throw new Error(error.message||'send failed');
   if(data&&data.error)throw new Error(JSON.stringify(data.detail||data.error));
   return data;
@@ -4297,8 +4489,9 @@ async function emailInvoice(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
   const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers||{};
   const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number);
-  if(!choice)return;
-  const sendTo=choice.email;
+  if(!choice||!choice.to||!choice.to.length)return;
+  const sentRecord=encodeSentTo(choice);
+  const who=sentRecipientsPhrase(sentRecord);
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -4310,9 +4503,9 @@ async function emailInvoice(id){
     <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
   try{
-    await sendEmailViaResend(sendTo,subject,htmlBody,result.blob,result.filename);
-    await markInvoiceSent(id,sendTo);
-    toast(`✓ Invoice emailed to ${sendTo}`);
+    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc);
+    await markInvoiceSent(id,sentRecord);
+    toast(`✓ Invoice emailed to ${who}`);
     openInvDetail(id);
   }catch(e){
     // Fall back to the share/download path if direct send fails
@@ -4320,17 +4513,18 @@ async function emailInvoice(id){
     toast('Direct send failed — opening share instead');
     const file=new File([result.blob],result.filename,{type:'application/pdf'});
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id,sendTo);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
+      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id,sentRecord);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
     }
     const url=URL.createObjectURL(result.blob);
     const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-    await markInvoiceSent(id,sendTo);
+    await markInvoiceSent(id,sentRecord);
   }
 }
 async function markInvoiceSent(id,sentTo){
   const inv=invoices.find(x=>x.id===id);
+  const phrase=sentTo?sentRecipientsPhrase(sentTo):'';
   await stampSent('invoices',id,sentTo?{sent_to:sentTo}:{});
-  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}${sentTo?' · '+sentTo:''}`.trim():null,'invoice',id);
+  logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}${phrase?' · '+phrase:''}`.trim():null,'invoice',id);
   await fetchInvoices();renderInvoices();
 }
 async function toggleInvoiceSent(id){
@@ -5411,7 +5605,7 @@ function renderPublicQuote(host,token,q){
   const items=q.items||[];
   // compute total live from selected items
   window._pqSelected={};
-  items.forEach(it=>{window._pqSelected[it.id]=it.is_optional?!!it.selected_by_default:true;});
+  items.forEach(it=>{window._pqSelected[it.id]=!it.is_optional;});
   function calcTotal(){
     let sub=0;
     items.forEach(it=>{if(window._pqSelected[it.id])sub+=Number(it.total)||0;});
