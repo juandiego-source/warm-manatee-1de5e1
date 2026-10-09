@@ -819,6 +819,11 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
       <div class="addr-suggest" id="cust-address-suggest"></div>
     </div>
     <div class="form-group"><label class="form-label">Notes</label><textarea class="form-input" id="cust-notes" placeholder="PM company, HOA info..."></textarea></div>
+    <div class="form-group">
+      <label class="form-label">Other contacts <span style="font-weight:400;color:var(--ink3)">(name + email — pick one when you send)</span></label>
+      <div id="cust-contacts"></div>
+      <button type="button" class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addCustContactRow()">+ Add contact</button>
+    </div>
     <button class="btn btn-red btn-full" onclick="saveCustomer()">Save Client</button>
     <button class="btn btn-full btn-full-ghost" onclick="closeModal('customer')">Cancel</button>
   </div>
@@ -1017,6 +1022,19 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   </div>
 </div>
 
+<!-- SEND TO -->
+<div class="modal-overlay" id="modal-sendto" onclick="overlayClose(event,'sendto')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="sendto-title">Send to</div>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Choose who gets this email. A one-off address is used for this send only and is not saved on the client.</p>
+    <div id="sendto-choices"></div>
+    <div class="form-group" style="margin-top:12px"><label class="form-label">One-off email</label><input class="form-input" id="sendto-custom" type="email" placeholder="name@example.com" autocomplete="off"></div>
+    <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
+    <button class="btn btn-full btn-full-ghost" onclick="cancelSendTo()">Cancel</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <div id="photo-lightbox" onclick="if(event.target.id==='photo-lightbox')closeLightbox()">
@@ -1098,26 +1116,31 @@ async function initAuth(){
     else showAuthScreen();
   });
 }
+let loginEpoch=0;
 async function afterLogin(user){
+  const gen=++loginEpoch;
   currentUser=user;
   try{
     const{data:prof}=await db.from('profiles').select('*').eq('id',user.id).single();
+    if(gen!==loginEpoch)return;
     currentProfile=prof;
     clearTimeout(window._splashFailsafe);
       if(prof?.role==='admin'){
       showApp('admin');
       await loadAll();
+      if(gen!==loginEpoch)return;
       dataReady=true;
-      renderAll();
-      applyRoute(location.pathname);
+      try{renderAll();}catch(err){console.error(err);}
+      await applyRoute(location.pathname);
       history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       await initNotifications();
     }else if(prof?.subcontractor_id){
       currentSubId=prof.subcontractor_id;
       showApp('sub');
       await loadAll();
+      if(gen!==loginEpoch)return;
       dataReady=true;
-      applyRoute(location.pathname);
+      await applyRoute(location.pathname);
       history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       const sub=subs.find(s=>s.id===currentSubId);
       document.getElementById('sub-welcome-name').textContent='Hey, '+(sub?.name||'there')+'!';
@@ -1269,7 +1292,11 @@ function showApp(role){
   hideAuthScreen();
   document.getElementById('more-menu-btn').style.display=role==='admin'?'flex':'none';
   routeSilent=true;
-  if(role==='admin'){document.getElementById('navbar').style.display='flex';showView('dashboard',document.querySelector('.nav-item'));renderAll();}
+  if(role==='admin'){
+    document.getElementById('navbar').style.display='flex';
+    const page=pageFromPath(location.pathname);
+    showView(page==='sub-portal'?'dashboard':page,document.querySelector('.nav-item'));
+  }
   else if(role==='sub'){
     document.getElementById('navbar').innerHTML=`<div class="nav-item active" onclick="showView('sub-portal',this)"><div class="nav-icon">${ICONS.home}</div><div class="nav-label">My Jobs</div><div class="nav-dot"></div></div>`;
     document.getElementById('navbar').style.display='flex';showView('sub-portal',document.querySelector('.nav-item'));
@@ -1428,6 +1455,51 @@ function addDaysYMD(ymd,days){
   const dt=new Date(Date.UTC(y,m-1,d));
   dt.setUTCDate(dt.getUTCDate()+days);
   return dt.toISOString().slice(0,10);
+}
+function addMonthsYMD(ymd,months){
+  const [y,m,d]=ymd.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1+months,1));
+  const last=new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth()+1,0)).getUTCDate();
+  dt.setUTCDate(Math.min(d,last));
+  return dt.toISOString().slice(0,10);
+}
+function ymdFromDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function ymdToLocalDate(ymd){
+  const [y,m,d]=String(ymd).split('-').map(Number);
+  return new Date(y,m-1,d);
+}
+function normalizeFrequency(frequency){
+  const f=String(frequency||'').trim().toLowerCase().replace(/[_-]+/g,' ').replace(/\s+/g,' ');
+  if(!f)return 'monthly';
+  if(f==='biweekly'||f==='bi weekly'||f==='every 2 weeks'||f==='every two weeks'||f==='2 weeks'||f==='fortnightly'||f==='14'||f==='14 days')return 'biweekly';
+  if(f==='weekly'||f==='every week'||f==='1 week'||f==='7'||f==='7 days')return 'weekly';
+  if(f==='monthly'||f==='every month'||f==='1 month')return 'monthly';
+  if(/bi\s*weekly/.test(f)||/fortnight/.test(f)||/(^|\s)2\s*weeks?/.test(f))return 'biweekly';
+  if(/week/.test(f))return 'weekly';
+  if(/month/.test(f))return 'monthly';
+  return 'monthly';
+}
+function stepYMD(ymd,frequency){
+  const f=normalizeFrequency(frequency);
+  if(f==='weekly')return addDaysYMD(ymd,7);
+  if(f==='biweekly')return addDaysYMD(ymd,14);
+  return addMonthsYMD(ymd,1);
+}
+function firstYMDAfter(anchor,frequency,afterYmd){
+  let ymd=String(anchor||'').slice(0,10);
+  const after=String(afterYmd||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(ymd))return /^\d{4}-\d{2}-\d{2}$/.test(after)?stepYMD(after,frequency):'';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(after))return ymd;
+  let guard=0;
+  while(ymd<=after&&guard<500){
+    const next=stepYMD(ymd,frequency);
+    if(!next||next<=ymd)break;
+    ymd=next;
+    guard++;
+  }
+  return ymd;
 }
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function invoiceIsOpen(i){return !!(i&&i.status!=='Paid'&&i.status!=='Cancelled');}
@@ -1871,27 +1943,24 @@ function filterJobs(el,val){jobFilter=val;document.querySelectorAll('#view-jobs 
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────
 function projectRecurringOccurrences(year,month){
-  const monthStart=new Date(year,month,1);
-  const monthEnd=new Date(year,month+1,0,23,59,59);
+  const monthStart=ymdFromDate(new Date(year,month,1));
+  const monthEnd=ymdFromDate(new Date(year,month+1,0));
   const occ={};
   // Build a set of "serviceId|date" that already have a REAL job, so we don't double-draw them.
   const realJobKeys=new Set();
-  jobs.forEach(j=>{if(j.recurring_service_id&&j.scheduled_date)realJobKeys.add(j.recurring_service_id+'|'+j.scheduled_date);});
+  jobs.forEach(j=>{if(j.recurring_service_id&&j.scheduled_date)realJobKeys.add(j.recurring_service_id+'|'+String(j.scheduled_date).slice(0,10));});
   recurring.filter(r=>r.active&&r.next_run_date).forEach(r=>{
-    let d=new Date(r.next_run_date+'T00:00:00');
+    let ymd=String(r.next_run_date).slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(ymd))return;
     let guard=0;
-    while(d<=monthEnd&&guard<80){
-      if(d>=monthStart){
-        const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        // Only project if there's NOT already a real job for this service on this day
-        if(!realJobKeys.has(r.id+'|'+ds)){
-          if(!occ[ds])occ[ds]=[];
-          occ[ds].push({title:r.title,customerName:r.customers?.name||'—',frequency:r.frequency,address:r.address,id:r.id});
-        }
+    while(ymd<=monthEnd&&guard<80){
+      if(ymd>=monthStart&&!realJobKeys.has(r.id+'|'+ymd)){
+        if(!occ[ymd])occ[ymd]=[];
+        occ[ymd].push({title:r.title,customerName:r.customers?.name||'—',frequency:normalizeFrequency(r.frequency),address:r.address,id:r.id});
       }
-      if(r.frequency==='weekly')d.setDate(d.getDate()+7);
-      else if(r.frequency==='biweekly')d.setDate(d.getDate()+14);
-      else d.setMonth(d.getMonth()+1);
+      const next=stepYMD(ymd,r.frequency);
+      if(!next||next<=ymd)break;
+      ymd=next;
       guard++;
     }
   });
@@ -2032,8 +2101,9 @@ function openCustDetail(id){
     <div class="detail-card">
       <div class="detail-section-lbl">Contact</div>
       ${c.phone?`<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value"><a href="tel:${c.phone}" style="color:var(--blue)">${c.phone}</a></span></div>`:''}
-      ${c.email?`<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value"><a href="mailto:${c.email}" style="color:var(--blue)">${c.email}</a></span></div>`:''}
-      ${c.billing_email?`<div class="detail-row"><span class="detail-label">Billing Email</span><span class="detail-value"><a href="mailto:${c.billing_email}" style="color:var(--blue)">${c.billing_email}</a></span></div>`:''}
+      ${c.email?`<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value"><a href="mailto:${esc(c.email)}" style="color:var(--blue)">${esc(c.email)}</a></span></div>`:''}
+      ${c.billing_email?`<div class="detail-row"><span class="detail-label">Billing Email</span><span class="detail-value"><a href="mailto:${esc(c.billing_email)}" style="color:var(--blue)">${esc(c.billing_email)}</a></span></div>`:''}
+      ${parseContacts(c.contacts).map(ct=>`<div class="detail-row"><span class="detail-label">${esc(ct.name||'Contact')}</span><span class="detail-value"><a href="mailto:${esc(ct.email)}" style="color:var(--blue)">${esc(ct.email)}</a></span></div>`).join('')}
       ${c.city?`<div class="detail-row"><span class="detail-label">City</span><span class="detail-value">${c.city}</span></div>`:''}
       ${c.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${c.notes}</span></div>`:''}
     </div>
@@ -2100,7 +2170,7 @@ async function undoDeleteCustomer(id){
 }
 function editCustFromDetail(id){closeDetail('cust');editCustomer(id);}
 
-function freqLabel(f){return{weekly:'Weekly',biweekly:'Every 2 weeks',monthly:'Monthly'}[f]||f;}
+function freqLabel(f){const n=normalizeFrequency(f);return{weekly:'Weekly',biweekly:'Every 2 weeks',monthly:'Monthly'}[n]||f;}
 function recCardsFor(custId){
   const list=recurring.filter(r=>r.customer_id===custId);
   return list.map(r=>`
@@ -2134,7 +2204,7 @@ function openRecModal(id,custId){
       document.getElementById('rec-client-price').value=r.client_price||'';
       document.getElementById('rec-sub-pay').value=r.sub_pay||'';
       document.getElementById('rec-sub').value=r.subcontractor_id||'';
-      document.getElementById('rec-frequency').value=r.frequency||'monthly';
+      document.getElementById('rec-frequency').value=normalizeFrequency(r.frequency)||'monthly';
       document.getElementById('rec-start').value=r.next_run_date||'';
       document.getElementById('rec-end').value=r.end_date||'';
       loadRecCustomerProps();
@@ -2375,14 +2445,17 @@ function seasonEndDate(fromDate){
   return new Date(year,10,30); // Nov 30
 }
 function buildRecurringJobDates(startDate,frequency,endDate){
+  const start=String(startDate||'').slice(0,10);
+  const endYmd=endDate instanceof Date&&!Number.isNaN(endDate.getTime())?ymdFromDate(endDate):String(endDate||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(endYmd))return [];
   const dates=[];
-  let d=new Date(startDate+'T00:00:00');
+  let ymd=start;
   let guard=0;
-  while(d<=endDate&&guard<200){
-    dates.push(new Date(d));
-    if(frequency==='weekly')d.setDate(d.getDate()+7);
-    else if(frequency==='biweekly')d.setDate(d.getDate()+14);
-    else d.setMonth(d.getMonth()+1);
+  while(ymd<=endYmd&&guard<200){
+    dates.push(ymdToLocalDate(ymd));
+    const next=stepYMD(ymd,frequency);
+    if(!next||next<=ymd)break;
+    ymd=next;
     guard++;
   }
   return dates;
@@ -2433,7 +2506,7 @@ async function saveRecService(){
     client_price:parseFloat(document.getElementById('rec-client-price').value)||0,
     sub_pay:parseFloat(document.getElementById('rec-sub-pay').value)||0,
     subcontractor_id:document.getElementById('rec-sub').value||null,
-    frequency:document.getElementById('rec-frequency').value,
+    frequency:normalizeFrequency(document.getElementById('rec-frequency').value),
     next_run_date:document.getElementById('rec-start').value||bizYMD(),
     end_date:endVal,
     active:true
@@ -2492,7 +2565,7 @@ function filterRecView(el,val){recViewFilter=val;document.querySelectorAll('#vie
 function renderRecurringView(){
   let list=recurring;
   if(recViewFilter==='paused')list=list.filter(r=>!r.active);
-  else if(recViewFilter!=='all')list=list.filter(r=>r.frequency===recViewFilter&&r.active);
+  else if(recViewFilter!=='all')list=list.filter(r=>normalizeFrequency(r.frequency)===recViewFilter&&r.active);
   else list=list.filter(r=>r.active);
   const today=bizYMD();
   document.getElementById('recurring-view-list').innerHTML=list.length?list.map(r=>{
@@ -2567,17 +2640,20 @@ async function extendRecService(id){
   const lastDate=visits.length?visits.map(v=>v.scheduled_date).sort().slice(-1)[0]:r.next_run_date;
   const input=prompt(`Extend "${r.title}" — add visits through what date? (YYYY-MM-DD)\n\nCurrently scheduled through ${fmtDate(lastDate)}.`, '');
   if(!input)return;
-  const endDate=new Date(input+'T00:00:00');
-  if(isNaN(endDate.getTime())){toast('Invalid date — use YYYY-MM-DD');return;}
-  // start from the day after the last existing visit
-  const start=new Date(lastDate+'T00:00:00');
-  if(r.frequency==='weekly')start.setDate(start.getDate()+7);
-  else if(r.frequency==='biweekly')start.setDate(start.getDate()+14);
-  else start.setMonth(start.getMonth()+1);
-  const dates=[];let d=new Date(start);let guard=0;
-  while(d<=endDate&&guard<200){dates.push(new Date(d));if(r.frequency==='weekly')d.setDate(d.getDate()+7);else if(r.frequency==='biweekly')d.setDate(d.getDate()+14);else d.setMonth(d.getMonth()+1);guard++;}
+  const endYmd=String(input).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(endYmd)){toast('Invalid date — use YYYY-MM-DD');return;}
+  // Next visits stay on the plan's cadence, measured from its start (next_run_date),
+  // landing on the first grid date after the last visit. Existing jobs are left in place.
+  const anchor=String(r.next_run_date||lastDate||bizYMD()).slice(0,10);
+  const freq=normalizeFrequency(r.frequency);
+  let ymd=firstYMDAfter(anchor,freq,String(lastDate||'').slice(0,10));
+  const dates=[];let guard=0;
+  while(ymd&&ymd<=endYmd&&guard<200){dates.push(ymd);const next=stepYMD(ymd,freq);if(!next||next<=ymd)break;ymd=next;guard++;}
   if(!dates.length){toast('That date is not past the current schedule');return;}
-  const rows=dates.map(dt=>({job_number:'SMK-'+Math.random().toString(36).slice(2,7).toUpperCase(),title:r.title,description:r.description,customer_id:r.customer_id,address:r.address,subcontractor_id:r.subcontractor_id,client_price:r.client_price,sub_pay:r.sub_pay,status:'Pending',payment_status:'Unpaid',scheduled_date:`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`,recurring_service_id:r.id,accepted_at:new Date().toISOString()}));
+  const taken=new Set(visits.map(v=>String(v.scheduled_date||'').slice(0,10)));
+  const fresh=dates.filter(ds=>!taken.has(ds));
+  if(!fresh.length){toast('Those visits are already on the schedule');return;}
+  const rows=fresh.map(ds=>({job_number:'SMK-'+Math.random().toString(36).slice(2,7).toUpperCase(),title:r.title,description:r.description,customer_id:r.customer_id,address:r.address,subcontractor_id:r.subcontractor_id,client_price:r.client_price,sub_pay:r.sub_pay,status:'Pending',payment_status:'Unpaid',scheduled_date:ds,recurring_service_id:r.id,accepted_at:new Date().toISOString()}));
   const{error}=await db.from('jobs').insert(rows);
   if(error){toast('Error: '+error.message);return;}
   logActivity('Recurring season extended',`${r.title} · +${rows.length} visits through ${fmtDate(input)}`,'recurring',id);
@@ -3025,14 +3101,18 @@ function updateLineItemField(arr,i,field,rawValue){
   const list=arr==='est'?estLineItems:invLineItems;
   const item=list[i];if(!item)return;
   if(field==='qty'||field==='cost'||field==='marginPct'||field==='price')item[field]=parseFloat(rawValue)||0;
+  else if(field==='isOptional')item.isOptional=!!rawValue;
   else item[field]=rawValue;
-  if(field!=='price')item.price=calcLineItemPrice(item);
-  else item.price=roundMoney(item.price);
-  item._recalc=true;
+  // Title, description (visit date), and qty keep the client price.
+  // Price is recalculated only when cost, margin, or the pricing mode changes.
+  const reprices=field==='cost'||field==='marginPct';
+  if(field==='price')item.price=roundMoney(item.price);
+  else if(reprices)item.price=calcLineItemPrice(item);
+  if(field==='qty'||field==='price'||reprices)item._recalc=true;
   const totalEl=document.getElementById(`${arr}-li-total-${i}`);
-  if(totalEl)totalEl.textContent=fmt(lineAmounts(item.qty,item.price,null).total);
+  if(totalEl)totalEl.textContent=fmt(lineAmounts(item.qty,item.price,item._recalc?null:item.storedTotal).total);
   const priceEl=document.getElementById(`${arr}-li-price-${i}`);
-  if(priceEl&&field!=='price')priceEl.value=roundMoney(item.price).toFixed(2);
+  if(priceEl&&(field==='price'||reprices))priceEl.value=roundMoney(item.price).toFixed(2);
   // Live-update the margin/markup badge
   const marginEl=document.getElementById(`${arr}-li-margin-${i}`);
   if(marginEl){
@@ -3090,7 +3170,7 @@ async function saveEstimate(sendNow){
   const manualAddr=document.getElementById('est-address').value.trim();
   const addr=manualAddr||(selAddr||null);
   const isRecurring=document.getElementById('est-recurring').checked;
-  const recFreq=document.getElementById('est-rec-frequency').value;
+  const recFreq=normalizeFrequency(document.getElementById('est-rec-frequency').value);
   const recStart=document.getElementById('est-rec-start').value||null;
   // If Save & Send, force status to Sent (unless already approved/declined)
   let status=document.getElementById('est-status').value;
@@ -3145,8 +3225,9 @@ async function handleEstimateApproval(estId){
     // Recurring: generate the whole season, with a confirmation first
     const start=est.rec_start_date||bizYMD();
     const end=est.rec_end_date?new Date(est.rec_end_date+'T00:00:00'):seasonEndDate(start);
-    const dates=buildRecurringJobDates(start,est.rec_frequency||'weekly',end);
-    const freqWord={weekly:'weekly',biweekly:'every-2-week',monthly:'monthly'}[est.rec_frequency]||'recurring';
+    const recFreq=normalizeFrequency(est.rec_frequency||'weekly');
+    const dates=buildRecurringJobDates(start,recFreq,end);
+    const freqWord={weekly:'weekly',biweekly:'every-2-week',monthly:'monthly'}[recFreq]||'recurring';
     const endYmd=`${end.getFullYear()}-${String(end.getMonth()+1).padStart(2,'0')}-${String(end.getDate()).padStart(2,'0')}`;
     if(!confirm(`This will schedule ${dates.length} ${freqWord} visits from ${fmtDate(start)} through ${fmtDate(endYmd)}. Set them up now?`)){
       toast('Approved — no visits scheduled yet');
@@ -3156,7 +3237,7 @@ async function handleEstimateApproval(estId){
     const{data:rec,error}=await db.from('recurring_services').insert({
       customer_id:est.customer_id,address:est.address,title:(firstItem?.title)||'Maintenance',
       description:est.notes||null,client_price:est.total,sub_pay:0,subcontractor_id:null,
-      frequency:est.rec_frequency||'weekly',next_run_date:start,active:true
+      frequency:recFreq,next_run_date:start,active:true
     }).select().single();
     if(error){toast('Error scheduling: '+error.message);return;}
     const n=await generateSeasonJobs(rec);
@@ -3184,7 +3265,8 @@ function estimateTimelineHTML(e){
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(e.created_at),icon:'✎'});
   const sent=e.sent_at||(e.status!=='Draft'?e.created_at:null);
-  steps.push({label:'Sent to client',done:!!sent||e.status==='Sent'||e.status==='Approved'||e.status==='Declined',time:tlTime(e.sent_at),icon:'📤'});
+  const sentWho=e.sent_to?`Sent to ${esc(e.sent_to)}`:'Sent to client';
+  steps.push({label:sentWho,done:!!sent||e.status==='Sent'||e.status==='Approved'||e.status==='Declined',time:tlTime(e.sent_at),icon:'📤'});
   steps.push({label:e.viewed_at?`Viewed by client${e.view_count>1?` (${e.view_count}×)`:''}`:'Viewed by client',done:!!e.viewed_at,time:tlTime(e.viewed_at),icon:'👁'});
   const respLabel=e.client_response||(e.status==='Approved'?'Accepted':e.status==='Declined'?'Declined':'Response');
   steps.push({label:e.client_response?`Client ${e.client_response}`:(e.status==='Approved'?'Accepted':'Awaiting response'),done:!!e.client_response||e.status==='Approved'||e.status==='Declined',time:tlTime(e.client_response_at),icon:e.client_response==='Declined'?'✕':'✓'});
@@ -3583,12 +3665,83 @@ async function copyQuoteLink(id){
   }
   logActivity('Quote link shared',est?`${est.estimate_number} — ${est.customers?.name||''}`.trim():null,'estimate',id);
 }
+function validEmail(v){return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v||'').trim());}
+function parseContacts(raw){
+  let extra=raw;
+  if(typeof extra==='string'){try{extra=JSON.parse(extra);}catch(e){extra=[];}}
+  if(!Array.isArray(extra))return [];
+  return extra.map(c=>({name:String(c&&c.name||'').trim(),email:String(c&&c.email||'').trim()})).filter(c=>validEmail(c.email));
+}
+function clientContactList(cust){
+  const out=[];
+  const add=(email,name,kind)=>{
+    const e=String(email||'').trim();
+    if(!validEmail(e))return;
+    if(out.some(x=>x.email.toLowerCase()===e.toLowerCase()))return;
+    out.push({email:e,name:String(name||'').trim(),kind});
+  };
+  if(!cust)return out;
+  add(cust.email,cust.name||'Main email','main');
+  add(cust.billing_email,'Billing','billing');
+  parseContacts(cust.contacts).forEach(c=>add(c.email,c.name,'saved'));
+  return out;
+}
+function preferredSendEmail(cust,kind){
+  if(!cust)return '';
+  const main=String(cust.email||'').trim();
+  const bill=String(cust.billing_email||'').trim();
+  const pick=kind==='invoice'?(bill||main):(main||bill);
+  return validEmail(pick)?pick:'';
+}
+let _sendPick=null;
+function pickSendRecipient(cust,kind,docLabel){
+  const contacts=clientContactList(cust);
+  const preferred=preferredSendEmail(cust,kind).toLowerCase();
+  return new Promise(resolve=>{
+    _sendPick={resolve};
+    const box=document.getElementById('sendto-choices');
+    box.innerHTML=contacts.length?contacts.map(c=>{
+      const checked=c.email.toLowerCase()===preferred;
+      const who=c.name?esc(c.name)+' · ':'';
+      const kindLbl=c.kind==='billing'?'Billing email':c.kind==='main'?'Main email':'Saved contact';
+      return `<label style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;min-height:44px">
+        <input type="radio" name="sendto-pick" value="${escapeAttr(c.email)}" ${checked?'checked':''} style="margin-top:4px">
+        <span><span style="font-weight:600;color:var(--ink)">${who}${esc(c.email)}</span><br><span style="font-size:11px;color:var(--ink3)">${kindLbl}</span></span>
+      </label>`;
+    }).join(''):'<div style="font-size:12.5px;color:var(--ink3);padding:6px 0 10px">No saved emails yet. Type one below — it is used for this send only.</div>';
+    if(preferred&&!box.querySelector('input[name="sendto-pick"]:checked')){
+      const first=box.querySelector('input[name="sendto-pick"]');
+      if(first)first.checked=true;
+    }
+    const custom=document.getElementById('sendto-custom');
+    if(custom)custom.value='';
+    const title=document.getElementById('sendto-title');
+    if(title)title.textContent='Send '+(docLabel||'');
+    openModal('sendto');
+  });
+}
+function confirmSendTo(){
+  const custom=document.getElementById('sendto-custom')?.value.trim()||'';
+  const picked=document.querySelector('input[name="sendto-pick"]:checked');
+  const email=custom||(picked?picked.value:'');
+  if(!validEmail(email)){toast('Enter a valid email');return;}
+  const resolve=_sendPick&&_sendPick.resolve;
+  _sendPick=null;
+  closeModal('sendto');
+  if(resolve)resolve({email,oneOff:!!custom});
+}
+function cancelSendTo(){
+  const resolve=_sendPick&&_sendPick.resolve;
+  _sendPick=null;
+  closeModal('sendto');
+  if(resolve)resolve(null);
+}
 async function emailEstimate(id){
   const est=estimates.find(x=>x.id===id);if(!est)return;
-  const cust=customers.find(c=>c.id===est.customer_id)||est.customers;
-  const sendTo=cust?.email||cust?.billing_email;
-  if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
-  if(!confirm(`Email ${est.estimate_number} to ${sendTo}?`))return;
+  const cust=customers.find(c=>c.id===est.customer_id)||est.customers||{};
+  const choice=await pickSendRecipient(cust,'estimate',est.estimate_number);
+  if(!choice)return;
+  const sendTo=choice.email;
   toast('Preparing & sending…');
   const result=await getEstimatePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3701,7 +3854,7 @@ async function editEst(id){
     document.getElementById('est-tax').value=e.tax_rate||0;
     document.getElementById('est-notes').value=e.notes||'';
     document.getElementById('est-recurring').checked=!!e.is_recurring;
-    document.getElementById('est-rec-frequency').value=e.rec_frequency||'weekly';
+    document.getElementById('est-rec-frequency').value=normalizeFrequency(e.rec_frequency||'weekly');
     document.getElementById('est-rec-start').value=e.rec_start_date||'';
     document.getElementById('est-rec-end').value=e.rec_end_date||'';
     toggleEstRecurringFields();
@@ -3889,7 +4042,7 @@ function invoiceTimelineHTML(inv){
   const overdue=(typeof invIsOverdue==='function')&&invIsOverdue(inv);
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(inv.created_at),icon:'✎'});
-  steps.push({label:'Sent to client',done:!!inv.sent_at,time:tlTime(inv.sent_at),icon:'📤'});
+  steps.push({label:inv.sent_to?`Sent to ${esc(inv.sent_to)}`:'Sent to client',done:!!inv.sent_at,time:inv.sent_at?tlTime(inv.sent_at):'',icon:'📤'});
   if(overdue&&inv.status!=='Paid'){
     steps.push({label:'Overdue (30+ days)',done:true,time:'',icon:'!',overdue:true});
   }
@@ -4142,10 +4295,10 @@ async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename){
 }
 async function emailInvoice(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers;
-  const sendTo=cust?.billing_email||cust?.email;
-  if(!sendTo){toast('⚠ This client has no email on file — add one via Edit Client');return;}
-  if(!confirm(`Email ${inv.invoice_number} to ${sendTo}?`))return;
+  const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers||{};
+  const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number);
+  if(!choice)return;
+  const sendTo=choice.email;
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -4217,6 +4370,18 @@ function onInvPropSelect(){
   if(sel&&sel!=='__new'){manual.value='';}
   if(sel==='__new'){document.getElementById('inv-prop-select').value='';manual.focus();}
 }
+async function restoreSentStamp(id,prevSentAt){
+  if(!id)return;
+  const want=prevSentAt||null;
+  try{
+    const res=await db.from('invoices').select('sent_at').eq('id',id).maybeSingle();
+    if(res.error||!res.data)return;
+    const got=res.data.sent_at||null;
+    if(got===want)return;
+    const back=await db.from('invoices').update({sent_at:want}).eq('id',id);
+    if(back.error)console.error('restore sent_at',back.error);
+  }catch(e){console.error('restore sent_at',e);}
+}
 async function saveInvoice(sendNow){
   const custId=document.getElementById('inv-customer').value;
   if(!custId){toast(`${ICONS.alert} Select a customer`);return;}
@@ -4231,11 +4396,13 @@ async function saveInvoice(sendNow){
   const payload={customer_id:custId,job_id:document.getElementById('inv-job').value||null,address:invAddr,status:document.getElementById('inv-status').value,due_date:document.getElementById('inv-due').value||null,tax_rate:tax,tax_amount:taxAmt,subtotal:sub,total,notes:document.getElementById('inv-notes').value.trim()||null};
   try{
     if(manualAddr&&!selAddr&&custId)await ensurePropertySaved(custId,manualAddr);
+    const prevSent=editId?(invoices.find(x=>x.id===editId)?.sent_at||null):null;
     let invId=editId;
     if(editId){const{error}=await db.from('invoices').update(payload).eq('id',editId);if(error){toast('Error: '+error.message);return;}await db.from('invoice_items').delete().eq('invoice_id',editId);}
     else{const{data,error}=await db.from('invoices').insert(payload).select().single();if(error){toast('Error: '+error.message);return;}invId=data.id;}
     const{error:iiErr}=await db.from('invoice_items').insert(invLineItems.map(i=>{const a=lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal);return {invoice_id:invId,job_id:i.jobId||document.getElementById('inv-job').value||null,title:i.title||null,description:i.desc||i.title||' ',quantity:moneyNum(i.qty)||0,unit_price:a.unit,total:a.total,cost:roundMoney(i.cost||0),margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin'};}));
     if(iiErr){toast('Error saving line items: '+iiErr.message);console.error('invoice_items',iiErr);}
+    await restoreSentStamp(invId,prevSent);
     logActivity(editId?'Invoice edited':'Invoice created',`${customers.find(c=>c.id===custId)?.name||''} · ${fmt(total)}`.trim(),'invoice',invId);
     closeModal('invoice');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();
     if(sendNow){toast('Saved — opening to send…');setTimeout(()=>openInvDetail(invId),400);}
@@ -4650,25 +4817,78 @@ function updateJobMarginPreview(){
 }
 
 // ── SAVE CUSTOMER ─────────────────────────────────────────────────────────
+let custContactRows=[];
+function addCustContactRow(name,email){
+  custContactRows.push({name:name||'',email:email||''});
+  renderCustContactRows();
+}
+function renderCustContactRows(){
+  const el=document.getElementById('cust-contacts');
+  if(!el)return;
+  el.innerHTML=custContactRows.map((c,i)=>`<div style="display:flex;gap:6px;margin-bottom:6px">
+    <input class="form-input" placeholder="Name" value="${escapeAttr(c.name||'')}" oninput="custContactRows[${i}].name=this.value">
+    <input class="form-input" type="email" placeholder="email@example.com" value="${escapeAttr(c.email||'')}" oninput="custContactRows[${i}].email=this.value">
+    <button type="button" class="li-del" onclick="custContactRows.splice(${i},1);renderCustContactRows()" aria-label="Remove contact">×</button>
+  </div>`).join('');
+}
+function contactsFromEditor(){
+  const contacts=[];
+  for(const c of custContactRows){
+    const name=String(c.name||'').trim();
+    const email=String(c.email||'').trim();
+    if(!name&&!email)continue;
+    if(!validEmail(email))return {error:'Check the extra contact email'};
+    contacts.push({name,email});
+  }
+  return {contacts};
+}
 async function saveCustomer(){
   const name=document.getElementById('cust-name').value.trim();
   if(!name){toast(`${ICONS.alert} Name is required`);document.getElementById('cust-name')?.focus();return;}
+  const edited=contactsFromEditor();
+  if(edited.error){toast(edited.error);return;}
   const editId=document.getElementById('cust-edit-id').value;
   const address=document.getElementById('cust-address').value.trim();
-  const payload={name,phone:document.getElementById('cust-phone').value.trim()||null,email:document.getElementById('cust-email').value.trim()||null,billing_email:document.getElementById('cust-billing-email').value.trim()||null,city:document.getElementById('cust-city').value.trim()||null,notes:document.getElementById('cust-notes').value.trim()||null};
+  const payload={name,phone:document.getElementById('cust-phone').value.trim()||null,email:document.getElementById('cust-email').value.trim()||null,billing_email:document.getElementById('cust-billing-email').value.trim()||null,city:document.getElementById('cust-city').value.trim()||null,notes:document.getElementById('cust-notes').value.trim()||null,contacts:edited.contacts};
   try{
     let custId=editId;
-    if(editId){const r=await db.from('customers').update(payload).eq('id',editId);if(r.error){toast('Error: '+r.error.message);return;}}
-    else{const r=await db.from('customers').insert(payload).select().single();if(r.error){toast('Error: '+r.error.message);return;}custId=r.data.id;}
+    let contactsSkipped=false;
+    if(editId){
+      let r=await db.from('customers').update(payload).eq('id',editId);
+      if(r.error&&/contacts/i.test(r.error.message||'')){
+        const slim=Object.assign({},payload);delete slim.contacts;
+        r=await db.from('customers').update(slim).eq('id',editId);
+        contactsSkipped=true;
+      }
+      if(r.error){toast('Error: '+r.error.message);return;}
+    }else{
+      let r=await db.from('customers').insert(payload).select().single();
+      if(r.error&&/contacts/i.test(r.error.message||'')){
+        const slim=Object.assign({},payload);delete slim.contacts;
+        r=await db.from('customers').insert(slim).select().single();
+        contactsSkipped=true;
+      }
+      if(r.error){toast('Error: '+r.error.message);return;}
+      custId=r.data.id;
+    }
     if(address){await db.from('properties').insert({customer_id:custId,address});await fetchProperties();}
-    toast(editId?'Client updated ✓':'Client added ✓');
+    toast(contactsSkipped?'Client saved. Extra contacts need a one-time database update before they can be stored.':(editId?'Client updated ✓':'Client added ✓'));
     closeModal('customer');await fetchCustomers();renderCustomers();
   }catch(e){toast('Error: '+e.message);}
 }
 function editCustomer(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   openModal('customer');document.getElementById('cust-modal-title').textContent='Edit Client';document.getElementById('cust-edit-id').value=id;
-  setTimeout(()=>{document.getElementById('cust-name').value=c.name||'';document.getElementById('cust-phone').value=c.phone||'';document.getElementById('cust-email').value=c.email||'';document.getElementById('cust-billing-email').value=c.billing_email||'';document.getElementById('cust-city').value=c.city||'';document.getElementById('cust-notes').value=c.notes||'';},60);
+  setTimeout(()=>{
+    document.getElementById('cust-name').value=c.name||'';
+    document.getElementById('cust-phone').value=c.phone||'';
+    document.getElementById('cust-email').value=c.email||'';
+    document.getElementById('cust-billing-email').value=c.billing_email||'';
+    document.getElementById('cust-city').value=c.city||'';
+    document.getElementById('cust-notes').value=c.notes||'';
+    custContactRows=parseContacts(c.contacts).map(ct=>({name:ct.name,email:ct.email}));
+    renderCustContactRows();
+  },60);
 }
 
 // ── SAVE SUB ──────────────────────────────────────────────────────────────
@@ -4780,6 +5000,7 @@ function openModal(type){
   }else if(type==='customer'){
     document.getElementById('cust-modal-title').textContent='New Client';document.getElementById('cust-edit-id').value='';
     ['cust-name','cust-phone','cust-email','cust-billing-email','cust-city','cust-address','cust-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+    custContactRows=[];renderCustContactRows();
   }else if(type==='sub'){
     document.getElementById('sub-modal-title').textContent='New Subcontractor';document.getElementById('sub-edit-id').value='';
     ['sub-name','sub-phone','sub-email','sub-specialty'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
@@ -4806,10 +5027,12 @@ function openModal(type){
 }
 function closeModal(type){
   const overlay=document.getElementById(`modal-${type}`);
+  if(!overlay)return;
   const modal=overlay.querySelector('.modal');
   if(modal)modal.style.transform='';
   overlay.classList.remove('open');
   if(type==='markpaid'){overlay.style.zIndex='';overlay.style.position='';}
+  if(type==='sendto')abandonSendPick();
 }
 function overlayClose(e,type){if(e.target===document.getElementById(`modal-${type}`))closeModal(type);}
 function closeDetail(type){
@@ -4877,26 +5100,64 @@ function resetListFilters(){
     chips.forEach((c,i)=>c.classList.toggle('active',i===0));
   });
 }
+function abandonSendPick(){
+  if(!_sendPick)return;
+  const resolve=_sendPick.resolve;
+  _sendPick=null;
+  resolve(null);
+}
 function closeAllOverlays(){
+  abandonSendPick();
   document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');const modal=m.querySelector('.modal');if(modal)modal.style.transform='';});
   ['job','cust','est','inv'].forEach(closeDetail);
   const trash=document.getElementById('trash-overlay');if(trash)trash.style.display='none';
   const activity=document.getElementById('activity-overlay');if(activity)activity.style.display='none';
   const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
 }
-function applyRoute(pathname){
+function pageFromPath(pathname){
+  const parts=String(pathname||'').split('/').filter(Boolean);
+  let head=parts[0]||'';
+  try{head=decodeURIComponent(head);}catch(e){}
+  return PATH_VIEW[head.toLowerCase()]||'dashboard';
+}
+function routeSlug(pathname){
+  const parts=String(pathname||'').split('/').filter(Boolean);
+  if(parts.length<2)return null;
+  try{return decodeURIComponent(parts[1]);}catch(e){return parts[1];}
+}
+function normKey(v){return String(v??'').trim().toLowerCase();}
+function findBySlug(list,field,slug){
+  const key=normKey(slug);
+  if(!key||!Array.isArray(list))return null;
+  return list.find(x=>normKey(x[field])===key||normKey(x.id)===key)||null;
+}
+async function fetchBySlug(table,field,slug){
+  const key=String(slug||'').trim();
+  if(!key)return null;
+  try{
+    let res=await db.from(table).select('*').ilike(field,key).limit(1);
+    if(res.error)res=await db.from(table).select('*').eq(field,key).limit(1);
+    if(res.data&&res.data[0])return res.data[0];
+    if(/^[0-9a-f-]{16,}$/i.test(key)){
+      const byId=await db.from(table).select('*').eq('id',key).maybeSingle();
+      if(byId.data)return byId.data;
+    }
+  }catch(e){console.error('fetchBySlug',table,e);}
+  return null;
+}
+async function applyRoute(pathname){
   const path=pathname||location.pathname;
-  const parts=path.split('/').filter(Boolean).map(decodeURIComponent);
-  const head=parts[0]||'';
-  const slug=parts[1]||null;
+  const slug=routeSlug(path);
+  const head=(()=>{const p=String(path||'').split('/').filter(Boolean)[0]||'';try{return decodeURIComponent(p).toLowerCase();}catch(e){return String(p).toLowerCase();}})();
   if(currentProfile?.role==='sub'){
     routeSilent=true;
     showView('sub-portal',document.querySelector('.nav-item'));
     routeSilent=false;
     document.title='My Jobs · Sumak Ops';
     if(head==='jobs'&&slug&&dataReady){
-      const j=jobs.find(x=>x.job_number===slug||x.id===slug);
-      if(j)openJobDetail(j.id);else toast('Job not found');
+      let j=findBySlug(jobs,'job_number',slug);
+      if(!j){j=await fetchBySlug('jobs','job_number',slug);if(j)jobs.push(j);}
+      if(j){recentRecordOpens.delete(String(j.id));openJobDetail(j.id);}else toast('Job not found');
     }
     return;
   }
@@ -4917,23 +5178,26 @@ function applyRoute(pathname){
   document.title='Sumak Ops';
   if(!slug||!dataReady)return;
   if(page==='jobs'){
-    const j=jobs.find(x=>x.job_number===slug||x.id===slug);
-    if(j)openJobDetail(j.id);else toast('Job not found');
+    let j=findBySlug(jobs,'job_number',slug);
+    if(!j){j=await fetchBySlug('jobs','job_number',slug);if(j)jobs.push(j);}
+    if(j){recentRecordOpens.delete(String(j.id));openJobDetail(j.id);}else toast('Job not found');
   }else if(page==='estimates'){
-    const e=estimates.find(x=>x.estimate_number===slug||x.id===slug);
-    if(e)openEstDetail(e.id);else toast('Estimate not found');
+    let e=findBySlug(estimates,'estimate_number',slug);
+    if(!e){e=await fetchBySlug('estimates','estimate_number',slug);if(e)estimates.push(e);}
+    if(e){recentRecordOpens.delete(String(e.id));openEstDetail(e.id);}else toast('Estimate not found');
   }else if(page==='invoices'){
-    const inv=invoices.find(x=>x.invoice_number===slug||x.id===slug);
-    if(inv)openInvDetail(inv.id);else toast('Invoice not found');
+    let inv=findBySlug(invoices,'invoice_number',slug);
+    if(!inv){inv=await fetchBySlug('invoices','invoice_number',slug);if(inv)invoices.push(inv);}
+    if(inv){recentRecordOpens.delete(String(inv.id));openInvDetail(inv.id);}else toast('Invoice not found');
   }else if(page==='customers'){
-    const c=customers.find(x=>x.id===slug);
-    if(c)openCustDetail(c.id);else toast('Client not found');
+    let c=findBySlug(customers,'id',slug);
+    if(!c){c=await fetchBySlug('customers','id',slug);if(c)customers.push(c);}
+    if(c){recentRecordOpens.delete(String(c.id));openCustDetail(c.id);}else toast('Client not found');
   }
 }
 function historyBack(){
   if(history.state&&history.state.from){history.back();return;}
-  const parts=location.pathname.split('/').filter(Boolean);
-  const page=PATH_VIEW[parts[0]||'']||'dashboard';
+  const page=pageFromPath(location.pathname);
   closeAllOverlays();
   routeSilent=true;
   showView(page,null);
@@ -4992,7 +5256,7 @@ window.addEventListener('popstate',()=>{
   const notif=document.getElementById('notif-panel');
   const sheetOpen=(trash&&trash.style.display==='flex')||(activity&&activity.style.display==='flex')||(notif&&notif.classList.contains('open'));
   if(modalOpen||sheetOpen){
-    if(modalOpen){modalOpen.classList.remove('open');const modal=modalOpen.querySelector('.modal');if(modal)modal.style.transform='';}
+    if(modalOpen){abandonSendPick();modalOpen.classList.remove('open');const modal=modalOpen.querySelector('.modal');if(modal)modal.style.transform='';}
     if(trash)trash.style.display='none';
     if(activity)activity.style.display='none';
     if(notif)notif.classList.remove('open');
@@ -5261,22 +5525,20 @@ document.addEventListener('visibilitychange',async()=>{
   if(document.querySelector('.modal-overlay.open'))return;
   if(Date.now()-_lastRefresh<=4000)return;
   _lastRefresh=Date.now();
-  // Remember exactly which view is open RIGHT NOW, before any refresh touches it
-  const activeView=document.querySelector('.view.active');
-  const currentName=activeView?activeView.id.replace('view-',''):null;
+  const beforeEl=document.querySelector('.view.active');
+  const beforeName=beforeEl?beforeEl.id.replace('view-',''):null;
+  const hadDetail=!!document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
   try{
     await loadAll();
     if(currentProfile.role==='admin')renderAll();
     else renderSubPortal();
     await fetchNotifications();renderNotifPanel();
   }catch(e){}
-  // Restore the view we were on if the refresh knocked us off it
-  if(currentName){
-    const nowActive=document.querySelector('.view.active');
-    const nowName=nowActive?nowActive.id.replace('view-',''):null;
-    if(nowName!==currentName&&document.getElementById('view-'+currentName)){
-      showView(currentName);
-    }
+  const nowEl=document.querySelector('.view.active');
+  const nowName=nowEl?nowEl.id.replace('view-',''):null;
+  const stillDetail=!!document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
+  if((beforeName&&nowName!==beforeName)||(hadDetail&&!stillDetail)){
+    applyRoute(location.pathname);
   }
 });
 </script>
