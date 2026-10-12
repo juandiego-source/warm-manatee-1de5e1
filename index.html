@@ -589,7 +589,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 
   <!-- CLIENTS -->
   <div class="view" id="view-customers">
-    <div class="page-header"><div class="page-title">Clients</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openModal('import')">Import</button><button class="btn btn-red btn-sm" onclick="openModal('customer')">+ New</button></div></div>
+    <div class="page-header"><div class="page-title">Clients</div><div style="display:flex;gap:8px"><button class="btn btn-glass btn-sm" onclick="openMergeTool()">Merge</button><button class="btn btn-glass btn-sm" onclick="openModal('import')">Import</button><button class="btn btn-red btn-sm" onclick="openModal('customer')">+ New</button></div></div>
     <div style="padding:0 14px 10px"><input class="form-input" id="cust-search" placeholder="Search by name, initials, phone, email, city..." oninput="renderCustomers()"></div>
     <div class="page-body" id="customers-list"></div>
   </div>
@@ -904,7 +904,8 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="modal-title" id="inv-modal-title">New Invoice</div>
     <input type="hidden" id="inv-edit-id">
     <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="inv-customer" onchange="loadInvCustomerProps()"><option value="">Select customer...</option></select></div>
-    <div class="form-group"><label class="form-label">Linked Job</label><select class="form-input" id="inv-job"><option value="">Select job (optional)...</option></select></div>
+    <div class="form-group"><label class="form-label">Linked Job</label><select class="form-input" id="inv-job" onchange="refreshInvoiceDupWarning()"><option value="">Select job (optional)...</option></select></div>
+    <div id="inv-dup-warn"></div>
     <div class="form-group"><label class="form-label">Service Address</label>
       <select class="form-input" id="inv-prop-select" onchange="onInvPropSelect()" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
       <input class="form-input" id="inv-address" placeholder="Or type a new address" autocomplete="off">
@@ -1006,6 +1007,33 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   </div>
 </div>
 
+<!-- DUPLICATE INVOICE -->
+<div class="modal-overlay" id="modal-dupinv" onclick="overlayClose(event,'dupinv')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">This job already has an invoice</div>
+    <div id="dupinv-body"></div>
+    <p style="font-size:12.5px;color:var(--ink2);margin:12px 0 16px;line-height:1.5">Open the invoice above. A second invoice bills the same job again. Choose that only when you really mean to.</p>
+    <button class="btn btn-red btn-full" onclick="confirmDupInvoiceOverride()">Create a second invoice anyway</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('dupinv')">Don't create another</button>
+  </div>
+</div>
+
+<!-- MERGE CLIENTS -->
+<div class="modal-overlay" id="modal-merge" onclick="overlayClose(event,'merge')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Merge clients</div>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5">Pick the duplicate to archive and the record to keep. Jobs, properties, estimates, invoices, and maintenance plans move onto the one you keep. Nothing is deleted until you confirm.</p>
+    <div id="merge-suggestions"></div>
+    <div class="form-group"><label class="form-label">Duplicate to archive</label><select class="form-input" id="merge-drop" onchange="renderMergePreview()"></select></div>
+    <div class="form-group"><label class="form-label">Record to keep</label><select class="form-input" id="merge-keep" onchange="renderMergePreview()"></select></div>
+    <div id="merge-preview"></div>
+    <button class="btn btn-red btn-full" onclick="confirmMergeClients()">Move records and archive duplicate</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('merge')">Cancel</button>
+  </div>
+</div>
+
 <!-- MARK PAID MODAL -->
 <div class="modal-overlay" id="modal-markpaid" onclick="overlayClose(event,'markpaid')">
   <div class="modal">
@@ -1037,6 +1065,20 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="form-group" style="margin-top:12px"><label class="form-label">CC addresses</label><input class="form-input" id="sendto-cc" type="text" placeholder="cc@example.com, other@example.com" autocomplete="off"></div>
     <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
     <button class="btn btn-full btn-full-ghost" onclick="cancelSendTo()">Cancel</button>
+  </div>
+</div>
+
+<!-- MARK INVOICE SENT -->
+<div class="modal-overlay" id="modal-markinv" onclick="overlayClose(event,'markinv')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="markinv-title">Mark as sent</div>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Record who received this invoice, including anyone on CC. Both address fields are optional. This does not send another email.</p>
+    <div class="form-group"><label class="form-label">Sent to</label><input class="form-input" id="markinv-to" type="text" placeholder="billing@example.com" autocomplete="off"></div>
+    <div class="form-group"><label class="form-label">CC</label><input class="form-input" id="markinv-cc" type="text" placeholder="judy@example.com" autocomplete="off"></div>
+    <div class="form-group"><label class="form-label">Note</label><input class="form-input" id="markinv-note" type="text" placeholder="sent via the portal" autocomplete="off"></div>
+    <button class="btn btn-red btn-full" id="markinv-save" onclick="confirmMarkInvoiceSent()">Mark as Sent</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('markinv')">Cancel</button>
   </div>
 </div>
 
@@ -1103,7 +1145,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const db=supabase.createClient(SB_URL,SB_KEY);
 
 let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices=[],estItems={},invItems={},recurring=[];
-let invoicedJobIds=new Set(),jobInvoiceMap={},services=[],costRequests=[];
+let invoicedJobIds=new Set(),jobInvoiceMap={},jobInvoiceIds={},invoiceItemJobLinks=[],services=[],costRequests=[];
 const inviteSubId=new URLSearchParams(window.location.search).get('invite');
 let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
@@ -1358,13 +1400,59 @@ async function fetchServices(){const{data,error}=await fetchAllRows(()=>db.from(
 async function fetchRecurring(){const{data,error}=await fetchAllRows(()=>db.from('recurring_services').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchRecurring',error);recurring=data||[];}
 async function fetchInvoicedJobIds(){
   const{data:d1,error:e1}=await fetchAllRows(()=>db.from('invoice_items').select('job_id,invoice_id').not('job_id','is',null));
-  const{data:d2,error:e2}=await fetchAllRows(()=>db.from('invoices').select('id,job_id').not('job_id','is',null));
   if(e1)console.error('fetchInvoicedJobIds items',e1);
-  if(e2)console.error('fetchInvoicedJobIds invoices',e2);
+  invoiceItemJobLinks=(d1||[]).filter(x=>x.job_id&&x.invoice_id);
+  indexInvoicedJobs();
+}
+function invoiceIsVoid(inv){
+  const s=String(inv&&inv.status||'').trim().toLowerCase();
+  return s==='void'||s==='voided'||s==='cancelled'||s==='canceled';
+}
+function indexInvoicedJobs(){
+  const links={};
+  const add=(jobId,invoiceId)=>{
+    if(!jobId||!invoiceId)return;
+    if(!links[jobId])links[jobId]=new Set();
+    links[jobId].add(invoiceId);
+  };
+  (invoiceItemJobLinks||[]).forEach(x=>add(x.job_id,x.invoice_id));
+  (invoices||[]).forEach(inv=>{if(inv&&inv.job_id)add(inv.job_id,inv.id);});
+  const byEst={};
+  (invoices||[]).forEach(inv=>{
+    if(!inv||!inv.estimate_id||invoiceIsVoid(inv))return;
+    if(!byEst[inv.estimate_id])byEst[inv.estimate_id]=[];
+    byEst[inv.estimate_id].push(inv.id);
+  });
+  (jobs||[]).forEach(j=>{
+    if(!j||!j.estimate_id)return;
+    (byEst[j.estimate_id]||[]).forEach(id=>add(j.id,id));
+  });
+  jobInvoiceIds=links;
   jobInvoiceMap={};
-  (d1||[]).forEach(x=>{if(x.job_id)jobInvoiceMap[x.job_id]=x.invoice_id;});
-  (d2||[]).forEach(x=>{if(x.job_id)jobInvoiceMap[x.job_id]=x.id;});
+  Object.keys(links).forEach(jobId=>{
+    const live=nonVoidInvoicesForJob(jobId,links);
+    if(live[0])jobInvoiceMap[jobId]=live[0].id;
+  });
   invoicedJobIds=new Set(Object.keys(jobInvoiceMap));
+}
+function nonVoidInvoicesForJob(jobId,links){
+  if(!jobId)return [];
+  const ids=new Set(links&&links[jobId]?links[jobId]:(jobInvoiceIds[jobId]||[]));
+  (invoices||[]).forEach(inv=>{
+    if(!inv||invoiceIsVoid(inv))return;
+    if(inv.job_id===jobId)ids.add(inv.id);
+  });
+  const job=(jobs||[]).find(j=>j.id===jobId);
+  if(job&&job.estimate_id){
+    (invoices||[]).forEach(inv=>{
+      if(!inv||invoiceIsVoid(inv))return;
+      if(inv.estimate_id===job.estimate_id)ids.add(inv.id);
+    });
+  }
+  (invoiceItemJobLinks||[]).forEach(x=>{if(x.job_id===jobId&&x.invoice_id)ids.add(x.invoice_id);});
+  const list=[...ids].map(id=>(invoices||[]).find(i=>i.id===id)).filter(i=>i&&!invoiceIsVoid(i));
+  list.sort((a,b)=>invoiceSortKey(b)-invoiceSortKey(a)||String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  return list;
 }
 async function fetchJobs(){
   const isAdmin=currentProfile?.role==='admin';
@@ -1372,6 +1460,7 @@ async function fetchJobs(){
   const{data,error}=await fetchAllRows(()=>db.from(source).select('*, customers(name), subcontractors(name)').is('deleted_at',null).order('created_at',{ascending:false}));
   if(error)console.error('fetchJobs',error);
   jobs=data||[];
+  indexInvoicedJobs();
 }
 async function fetchCustomers(){const{data,error}=await fetchAllRows(()=>db.from('customers').select('*').is('deleted_at',null).order('name'));if(error)console.error('fetchCustomers',error);customers=data||[];buildSelect('job-customer',customers,'Select customer...');buildSelect('est-customer',customers,'Select customer...');buildSelect('inv-customer',customers,'Select customer...');buildSelect('rec-customer',customers,'Select client...');buildSelect('cr-customer',customers,'Select client...');}
 async function fetchSubs(){const{data,error}=await fetchAllRows(()=>db.from('subcontractors').select('*').order('name'));if(error)console.error('fetchSubs',error);subs=data||[];buildSelect('job-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('rec-sub',subs.filter(s=>s.active),'Unassigned');buildSelect('cr-sub',subs.filter(s=>s.active),'Select subcontractor...');}
@@ -1401,6 +1490,7 @@ async function fetchInvoices(){
     if(error)console.error('fetchInvoices fallback',error);
   }
   invoices=sortInvoices(data||[]);
+  indexInvoicedJobs();
 }
 function invoiceSortKey(inv){
   const m=String(inv.invoice_number||'').match(/(\d+)\s*$/);
@@ -2181,6 +2271,7 @@ function openCustDetail(id){
     ${cInv.length?cInv.map(i=>invoiceListCard(i,`closeDetail('cust');openInvDetail('${i.id}')`)).join(''):'<div style="font-size:13px;color:var(--ink3);padding:8px 0">No invoices yet</div>'}
     <div class="action-row" style="margin-top:12px">
       <button class="action-btn ab-glass" onclick="editCustFromDetail('${id}')">${ICONS.pencil} Edit Client</button>
+      <button class="action-btn ab-glass" onclick="openMergeTool('${id}')">Merge into another client</button>
       <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
     </div>`;
   wireAddressAutocomplete(`new-prop-${id}`,`new-prop-suggest-${id}`);
@@ -2212,6 +2303,149 @@ async function undoDeleteCustomer(id){
   await fetchCustomers();renderCustomers();toast('Client restored ✓');
 }
 function editCustFromDetail(id){closeDetail('cust');editCustomer(id);}
+function clientFold(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'');}
+function clientsLookAlike(a,b){
+  const fa=clientFold(a&&a.name),fb=clientFold(b&&b.name);
+  if(!fa||!fb)return false;
+  if(fa===fb)return true;
+  const short=fa.length<=fb.length?fa:fb;
+  const long=fa.length<=fb.length?fb:fa;
+  return short.length>=8&&long.includes(short);
+}
+function duplicateClientGroups(list){
+  const rows=(list||customers||[]).slice();
+  const parent=rows.map((_,i)=>i);
+  const find=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  const union=(a,b)=>{const pa=find(a),pb=find(b);if(pa!==pb)parent[pb]=pa;};
+  for(let i=0;i<rows.length;i++){
+    for(let j=i+1;j<rows.length;j++){
+      if(clientsLookAlike(rows[i],rows[j]))union(i,j);
+    }
+  }
+  const groups={};
+  rows.forEach((c,i)=>{const p=find(i);if(!groups[p])groups[p]=[];groups[p].push(c);});
+  return Object.values(groups).filter(g=>g.length>1);
+}
+function clientRecordCounts(id){
+  return {
+    jobs:(jobs||[]).filter(j=>j.customer_id===id).length,
+    properties:(properties||[]).filter(p=>p.customer_id===id).length,
+    estimates:(estimates||[]).filter(e=>e.customer_id===id).length,
+    invoices:(invoices||[]).filter(i=>i.customer_id===id).length,
+    plans:(recurring||[]).filter(r=>r.customer_id===id).length
+  };
+}
+function mergedClientPatch(keep,drop){
+  const patch={};
+  ['phone','email','billing_email','city'].forEach(k=>{
+    if(!String(keep[k]||'').trim()&&String(drop[k]||'').trim())patch[k]=String(drop[k]).trim();
+  });
+  const kn=String(keep.notes||'').trim();
+  const dn=String(drop.notes||'').trim();
+  if(!kn&&dn)patch.notes=dn;
+  else if(kn&&dn&&kn!==dn)patch.notes=kn+'\n\nMerged from '+drop.name+': '+dn;
+  const seen=new Set();
+  const contacts=[];
+  const add=(c)=>{
+    const email=String(c&&c.email||'').trim();
+    if(!validEmail(email))return;
+    const key=email.toLowerCase();
+    if(seen.has(key))return;
+    seen.add(key);
+    contacts.push({name:String(c.name||'').trim(),email});
+  };
+  parseContacts(keep.contacts).forEach(add);
+  parseContacts(drop.contacts).forEach(add);
+  if(validEmail(drop.email)&&String(keep.email||'').trim())add({name:drop.name||'',email:drop.email});
+  if(validEmail(drop.billing_email)&&String(keep.billing_email||'').trim()&&String(drop.billing_email).trim().toLowerCase()!==String(keep.billing_email||'').trim().toLowerCase())add({name:'Billing',email:drop.billing_email});
+  const before=new Set(parseContacts(keep.contacts).map(c=>c.email.toLowerCase()));
+  if(contacts.some(c=>!before.has(c.email.toLowerCase())))patch.contacts=contacts;
+  return patch;
+}
+function fillMergeSelect(id,selected){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const prev=selected!=null?selected:el.value;
+  el.innerHTML='<option value="">Select a client...</option>'+customers.map(c=>`<option value="${c.id}">${esc(c.name)}${c.city?' · '+esc(c.city):''}</option>`).join('');
+  if(prev&&customers.some(c=>c.id===prev))el.value=prev;
+}
+function openMergeTool(dropId){
+  fillMergeSelect('merge-drop',dropId||'');
+  fillMergeSelect('merge-keep','');
+  const box=document.getElementById('merge-suggestions');
+  const groups=duplicateClientGroups();
+  if(box){
+    box.innerHTML=groups.length?`<div class="warn-banner"><div class="warn-title">${ICONS.alert} Possible duplicates</div><div class="warn-sub" style="margin-bottom:8px">These names look like the same client. Merge one duplicate into the record you want to keep, then run it again if a third record is left.</div>${groups.map(g=>`<div style="font-size:12.5px;color:var(--ink);margin-top:6px">${g.map(c=>esc(c.name)).join(' · ')}</div>`).join('')}</div>`:'';
+  }
+  renderMergePreview();
+  openModal('merge');
+}
+function renderMergePreview(){
+  const el=document.getElementById('merge-preview');
+  if(!el)return;
+  const dropId=document.getElementById('merge-drop')?.value||'';
+  const keepId=document.getElementById('merge-keep')?.value||'';
+  if(!dropId||!keepId){el.innerHTML='';return;}
+  if(dropId===keepId){el.innerHTML=`<div class="warn-banner"><div class="warn-sub">Pick two different clients.</div></div>`;return;}
+  const drop=customers.find(c=>c.id===dropId);
+  const keep=customers.find(c=>c.id===keepId);
+  const n=clientRecordCounts(dropId);
+  el.innerHTML=`<div class="detail-card" style="margin-bottom:12px"><div class="detail-section-lbl">Will move onto ${esc(keep?.name||'the kept client')}</div><div class="detail-row"><span class="detail-label">From</span><span class="detail-value">${esc(drop?.name||'')}</span></div><div class="detail-row"><span class="detail-label">Jobs</span><span class="detail-value">${n.jobs}</span></div><div class="detail-row"><span class="detail-label">Properties</span><span class="detail-value">${n.properties}</span></div><div class="detail-row"><span class="detail-label">Estimates</span><span class="detail-value">${n.estimates}</span></div><div class="detail-row"><span class="detail-label">Invoices</span><span class="detail-value">${n.invoices}</span></div><div class="detail-row"><span class="detail-label">Plans</span><span class="detail-value">${n.plans}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">${esc(drop?.name||'The duplicate')} is archived after the move. Restore it from Recently Deleted if you need it back. Jobs and invoices stay.</div></div>`;
+}
+async function movePropertiesToClient(dropId,keepId){
+  const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
+  const moving=properties.filter(p=>p.customer_id===dropId);
+  const kept=properties.filter(p=>p.customer_id===keepId).map(p=>({...p}));
+  for(const p of moving){
+    const clash=kept.find(k=>norm(k.address)&&norm(k.address)===norm(p.address));
+    if(clash){
+      const{error}=await db.from('properties').delete().eq('id',p.id);
+      if(error)return error;
+    }else{
+      const{error}=await db.from('properties').update({customer_id:keepId}).eq('id',p.id);
+      if(error)return error;
+      kept.push({...p,customer_id:keepId});
+    }
+  }
+  return null;
+}
+async function confirmMergeClients(){
+  const dropId=document.getElementById('merge-drop')?.value||'';
+  const keepId=document.getElementById('merge-keep')?.value||'';
+  if(!dropId||!keepId){toast('Choose the duplicate and the record to keep');return;}
+  if(dropId===keepId){toast('Pick two different clients');return;}
+  const drop=customers.find(c=>c.id===dropId);
+  const keep=customers.find(c=>c.id===keepId);
+  if(!drop||!keep){toast('Those clients are not on this list');return;}
+  const n=clientRecordCounts(dropId);
+  const msg=`Move ${n.jobs} jobs, ${n.properties} properties, ${n.estimates} estimates, ${n.invoices} invoices, and ${n.plans} plans from "${drop.name}" onto "${keep.name}", then archive "${drop.name}"?\n\nJobs and invoices are not deleted. You can restore the empty client from Recently Deleted.`;
+  if(!confirm(msg))return;
+  const tables=['jobs','estimates','invoices','recurring_services','cost_requests'];
+  for(const table of tables){
+    const{error}=await db.from(table).update({customer_id:keepId}).eq('customer_id',dropId);
+    if(error){toast('Could not move '+table+': '+error.message);return;}
+  }
+  const propErr=await movePropertiesToClient(dropId,keepId);
+  if(propErr){toast('Could not move properties: '+propErr.message);return;}
+  const patch=mergedClientPatch(keep,drop);
+  if(Object.keys(patch).length){
+    let res=await db.from('customers').update(patch).eq('id',keepId);
+    if(res.error&&Object.prototype.hasOwnProperty.call(patch,'contacts')){
+      const slim=Object.assign({},patch);delete slim.contacts;
+      if(Object.keys(slim).length)res=await db.from('customers').update(slim).eq('id',keepId);
+      else res={error:null};
+    }
+    if(res.error){toast('Records moved, but the kept client could not be filled in: '+res.error.message);return;}
+  }
+  const{error:archErr}=await db.from('customers').update({deleted_at:new Date().toISOString()}).eq('id',dropId);
+  if(archErr){toast('Records moved, but '+drop.name+' could not be archived: '+archErr.message);return;}
+  logActivity('Clients merged',`${drop.name} → ${keep.name} · ${n.jobs} jobs, ${n.properties} properties, ${n.estimates} estimates, ${n.invoices} invoices, ${n.plans} plans`,'customer',keepId);
+  closeModal('merge');
+  closeDetail('cust');
+  await Promise.all([fetchCustomers(),fetchProperties(),fetchJobs(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchCostRequests()]);
+  renderAll();
+  toast(drop.name+' archived · records are on '+keep.name);
+}
 
 function freqLabel(f){const n=normalizeFrequency(f);return{weekly:'Weekly',biweekly:'Every 2 weeks',monthly:'Monthly'}[n]||f;}
 function recCardsFor(custId){
@@ -2611,15 +2845,19 @@ function renderRecurringView(){
   else if(recViewFilter!=='all')list=list.filter(r=>normalizeFrequency(r.frequency)===recViewFilter&&r.active);
   else list=list.filter(r=>r.active);
   const today=bizYMD();
-  document.getElementById('recurring-view-list').innerHTML=list.length?list.map(r=>{
+  const flagged=plansNeedingVisits(today);
+  const fixBanner=flagged.length?`<div class="warn-banner"><div class="warn-title">${ICONS.alert} ${plural(flagged.length,'plan')} need visit dates</div><div class="warn-sub">Every 2 weeks is 14 days apart. Plans with no upcoming visits can be filled from their frequency. Completed visits stay.</div><button class="btn btn-sm" style="background:var(--amber);color:white;margin-top:10px;border-radius:8px" onclick="openVisitFixList()">Review and regenerate</button></div>`:'';
+  document.getElementById('recurring-view-list').innerHTML=fixBanner+(list.length?list.map(r=>{
     const visits=jobs.filter(j=>j.recurring_service_id===r.id);
     const upcoming=visits.filter(j=>j.scheduled_date>=today&&j.status!=='Completed'&&j.status!=='Cancelled');
     const done=visits.filter(j=>j.status==='Completed').length;
     const next=upcoming.slice().sort((a,b)=>a.scheduled_date.localeCompare(b.scheduled_date))[0];
+    const issue=planVisitIssue(r,today);
+    const issueNote=issue?(issue.kind==='empty'?'No upcoming visits — regenerate to add dates':issue.kind==='title'?'Title still says Weekly':(normalizeFrequency(r.frequency)==='biweekly'?'Upcoming visits are not 14 days apart':'Upcoming visits do not match this frequency')):'';
     return`
     <div class="card" onclick="openRecDetail('${r.id}')" style="cursor:pointer">
       <div class="card-top">
-        <div><div class="card-id">${freqLabel(r.frequency)}${r.active?'':' · PAUSED'}</div><div class="card-title" style="${r.active?'':'opacity:0.5;text-decoration:line-through'}">${r.title}</div></div>
+        <div><div class="card-id">${freqLabel(r.frequency)}${r.active?'':' · PAUSED'}${normalizeFrequency(r.frequency)==='biweekly'?' · 14 days':''}</div><div class="card-title" style="${r.active?'':'opacity:0.5;text-decoration:line-through'}">${esc(r.title)}</div></div>
         <span class="pill pill-sent">${fmt(r.client_price)}/visit</span>
       </div>
       <div class="card-meta">
@@ -2631,8 +2869,9 @@ function renderRecurringView(){
         <div style="font-size:11px;color:var(--ink3)">${upcoming.length} upcoming${done>0?` · ${done} done`:''}${next?` · next ${fmtDate(next.scheduled_date)}`:''}</div>
         <div style="font-size:11px;color:var(--red)">View ›</div>
       </div>
+      ${issueNote?`<div style="font-size:11.5px;color:var(--amber);margin-top:6px">${esc(issueNote)}</div>`:''}
     </div>`;}).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-title">Nothing here</div><div class="empty-sub">Tap + New to set up a recurring service</div></div>`;
+    :`<div class="empty"><div class="empty-icon">${ICONS.calendar}</div><div class="empty-title">Nothing here</div><div class="empty-sub">Tap + New to set up a recurring service</div></div>`);
 }
 function openRecDetail(id){
   const r=recurring.find(x=>x.id===id);if(!r)return;
@@ -2663,7 +2902,8 @@ function openRecDetail(id){
       <div style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border-radius:var(--rxs);padding:10px"><div style="font-size:20px;font-weight:700;color:var(--ink);font-family:'Cormorant Garamond',serif">${visits.length}</div><div style="font-size:10px;color:var(--ink3)">total</div></div>
     </div>
     ${lastDate?`<div style="font-size:11.5px;color:var(--ink3);margin-bottom:6px">Scheduled through <b style="color:var(--ink2)">${fmtDate(lastDate)}</b></div>`:''}
-    <button class="btn btn-red btn-full" onclick="extendRecService('${r.id}')" style="margin-bottom:10px">+ Add more visits (extend season)</button>
+    <button class="btn btn-red btn-full" onclick="extendRecService('${r.id}')" style="margin-bottom:8px">+ Add more visits (extend season)</button>
+    ${planVisitIssue(r)?`<button class="btn btn-glass btn-full" onclick="regeneratePlanVisits('${r.id}').then(()=>{if(document.getElementById('trash-overlay')?.style.display==='flex')openRecDetail('${r.id}');})" style="margin-bottom:10px">Regenerate upcoming visits</button>`:`<div style="font-size:11.5px;color:var(--ink3);margin-bottom:10px">${normalizeFrequency(r.frequency)==='biweekly'?'Upcoming visits follow every 14 days.':'Upcoming visits follow this frequency.'}</div>`}
     <div style="font-size:11.5px;color:var(--ink2);font-weight:600;margin-bottom:6px">Upcoming visits</div>
     <div style="font-size:11.5px;color:var(--ink3);line-height:1.8;margin-bottom:14px">
       ${upcoming.length?upcoming.slice(0,12).map(v=>`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${fmtDate(v.scheduled_date)}</span><span class="${pClass(v.status)}" style="font-size:10px">${v.status}</span></div>`).join(''):'<div>No upcoming visits — extend the season above to add more</div>'}
@@ -2702,6 +2942,137 @@ async function extendRecService(id){
   logActivity('Recurring season extended',`${r.title} · +${rows.length} visits through ${fmtDate(input)}`,'recurring',id);
   await fetchJobs();renderAll();closeTrash();
   toast(`Added ${rows.length} more visit${rows.length!==1?'s':''} ✓`);
+}
+function ymdDiffDays(a,b){
+  const as=String(a||'').slice(0,10),bs=String(b||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(as)||!/^\d{4}-\d{2}-\d{2}$/.test(bs))return null;
+  const [ay,am,ad]=as.split('-').map(Number);
+  const [by,bm,bd]=bs.split('-').map(Number);
+  return Math.round((Date.UTC(by,bm-1,bd)-Date.UTC(ay,am-1,ad))/86400000);
+}
+function planHorizonYmd(plan,today){
+  today=today||bizYMD();
+  const end=plan&&plan.end_date?String(plan.end_date).slice(0,10):'';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(end)&&end>=today)return end;
+  return ymdFromDate(seasonEndDate(today));
+}
+function planGridDates(plan,throughYmd){
+  const anchor=String(plan&&plan.next_run_date||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(anchor)||!/^\d{4}-\d{2}-\d{2}$/.test(throughYmd))return [];
+  return buildRecurringJobDates(anchor,normalizeFrequency(plan.frequency),throughYmd).map(d=>ymdFromDate(d));
+}
+function biweeklyTitleFix(plan){
+  if(!plan||normalizeFrequency(plan.frequency)!=='biweekly')return null;
+  const title=String(plan.title||'');
+  if(!/^weekly\b/i.test(title))return null;
+  return title.replace(/^weekly\b/i,'Biweekly');
+}
+function planVisitIssue(plan,today){
+  if(!plan||plan.active===false)return null;
+  today=today||bizYMD();
+  const through=planHorizonYmd(plan,today);
+  const wanted=planGridDates(plan,through).filter(d=>d>=today);
+  if(!wanted.length)return null;
+  const want=new Set(wanted);
+  const visits=(jobs||[]).filter(j=>j.recurring_service_id===plan.id&&j.scheduled_date).map(j=>({...j,ymd:String(j.scheduled_date).slice(0,10)}));
+  const upcoming=visits.filter(j=>j.ymd>=today&&j.status!=='Completed'&&j.status!=='Cancelled').sort((a,b)=>a.ymd.localeCompare(b.ymd));
+  const occupied=new Set(visits.map(j=>j.ymd));
+  const remove=upcoming.filter(j=>j.status==='Pending'&&!want.has(j.ymd)&&!invoicedJobIds.has(j.id));
+  const add=wanted.filter(d=>!occupied.has(d));
+  if(!upcoming.length)return {kind:'empty',wanted,upcoming,remove,add,through};
+  if(!remove.length&&!add.length){
+    if(biweeklyTitleFix(plan))return {kind:'title',wanted,upcoming,remove,add,through};
+    return null;
+  }
+  return {kind:remove.length?'spacing':'gap',wanted,upcoming,remove,add,through};
+}
+function visitFixSummary(plan,issue){
+  const freq=freqLabel(plan.frequency);
+  const step=normalizeFrequency(plan.frequency)==='biweekly'?'every 14 days':freq.toLowerCase();
+  const titleFix=biweeklyTitleFix(plan);
+  const who=plan.customers?.name?plan.customers.name+' · ':'';
+  return `${who}${plan.title} (${freq}, ${step}): remove ${issue.remove.length} off-schedule visit${issue.remove.length===1?'':'s'}, add ${issue.add.length} through ${fmtDate(issue.through)}${titleFix?`. Title becomes "${titleFix}"`:''}`;
+}
+async function regeneratePlanVisits(planId,opts){
+  const plan=recurring.find(r=>r.id===planId);if(!plan)return {ok:false,reason:'missing'};
+  const today=(opts&&opts.today)||bizYMD();
+  const issue=planVisitIssue(plan,today);
+  if(!issue||(!issue.remove.length&&!issue.add.length&&!biweeklyTitleFix(plan))){toast('Visits already match this plan');return {ok:false,reason:'clean'};}
+  const titleFix=biweeklyTitleFix(plan);
+  if(!(opts&&opts.skipConfirm)){
+    const msg=`Regenerate upcoming visits for "${plan.title}"?\n\n${visitFixSummary(plan,issue)}\n\nCompleted visits, past visits, and anything already invoiced stay. Future visits that have not started and do not match the schedule are removed. Nothing changes until you confirm.`;
+    if(!confirm(msg))return {ok:false,reason:'cancelled'};
+  }
+  if(issue.remove.length){
+    const{error}=await db.from('jobs').update({deleted_at:new Date().toISOString()}).in('id',issue.remove.map(v=>v.id));
+    if(error){toast('Could not update visits: '+error.message);return {ok:false,reason:error.message};}
+  }
+  const{data:existing}=await db.from('jobs').select('scheduled_date').eq('recurring_service_id',plan.id).is('deleted_at',null);
+  const taken=new Set((existing||[]).map(j=>String(j.scheduled_date||'').slice(0,10)));
+  issue.remove.forEach(v=>taken.delete(v.ymd));
+  const fresh=issue.add.filter(ds=>!taken.has(ds));
+  if(fresh.length){
+    const rows=fresh.map(ds=>({
+      job_number:'SMK-'+Math.random().toString(36).slice(2,7).toUpperCase(),
+      title:titleFix||plan.title,
+      description:plan.description,
+      customer_id:plan.customer_id,
+      address:plan.address,
+      subcontractor_id:plan.subcontractor_id,
+      client_price:plan.client_price,
+      sub_pay:plan.sub_pay,
+      status:'Pending',
+      payment_status:'Unpaid',
+      scheduled_date:ds,
+      recurring_service_id:plan.id,
+      accepted_at:new Date().toISOString()
+    }));
+    const{error}=await db.from('jobs').insert(rows);
+    if(error){toast('Could not add visits: '+error.message);return {ok:false,reason:error.message};}
+  }
+  if(titleFix){
+    await db.from('recurring_services').update({title:titleFix}).eq('id',plan.id);
+    const keepIds=(jobs||[]).filter(j=>j.recurring_service_id===plan.id&&j.status==='Pending'&&String(j.scheduled_date||'').slice(0,10)>=today&&!issue.remove.some(v=>v.id===j.id)).map(j=>j.id);
+    if(keepIds.length)await db.from('jobs').update({title:titleFix}).in('id',keepIds);
+  }
+  logActivity('Visits regenerated',`${plan.customers?.name||''} · ${plan.title} · -${issue.remove.length} +${fresh.length} · ${freqLabel(plan.frequency)}`.trim(),'recurring',plan.id);
+  await fetchRecurring();await fetchJobs();renderAll();
+  return {ok:true,removed:issue.remove.length,added:fresh.length};
+}
+function plansNeedingVisits(today){
+  return (recurring||[]).filter(r=>r.active&&planVisitIssue(r,today));
+}
+async function regenerateFlaggedPlans(){
+  const list=plansNeedingVisits();
+  if(!list.length){toast('Every active plan already has visits on its schedule');return;}
+  const lines=list.slice(0,12).map(r=>visitFixSummary(r,planVisitIssue(r)));
+  const extra=list.length>12?`\n…and ${list.length-12} more`:'' ;
+  if(!confirm(`Regenerate upcoming visits on ${plural(list.length,'plan')}?\n\n${lines.join('\n')}${extra}\n\nCompleted visits stay. This does not change anything until you confirm.`))return;
+  let removed=0,added=0,failed=0;
+  for(const r of list){
+    const res=await regeneratePlanVisits(r.id,{skipConfirm:true});
+    if(res&&res.ok){removed+=res.removed||0;added+=res.added||0;}
+    else if(res&&res.reason&&res.reason!=='clean'&&res.reason!=='cancelled')failed++;
+  }
+  closeTrash();
+  toast(failed?`Updated some plans · ${failed} could not be saved`:`Visits updated · removed ${removed}, added ${added}`);
+}
+function openVisitFixList(){
+  const list=plansNeedingVisits();
+  let overlay=document.getElementById('trash-overlay');
+  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
+  const rows=list.length?list.map(r=>{
+    const issue=planVisitIssue(r);
+    const why=issue.kind==='empty'?'No upcoming visits':issue.kind==='title'?'Title still says Weekly':`Upcoming dates are not ${normalizeFrequency(r.frequency)==='biweekly'?'14 days apart':freqLabel(r.frequency).toLowerCase()}`;
+    return `<div class="detail-row" style="align-items:flex-start"><div style="flex:1"><div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.customers?.name||'Client')}</div><div style="font-size:12px;color:var(--ink2)">${esc(r.title)} · ${esc(freqLabel(r.frequency))}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${why}</div></div><button class="btn btn-sm btn-red" onclick="regeneratePlanVisits('${r.id}').then(()=>openVisitFixList())">Regenerate</button></div>`;
+  }).join(''):`<div style="padding:12px 0;color:var(--ink3);font-size:13px">Every active plan already has visits on its schedule.</div>`;
+  overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Fix visit dates</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Every 2 weeks means a visit every 14 days, counted from the plan start. Plans with no upcoming visits get new dates from that same schedule through the season end. Completed visits are left alone. Nothing is written until you confirm a plan.</div>
+    ${rows}
+    ${list.length?`<button class="btn btn-red btn-full" style="margin-top:8px" onclick="regenerateFlaggedPlans()">Regenerate all ${list.length}</button>`:''}
+  </div>`;
+  overlay.style.display='flex';
 }
 function newJobForCustomer(custId){closeDetail('cust');openModal('job');setTimeout(()=>{document.getElementById('job-customer').value=custId;loadCustomerProps();},80);}
 
@@ -2830,6 +3201,7 @@ function openMoreMenu(){
     {icon:ICONS.chart,label:'Reports',sub:'Revenue, profit, payouts',fn:"closeTrash();showView('payments',null);renderPayments();"},
     {icon:ICONS.calendar,label:'Notification Status',sub:'Check or enable push alerts',fn:"openNotifDiagnostics();"},
     {icon:ICONS.fileText,label:'Activity Log',sub:'Full history of everything that happened',fn:"closeTrash();openActivityLog();"},
+    {icon:ICONS.users,label:'Merge clients',sub:'Move jobs and invoices onto one record',fn:"closeTrash();openMergeTool();"},
     {icon:ICONS.trash,label:'Recently Deleted',sub:'Restore jobs or clients',fn:"closeTrash();openTrash();"}
   ];
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:70vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
@@ -3186,6 +3558,7 @@ function renderEstLineItems(){
 function renderInvLineItems(){
   document.getElementById('inv-line-items').innerHTML=invLineItems.map((item,i)=>lineItemCardHTML(item,i,'inv')).join('');
   calcInvTotal();
+  refreshInvoiceDupWarning();
 }
 function lineItemsSubtotal(items){
   return roundMoney(items.reduce((s,i)=>s+lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal).total,0));
@@ -3778,8 +4151,11 @@ function sentTimelineLabel(raw){
 }
 function sentHeaderHTML(row){
   if(!row||!row.sent_at)return '';
+  const rec=parseSentTo(row.sent_to);
   const phrase=sentRecipientsPhrase(row.sent_to);
-  return `<div style="color:var(--green);font-weight:600">✓ Sent ${fmtDateTime(row.sent_at)}${phrase?' · '+esc(phrase):''}</div>`;
+  const when=`✓ Sent ${fmtDateTime(row.sent_at)}${phrase?' · '+esc(phrase):''}`;
+  const ccLine=rec.cc.length?`<div>CC: ${rec.cc.map(esc).join(', ')}</div>`:'';
+  return `<div style="color:var(--green);font-weight:600">${when}</div>${ccLine}`;
 }
 function parseContacts(raw){
   let extra=raw;
@@ -4015,6 +4391,11 @@ async function updateEstStatus(id,status){
 async function deleteEst(id){if(!confirm('Delete this estimate?'))return;await db.from('estimate_items').delete().eq('estimate_id',id);const{error}=await db.from('estimates').delete().eq('id',id);if(error){toast('Could not delete: '+error.message);return;}closeDetail('est');await fetchEstimates();renderEstimates();toast('Estimate deleted ✓');}
 async function convertEstToInvoice(estId){
   const e=estimates.find(x=>x.id===estId);if(!e)return;
+  const conflicts=estimateInvoiceConflicts(estId);
+  if(conflicts.length){
+    const ok=await askDuplicateInvoiceOverride(conflicts);
+    if(!ok)return;
+  }
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
   const source=Array.isArray(items)?items:[];
   const billable=source.filter(i=>!lineIsOptional(i));
@@ -4197,13 +4578,28 @@ async function createBatchInvoices(){
   const selectedJobs=checked.map(cb=>jobs.find(j=>j.id===cb.dataset.job)).filter(Boolean);
   const missing=selectedJobs.filter(j=>!j.customer_id);
   if(missing.length){toast(`${ICONS.alert} ${plural(missing.length,'selected job','selected jobs')} ${missing.length===1?'has':'have'} no client — add one before invoicing`);return;}
-  const total=roundMoney(selectedJobs.reduce((s,j)=>s+moneyNum(j.client_price),0));
-  if(!confirm(`Create invoices for ${plural(selectedJobs.length,'job')} totaling ${fmt(total)}?`))return;
+  const blocked=[];
+  const clear=[];
+  selectedJobs.forEach(j=>{
+    const hits=nonVoidInvoicesForJob(j.id);
+    if(hits.length)blocked.push({jobId:j.id,job:j,inv:hits[0]});
+    else clear.push(j);
+  });
+  let includeBlocked=false;
+  if(blocked.length){
+    includeBlocked=await askDuplicateInvoiceOverride(blocked);
+    if(!includeBlocked&&!clear.length)return;
+  }
+  const finalJobs=includeBlocked?selectedJobs:clear;
+  if(!finalJobs.length)return;
+  const total=roundMoney(finalJobs.reduce((s,j)=>s+moneyNum(j.client_price),0));
+  if(!confirm(`Create invoices for ${plural(finalJobs.length,'job')} totaling ${fmt(total)}?`))return;
   // Group selected jobs by customer + address, so each property gets its own invoice
   const groups={};
+  const finalIds=new Set(finalJobs.map(j=>j.id));
   checked.forEach(cb=>{
     const job=jobs.find(j=>j.id===cb.dataset.job);
-    if(!job)return;
+    if(!job||!finalIds.has(job.id))return;
     const key=(cb.dataset.cust||'')+'||'+(job.address||'no-address');
     if(!groups[key])groups[key]={custId:cb.dataset.cust,address:job.address||null,jobs:[]};
     groups[key].jobs.push(job);
@@ -4289,6 +4685,7 @@ async function openInvDetail(id){
       <button class="action-btn ab-glass" onclick="shareInvoicePdf('${inv.id}')">${ICONS.send} Share / Text PDF</button>
       <button class="action-btn ab-red" onclick="emailInvoice('${inv.id}')">${ICONS.send} Email to Client</button>
       <button class="action-btn ab-glass" onclick="toggleInvoiceSent('${inv.id}')">${inv.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
+      ${inv.sent_at?`<button class="action-btn ab-glass" onclick="openMarkInvoiceSent('${inv.id}')">${ICONS.mail} Edit who it was sent to</button>`:''}
       <button class="action-btn ab-glass" onclick="editInv('${inv.id}')">${ICONS.pencil} Edit Invoice</button>
       <button class="action-btn ab-danger" onclick="deleteInv('${inv.id}')">${ICONS.trash} Delete</button>
     </div>`;
@@ -4529,17 +4926,64 @@ async function markInvoiceSent(id,sentTo){
 }
 async function toggleInvoiceSent(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const undoing=!!inv.sent_at;
-  if(!confirm(undoing?`Mark ${inv.invoice_number} as not sent?`:`Mark ${inv.invoice_number} as sent?`))return;
-  const newVal=undoing?null:new Date().toISOString();
-  const payload={sent_at:newVal};
-  if(undoing)payload.sent_to=null;
+  if(!inv.sent_at){openMarkInvoiceSent(id);return;}
+  if(!confirm(`Mark ${inv.invoice_number} as not sent?`))return;
+  const payload={sent_at:null,sent_to:null};
   let {error}=await db.from('invoices').update(payload).eq('id',id);
   if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
-    await db.from('invoices').update({sent_at:newVal}).eq('id',id);
+    ({error}=await db.from('invoices').update({sent_at:null}).eq('id',id));
   }
+  if(error){toast('Could not update: '+error.message);return;}
+  logActivity('Invoice marked not sent',inv.invoice_number||'','invoice',id);
   await fetchInvoices();renderInvoices();openInvDetail(id);
-  toast(newVal?'Marked as sent ✓':'Marked as not sent');
+  toast('Marked as not sent');
+}
+let _markInvId=null;
+function openMarkInvoiceSent(id){
+  const inv=invoices.find(x=>x.id===id);if(!inv)return;
+  _markInvId=id;
+  const rec=parseSentTo(inv.sent_to);
+  const toEl=document.getElementById('markinv-to');
+  const ccEl=document.getElementById('markinv-cc');
+  const noteEl=document.getElementById('markinv-note');
+  if(toEl)toEl.value=rec.to.join(', ');
+  if(ccEl)ccEl.value=rec.cc.join(', ');
+  if(noteEl)noteEl.value=rec.note||'';
+  const title=document.getElementById('markinv-title');
+  if(title)title.textContent=inv.sent_at?`Who ${inv.invoice_number||'this invoice'} was sent to`:`Mark ${inv.invoice_number||'invoice'} as sent`;
+  const save=document.getElementById('markinv-save');
+  if(save)save.textContent=inv.sent_at?'Save recipients':'Mark as Sent';
+  openModal('markinv');
+}
+function confirmMarkInvoiceSent(){
+  const id=_markInvId;if(!id)return;
+  const toParts=parseAddressList(document.getElementById('markinv-to')?.value||'');
+  const ccParts=parseAddressList(document.getElementById('markinv-cc')?.value||'');
+  const note=String(document.getElementById('markinv-note')?.value||'').trim();
+  const bad=[...toParts,...ccParts].filter(e=>!validEmail(e));
+  if(bad.length){toast('Check these addresses: '+bad.join(', '));return;}
+  const inv=invoices.find(x=>x.id===id);
+  _markInvId=null;
+  closeModal('markinv');
+  return applyMarkInvoiceSent(id,toParts,ccParts,note,inv);
+}
+async function applyMarkInvoiceSent(id,toList,ccList,note,inv){
+  const sentRecord=encodeSentTo({to:toList,cc:ccList,note});
+  const already=!!(inv&&inv.sent_at);
+  let error;
+  if(already){
+    const payload={sent_to:sentRecord};
+    let res=await db.from('invoices').update(payload).eq('id',id);
+    error=res.error;
+  }else{
+    error=await stampSent('invoices',id,sentRecord?{sent_to:sentRecord}:{});
+  }
+  if(error){toast('Could not save recipients: '+(error.message||'update failed'));return;}
+  const phrase=sentRecipientsPhrase(sentRecord)||'';
+  logActivity(already?'Invoice recipients updated':'Invoice marked sent',`${inv?.invoice_number||''}${phrase?' — '+phrase:''}`.trim(),'invoice',id);
+  await fetchInvoices();renderInvoices();
+  if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
+  toast(phrase?(already?'Recipients saved · ':'Marked as sent · ')+phrase:(already?'Recipients saved':'Marked as sent ✓'));
 }
 async function markInvPaid(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
@@ -4563,6 +5007,80 @@ function onInvPropSelect(){
   const manual=document.getElementById('inv-address');
   if(sel&&sel!=='__new'){manual.value='';}
   if(sel==='__new'){document.getElementById('inv-prop-select').value='';manual.focus();}
+}
+function draftInvoiceJobIds(){
+  const ids=new Set();
+  const main=document.getElementById('inv-job')?.value;
+  if(main)ids.add(main);
+  (invLineItems||[]).forEach(i=>{if(i&&i.jobId)ids.add(i.jobId);});
+  return [...ids];
+}
+function duplicateInvoiceConflicts(jobIds,exceptInvoiceId){
+  const out=[];
+  const seen=new Set();
+  (jobIds||[]).forEach(jobId=>{
+    const job=(jobs||[]).find(j=>j.id===jobId)||null;
+    nonVoidInvoicesForJob(jobId).forEach(inv=>{
+      if(exceptInvoiceId&&inv.id===exceptInvoiceId)return;
+      const key=jobId+'|'+inv.id;
+      if(seen.has(key))return;
+      seen.add(key);
+      out.push({jobId,job,inv});
+    });
+  });
+  return out;
+}
+function duplicateInvoiceWarningHTML(conflicts){
+  if(!conflicts||!conflicts.length)return '';
+  return conflicts.map(({job,inv})=>{
+    const who=job?(job.job_number||'This job'):'This job';
+    const num=inv.invoice_number||'the existing invoice';
+    return `<div class="warn-banner" style="margin-bottom:8px"><div class="warn-title">${ICONS.alert} ${esc(who)} already has ${esc(num)}</div><div class="warn-sub">${esc(inv.status||'On file')} · ${fmt(inv.total)}. Open it instead of billing this job again.</div><button type="button" class="btn btn-sm btn-glass" style="margin-top:8px" onclick="openExistingInvoice('${inv.id}')">Open ${esc(num)}</button></div>`;
+  }).join('');
+}
+function refreshInvoiceDupWarning(){
+  const el=document.getElementById('inv-dup-warn');
+  if(!el)return;
+  const editId=document.getElementById('inv-edit-id')?.value||'';
+  el.innerHTML=duplicateInvoiceWarningHTML(duplicateInvoiceConflicts(draftInvoiceJobIds(),editId||null));
+}
+let _dupInvResolve=null;
+function abandonDupInvoicePrompt(){
+  const resolve=_dupInvResolve;
+  _dupInvResolve=null;
+  if(resolve)resolve(false);
+}
+function askDuplicateInvoiceOverride(conflicts){
+  return new Promise(resolve=>{
+    _dupInvResolve=resolve;
+    const box=document.getElementById('dupinv-body');
+    if(box)box.innerHTML=duplicateInvoiceWarningHTML(conflicts);
+    const overlay=document.getElementById('modal-dupinv');
+    if(overlay)overlay.style.zIndex='280';
+    openModal('dupinv');
+  });
+}
+function confirmDupInvoiceOverride(){
+  const resolve=_dupInvResolve;
+  _dupInvResolve=null;
+  closeModal('dupinv');
+  if(resolve)resolve(true);
+}
+function openExistingInvoice(id){
+  closeModal('dupinv');
+  closeModal('invoice');
+  showView('invoices',document.querySelectorAll('.nav-item')[5]);
+  openInvDetail(id);
+}
+function estimateInvoiceConflicts(estId){
+  const jobIds=(jobs||[]).filter(j=>j.estimate_id===estId).map(j=>j.id);
+  const conflicts=duplicateInvoiceConflicts(jobIds,null);
+  (invoices||[]).filter(i=>i.estimate_id===estId&&!invoiceIsVoid(i)).forEach(inv=>{
+    if(conflicts.some(c=>c.inv.id===inv.id))return;
+    const job=(jobs||[]).find(j=>j.estimate_id===estId)||null;
+    conflicts.push({jobId:job&&job.id,job,inv});
+  });
+  return conflicts;
 }
 async function restoreSentStamp(id,prevSentAt){
   if(!id)return;
@@ -4588,6 +5106,11 @@ async function saveInvoice(sendNow){
   const manualAddr=document.getElementById('inv-address').value.trim();
   const invAddr=manualAddr||selAddr||null;
   const payload={customer_id:custId,job_id:document.getElementById('inv-job').value||null,address:invAddr,status:document.getElementById('inv-status').value,due_date:document.getElementById('inv-due').value||null,tax_rate:tax,tax_amount:taxAmt,subtotal:sub,total,notes:document.getElementById('inv-notes').value.trim()||null};
+  const conflicts=duplicateInvoiceConflicts(draftInvoiceJobIds(),editId||null);
+  if(conflicts.length){
+    const ok=await askDuplicateInvoiceOverride(conflicts);
+    if(!ok)return;
+  }
   try{
     if(manualAddr&&!selAddr&&custId)await ensurePropertySaved(custId,manualAddr);
     const prevSent=editId?(invoices.find(x=>x.id===editId)?.sent_at||null):null;
@@ -4788,7 +5311,7 @@ async function openJobDetail(id){
       ${j.status==='Pending'?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
       ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${j.id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
       ${isAdmin&&j.payment_status==='Unpaid'?`<button class="action-btn ab-red" onclick="markPaidDetail('${j.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
-      ${isAdmin&&j.status==='Completed'?(jobInvoiceMap[j.id]?`<button class="action-btn ab-glass" onclick="closeDetail('job');showView('invoices',document.querySelectorAll('.nav-item')[5]);openInvDetail('${jobInvoiceMap[j.id]}')">${ICONS.receipt} View Invoice</button>`:`<button class="action-btn ab-red" onclick="convertJobToInvoice('${j.id}')">${ICONS.receipt} Convert to Invoice</button>`):''}
+      ${isAdmin&&j.status==='Completed'?jobInvoiceActionHTML(j):''}
       ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${j.id}')">${ICONS.send} Notify Sub</button>`:''}
       ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${j.id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${j.id}')">${ICONS.trash} Delete Job</button>`:''}
     </div>`;
@@ -4802,6 +5325,11 @@ async function openJobDetail(id){
 async function updateStatus(id,status){
   const upd={status};if(status==='Completed')upd.completed_at=new Date().toISOString();
   await db.from('jobs').update(upd).eq('id',id);await fetchJobs();renderAll();if(currentSubId)renderSubPortal();openJobDetail(id);toast('Status updated ✓');
+}
+function jobInvoiceActionHTML(j){
+  const list=nonVoidInvoicesForJob(j.id);
+  if(!list.length)return `<button class="action-btn ab-red" onclick="convertJobToInvoice('${j.id}')">${ICONS.receipt} Convert to Invoice</button>`;
+  return list.map(inv=>`<button class="action-btn ab-glass" onclick="closeDetail('job');showView('invoices',document.querySelectorAll('.nav-item')[5]);openInvDetail('${inv.id}')">${ICONS.receipt} View ${esc(inv.invoice_number||'Invoice')}</button>`).join('');
 }
 async function convertJobToInvoice(jobId){
   const j=jobs.find(x=>x.id===jobId);if(!j)return;
@@ -5214,8 +5742,9 @@ function openModal(type){
     document.getElementById('inv-address').value='';document.getElementById('inv-prop-select').innerHTML='<option value="">Select saved address...</option>';
     wireAddressAutocomplete('inv-address','inv-address-suggest');
     // populate job dropdown
-    const sel=document.getElementById('inv-job');sel.innerHTML='<option value="">Select job (optional)...</option>'+jobs.map(j=>`<option value="${j.id}">${j.job_number} — ${j.title}</option>`).join('');
+    const sel=document.getElementById('inv-job');sel.innerHTML='<option value="">Select job (optional)...</option>'+jobs.map(j=>{const billed=nonVoidInvoicesForJob(j.id).length?' · already invoiced':'';return `<option value="${j.id}">${esc(j.job_number)} — ${esc(j.title)}${billed}</option>`;}).join('');
     invLineItems=[{desc:'',qty:1,price:0}];renderInvLineItems();
+    refreshInvoiceDupWarning();
   }
   document.getElementById(`modal-${type}`).classList.add('open');pushHistoryState('modal');
 }
@@ -5227,6 +5756,7 @@ function closeModal(type){
   overlay.classList.remove('open');
   if(type==='markpaid'){overlay.style.zIndex='';overlay.style.position='';}
   if(type==='sendto')abandonSendPick();
+  if(type==='dupinv')abandonDupInvoicePrompt();
 }
 function overlayClose(e,type){if(e.target===document.getElementById(`modal-${type}`))closeModal(type);}
 function closeDetail(type){
