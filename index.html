@@ -5322,9 +5322,56 @@ async function openJobDetail(id){
   await renderJobPhotos(j.id);
   renderSiteReport(j);
 }
+function jobReadSource(){return currentProfile?.role==='admin'?'jobs':'sub_jobs';}
+function statusChangeLanded(previous,requested,actual){
+  if(!actual||actual!==requested)return false;
+  if(previous==null||previous==='')return false;
+  return actual!==previous;
+}
+function shouldStampCompletedAt(requested,landed,existingCompletedAt){
+  return requested==='Completed'&&!!landed&&!existingCompletedAt;
+}
+async function refreshJobViews(id){
+  await fetchJobs();
+  renderAll();
+  if(currentSubId)renderSubPortal();
+  if(id&&document.getElementById('job-detail')?.classList.contains('open'))openJobDetail(id);
+}
 async function updateStatus(id,status){
-  const upd={status};if(status==='Completed')upd.completed_at=new Date().toISOString();
-  await db.from('jobs').update(upd).eq('id',id);await fetchJobs();renderAll();if(currentSubId)renderSubPortal();openJobDetail(id);toast('Status updated ✓');
+  const source=jobReadSource();
+  let previous=jobs.find(x=>x.id===id)?.status??null;
+  if(!previous){
+    const pre=await db.from(source).select('status').eq('id',id).maybeSingle();
+    previous=pre.data?.status??null;
+  }
+  const{error}=await db.from('jobs').update({status}).eq('id',id);
+  if(error){toast('Could not update status: '+error.message);return;}
+  const{data:row,error:readErr}=await db.from(source).select('status, completed_at').eq('id',id).maybeSingle();
+  const landed=!readErr&&statusChangeLanded(previous,status,row?.status);
+  if(!landed){
+    await refreshJobViews(id);
+    toast('Status did not change.');
+    return;
+  }
+  if(shouldStampCompletedAt(status,landed,row?.completed_at)){
+    const stamp=await db.from('jobs').update({completed_at:new Date().toISOString()}).eq('id',id).eq('status','Completed');
+    if(stamp.error){
+      await refreshJobViews(id);
+      toast('Status saved, but the completion time did not: '+stamp.error.message);
+      return;
+    }
+    const check=await db.from(source).select('status, completed_at').eq('id',id).maybeSingle();
+    if(check.error||check.data?.status!=='Completed'||!check.data?.completed_at){
+      await refreshJobViews(id);
+      toast('Status did not change.');
+      return;
+    }
+  }
+  await fetchJobs();
+  renderAll();
+  if(currentSubId)renderSubPortal();
+  openJobDetail(id);
+  toast('Status updated ✓');
 }
 function jobInvoiceActionHTML(j){
   const list=nonVoidInvoicesForJob(j.id);
