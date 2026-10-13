@@ -440,7 +440,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   #view-dashboard.active{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;align-content:start;}
   #attention-list,#view-dashboard .attn-strip,#view-dashboard>div:last-child{grid-column:1 / -1;}
   #view-dashboard .widget{margin:12px 8px 0;min-width:0;}
-  #view-payments .stats-grid{grid-template-columns:repeat(4,1fr);}
+  #view-payments .stats-grid{grid-template-columns:repeat(4,minmax(0,1fr));}
 }
 </style>
 </head>
@@ -661,15 +661,30 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
         <div class="page-title">Reports</div>
       </div>
     </div>
-    <div style="padding:0 14px 10px"><input class="form-input" id="report-month" type="month" onchange="renderPayments()"></div>
-    <div class="stats-grid" style="padding-top:0">
-      <div class="stat-card accent"><div class="stat-label">Profit</div><div class="stat-value" id="pay-profit">—</div><div class="stat-hint" id="pay-margin">this month</div></div>
-      <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value" id="pay-revenue">—</div><div class="stat-hint">client charges</div></div>
-      <div class="stat-card"><div class="stat-label">Sub Cost</div><div class="stat-value money" id="pay-earned">—</div><div class="stat-hint">paid out</div></div>
-      <div class="stat-card"><div class="stat-label">Outstanding</div><div class="stat-value money" id="pay-outstanding">—</div><div class="stat-hint">unpaid to subs</div></div>
+    <div style="padding:0 14px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:150px">
+        <label class="form-label" for="report-month">Month</label>
+        <input class="form-input" id="report-month" type="month" onchange="renderPayments()">
+      </div>
+      <div style="flex:1;min-width:150px">
+        <label class="form-label" for="report-since">Balance since</label>
+        <input class="form-input" id="report-since" type="date" onchange="renderPayments()">
+      </div>
     </div>
+    <div style="padding:0 14px 8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-glass btn-sm" onclick="clearReportSince()">All-time balance</button>
+      <button class="btn btn-glass btn-sm" onclick="openRecordPayout('')">Record a payout</button>
+    </div>
+    <div style="padding:0 14px 8px;font-size:12px;color:var(--ink3);line-height:1.45">Owed counts completed visits only. Paid to subs uses the date you paid. Upcoming visits are listed apart from the balance.</div>
+    <div class="stats-grid" style="padding-top:0">
+      <div class="stat-card"><div class="stat-label">Owed to subs</div><div class="stat-value money" id="pay-outstanding">—</div><div class="stat-hint">completed this month</div></div>
+      <div class="stat-card"><div class="stat-label">Paid to subs</div><div class="stat-value money" id="pay-earned">—</div><div class="stat-hint">by date paid</div></div>
+      <div class="stat-card"><div class="stat-label">Client paid</div><div class="stat-value" id="pay-client">—</div><div class="stat-hint">on those jobs</div></div>
+      <div class="stat-card accent"><div class="stat-label">Profit</div><div class="stat-value" id="pay-profit">—</div><div class="stat-hint" id="pay-margin">completed work</div></div>
+    </div>
+    <div id="pay-revenue-note" style="padding:0 18px 4px;font-size:12px;color:var(--ink2);line-height:1.45"></div>
     <div class="section-hdr"><div class="section-lbl">By Subcontractor</div></div>
-    <div class="page-body"><div class="detail-card" id="pay-by-sub"></div><div style="margin:16px 0 8px" class="section-lbl">Jobs This Month</div><div id="payments-list"></div></div>
+    <div class="page-body"><div class="detail-card" id="pay-by-sub"></div><div id="pay-warnings"></div><div style="margin:16px 0 8px" class="section-lbl">Paid out this month</div><div id="payments-paid-list"></div><div style="margin:16px 0 8px" class="section-lbl">Completed this month</div><div id="payments-list"></div><div style="margin:16px 0 8px" class="section-lbl">Upcoming — not owed yet</div><div id="payments-upcoming"></div></div>
   </div>
 
   <!-- SUB PORTAL -->
@@ -1034,6 +1049,35 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   </div>
 </div>
 
+<!-- RECORD SUB PAYOUT -->
+<div class="modal-overlay" id="modal-subpay" onclick="overlayClose(event,'subpay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Record a payout</div>
+    <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5">Money you paid a sub. Mark as Paid on a job still works by itself. A job is marked paid here only when the amount tied to it covers the rest of its sub pay.</p>
+    <div class="form-group"><label class="form-label">Sub</label><select class="form-input" id="sp-sub" onchange="renderPayoutJobPicks()"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date paid</label><input class="form-input" id="sp-date" type="date"></div>
+      <div class="form-group"><label class="form-label">Amount</label><input class="form-input" id="sp-amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="updatePayoutPickHint()"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Method</label>
+      <select class="form-input" id="sp-method">
+        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Direct Deposit</option><option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Reference</label><input class="form-input" id="sp-ref" placeholder="Check number, Zelle confirmation..."></div>
+    <div class="form-group"><label class="form-label">Note</label><input class="form-input" id="sp-notes" placeholder="Optional"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px">
+      <div class="form-label" style="margin:0">Tie to completed jobs</div>
+      <button type="button" class="btn btn-glass btn-sm" onclick="fillPayoutFromAmount()">Apply amount to oldest</button>
+    </div>
+    <div id="sp-jobs" style="margin-bottom:8px"></div>
+    <div id="sp-hint" style="font-size:12px;color:var(--ink2);margin-bottom:8px"></div>
+    <button class="btn btn-red btn-full" id="sp-save" onclick="saveRecordPayout()">Save payout</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('subpay')">Cancel</button>
+  </div>
+</div>
+
 <!-- MARK PAID MODAL -->
 <div class="modal-overlay" id="modal-markpaid" onclick="overlayClose(event,'markpaid')">
   <div class="modal">
@@ -1146,6 +1190,7 @@ const db=supabase.createClient(SB_URL,SB_KEY);
 
 let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices=[],estItems={},invItems={},recurring=[];
 let invoicedJobIds=new Set(),jobInvoiceMap={},jobInvoiceIds={},invoiceItemJobLinks=[],services=[],costRequests=[];
+let subPayments=[],subPaymentJobs=[],subPayLedgerReady=false,payoutSaving=false;
 const inviteSubId=new URLSearchParams(window.location.search).get('invite');
 let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
@@ -1386,7 +1431,7 @@ async function doRegister(){
   if(error){msg.textContent=error.message;msg.className='auth-msg';}
   else{msg.textContent='Account created! Signing you in...';msg.className='auth-msg ok';}
 }
-async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];notifications=[];currentUser=null;currentProfile=null;currentSubId=null;}
+async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];notifications=[];subPayments=[];subPaymentJobs=[];subPayLedgerReady=false;currentUser=null;currentProfile=null;currentSubId=null;}
 function switchAuthTab(tab,el){
   document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
   document.getElementById('auth-login').style.display=tab==='login'?'block':'none';
@@ -1394,15 +1439,42 @@ function switchAuthTab(tab,el){
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────
-async function loadAll(){await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchServices(),fetchCostRequests()]);}
+async function loadAll(){await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchSubPayments(),fetchServices(),fetchCostRequests()]);}
 async function fetchCostRequests(){const{data,error}=await fetchAllRows(()=>db.from('cost_requests').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchCostRequests',error);costRequests=data||[];}
 async function fetchServices(){const{data,error}=await fetchAllRows(()=>db.from('services').select('*').eq('active',true).order('name'));if(error)console.error('fetchServices',error);services=data||[];}
 async function fetchRecurring(){const{data,error}=await fetchAllRows(()=>db.from('recurring_services').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchRecurring',error);recurring=data||[];}
 async function fetchInvoicedJobIds(){
-  const{data:d1,error:e1}=await fetchAllRows(()=>db.from('invoice_items').select('job_id,invoice_id').not('job_id','is',null));
+  const{data:d1,error:e1}=await fetchAllRows(()=>db.from('invoice_items').select('id, job_id, invoice_id, total, quantity, unit_price').not('job_id','is',null));
   if(e1)console.error('fetchInvoicedJobIds items',e1);
   invoiceItemJobLinks=(d1||[]).filter(x=>x.job_id&&x.invoice_id);
   indexInvoicedJobs();
+}
+async function fetchSubPayments(){
+  if(currentProfile?.role!=='admin'){
+    subPayments=[];
+    subPaymentJobs=[];
+    subPayLedgerReady=false;
+    return;
+  }
+  const pay=await fetchAllRows(()=>db.from('sub_payments').select('*').order('paid_on',{ascending:false}));
+  if(pay.error){
+    console.error('fetchSubPayments',pay.error);
+    subPayments=[];
+    subPaymentJobs=[];
+    subPayLedgerReady=false;
+    return;
+  }
+  const links=await fetchAllRows(()=>db.from('sub_payment_jobs').select('*'));
+  if(links.error){
+    console.error('fetchSubPaymentJobs',links.error);
+    subPayments=pay.data||[];
+    subPaymentJobs=[];
+    subPayLedgerReady=true;
+    return;
+  }
+  subPayments=pay.data||[];
+  subPaymentJobs=links.data||[];
+  subPayLedgerReady=true;
 }
 function invoiceIsVoid(inv){
   const s=String(inv&&inv.status||'').trim().toLowerCase();
@@ -1995,7 +2067,7 @@ function renderDashboard(){
 function renderJobs(){
   const q=(document.getElementById('job-search')?.value||'').trim().toLowerCase();
   const base=jobs.filter(j=>!j.recurring_service_id);
-  let list=jobFilter==='all'?base:jobFilter==='unpaid'?base.filter(j=>j.payment_status==='Unpaid'):base.filter(j=>j.status===jobFilter);
+  let list=jobFilter==='all'?base:jobFilter==='unpaid'?base.filter(j=>!subPayIsPaid(j)):base.filter(j=>j.status===jobFilter);
   let banner='';
   if(attnFocus==='needInvoice'){
     list=jobsNeedingInvoice();
@@ -3310,102 +3382,678 @@ async function linkSubAccount(profileId){
 }
 
 // ── PAYMENTS ─────────────────────────────────────────────────────────────
-function renderPayments(){
-  const monthInput=document.getElementById('report-month');
-  if(!monthInput.value)monthInput.value=bizYM();
-  const ym=monthInput.value;
-  const inMonth=j=>jobMonthKey(j)===ym;
-  const monthJobs=jobs.filter(inMonth);
-  const unbilledAll=jobsNeedingInvoice();
-  const unbilledAllValue=unbilledAll.reduce((s,j)=>s+moneyNum(j.client_price),0);
-  const paid=monthJobs.filter(j=>j.payment_status==='Paid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const unpaid=monthJobs.filter(j=>j.payment_status==='Unpaid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const revenue=monthJobs.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
-  const cost=monthJobs.reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const profit=revenue-cost;
-  const margin=revenue>0?(profit/revenue*100):0;
-  document.getElementById('pay-earned').textContent=fmt(paid);
-  document.getElementById('pay-outstanding').textContent=fmt(unpaid);
-  document.getElementById('pay-revenue').textContent=fmt(revenue);
-  document.getElementById('pay-profit').textContent=fmt(profit);
-  document.getElementById('pay-margin').textContent=revenue>0?`${margin.toFixed(0)}% margin`:'this month';
-  const bsm={};
-  monthJobs.forEach(j=>{
-    const key=j.subcontractor_id||'unassigned';
-    if(!bsm[key])bsm[key]={name:j.subcontractors?.name||'Unassigned',total:0,paid:0,unpaid:0,jobs:0,completed:0,revenue:0,billedToClient:0,notBilledToClient:0,notBilledValue:0};
-    bsm[key].total+=parseFloat(j.sub_pay)||0;
-    bsm[key].revenue+=parseFloat(j.client_price)||0;
-    bsm[key].jobs++;
-    if(j.status==='Completed')bsm[key].completed++;
-    if(j.payment_status==='Paid')bsm[key].paid+=parseFloat(j.sub_pay)||0;else bsm[key].unpaid+=parseFloat(j.sub_pay)||0;
-    // The reconciliation gap: is this job billed to a CLIENT yet?
-    if(jobNeedsInvoice(j)){bsm[key].notBilledToClient++;bsm[key].notBilledValue+=moneyNum(j.client_price);}
-    else if(j.status==='Completed'&&roundMoney(j.client_price)>0&&invoicedJobIds.has(j.id))bsm[key].billedToClient++;
-  });
-  const allTimeNote=`<div style="font-size:12.5px;color:var(--ink2);padding:4px 2px 12px">${unbilledAll.length?`${plural(unbilledAll.length,'completed job','completed jobs')} not invoiced across every month · ${fmt(unbilledAllValue)}`:'Every completed job with a client charge is invoiced.'} <span style="color:var(--red);font-weight:600;cursor:pointer" onclick="focusAttention('needInvoice')">Review</span></div>`;
-  document.getElementById('pay-by-sub').innerHTML=allTimeNote+
-    (Object.entries(bsm).map(([key,d])=>{
-      const p=d.revenue-d.total;
-      const gapWarn=d.notBilledToClient>0?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">⚠ ${plural(d.notBilledToClient,'job')} not billed to client (${fmt(d.notBilledValue)})</div>`:(d.completed>0?`<div style="font-size:11px;color:var(--green);margin-top:3px">✓ completed work this month is billed</div>`:`<div style="font-size:11px;color:var(--ink3);margin-top:3px">No completed jobs this month</div>`);
-      return`<div class="detail-row" style="cursor:pointer" onclick="openSubReconcile('${key}','${ym}')">
-        <div><div style="font-weight:600;color:var(--ink);font-size:14px">${d.name}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.jobs} job${d.jobs!==1?'s':''} · ${d.completed} completed</div>${gapWarn}</div>
-        <div style="text-align:right;display:flex;align-items:center;gap:10px">
-          <div><div style="font-weight:700;color:${p>=0?'var(--green)':'var(--rose)'};font-size:16px;font-family:'Cormorant Garamond',serif">${fmt(p)} profit</div><div style="font-size:11px;color:var(--ink3)">${fmt(d.revenue)} rev · ${fmt(d.total)} cost</div>${d.unpaid>0?`<div style="font-size:11px;color:var(--rose)">${fmt(d.unpaid)} owed to sub</div>`:`<div style="font-size:11px;color:var(--green)">sub paid up</div>`}</div>
-          ${key!=='unassigned'?`<button class="btn btn-sm btn-glass" style="padding:6px 8px" onclick="event.stopPropagation();printSubPayout('${key}')" title="Payout PDF">${ICONS.printer}</button>`:''}
-        </div>
-      </div>`;}).join('')||'<div style="color:var(--ink3);font-size:13px;padding:8px 0">No jobs this month</div>');
-  document.getElementById('payments-list').innerHTML=monthJobs.map(j=>{const p=(parseFloat(j.client_price)||0)-(parseFloat(j.sub_pay)||0);return`<div class="card"><div class="card-top"><div><div class="card-id">${j.job_number}</div><div class="card-title">${j.title}</div></div><span class="${pClass(j.payment_status)}">${j.payment_status}</span></div><div class="card-meta"><span class="card-meta-item">${ICONS.wrench} ${j.subcontractors?.name||'—'}</span>${j.scheduled_date?`<span class="card-meta-item">${ICONS.calendar} ${fmtDate(j.scheduled_date)}</span>`:''}${j.payment_method&&j.payment_status==='Paid'?`<span class="card-meta-item">${ICONS.creditCard} ${j.payment_method}</span>`:''}</div><div class="card-footer"><div><div class="card-amount">${fmt(j.sub_pay)} cost</div><div style="font-size:11px;font-weight:600;color:${p>=0?'var(--green)':'var(--rose)'}">${fmt(p)} profit</div></div>${j.payment_status==='Unpaid'?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();markPaidDetail('${j.id}')">Mark Paid</button>`:''}</div></div>`;}).join('')||`<div class="empty"><div class="empty-sub">No jobs this month</div></div>`;
+function subPayIsPaid(j){
+  return String(j&&j.payment_status||'').trim()==='Paid';
 }
-
-function openSubReconcile(subKey,ym){
-  const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
-  const subJobs=jobs.filter(j=>(j.subcontractor_id||'unassigned')===subKey&&inMonth(j)).sort((a,b)=>(a.scheduled_date||'').localeCompare(b.scheduled_date||''));
-  const subName=subJobs[0]?.subcontractors?.name||(subKey==='unassigned'?'Unassigned':'Sub');
-  const owedToSub=subJobs.filter(j=>j.payment_status==='Unpaid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const totalCost=subJobs.reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const completed=subJobs.filter(j=>j.status==='Completed'&&roundMoney(j.client_price)>0);
-  const unbilled=subJobs.filter(jobNeedsInvoice);
-  const unbilledValue=unbilled.reduce((s,j)=>s+(parseFloat(j.client_price)||0),0);
+function subPayLabel(j){
+  return subPayIsPaid(j)?'Paid':'Unpaid';
+}
+function jobIsCancelled(j){
+  const s=String(j&&j.status||'').trim().toLowerCase();
+  return s==='cancelled'||s==='canceled';
+}
+function jobIsDeleted(j){return !!(j&&j.deleted_at);}
+function jobIsCompletedWork(j){
+  return !!j&&!jobIsDeleted(j)&&!jobIsCancelled(j)&&String(j.status||'').trim()==='Completed';
+}
+function jobIsUpcomingWork(j){
+  if(!j||jobIsDeleted(j)||jobIsCancelled(j)||jobIsCompletedWork(j))return false;
+  return true;
+}
+function jobVisitYMD(j){
+  const s=j&&j.scheduled_date;
+  if(typeof s==='string'&&/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
+  return '';
+}
+function jobWorkYMD(j){
+  const visit=jobVisitYMD(j);
+  if(visit)return visit;
+  if(j&&j.completed_at){
+    const y=bizYMD(j.completed_at);
+    return /^\d{4}-\d{2}-\d{2}$/.test(y)?y:'';
+  }
+  return '';
+}
+function jobWorkMonth(j){
+  const ymd=jobWorkYMD(j);
+  return ymd?ymd.slice(0,7):'';
+}
+function jobPaidYMD(j){
+  if(!subPayIsPaid(j)||j.paid_at==null||j.paid_at==='')return '';
+  const p=String(j.paid_at);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(p))return p;
+  if(/^\d{4}-\d{2}-\d{2}T/.test(p)){
+    const y=bizYMD(p);
+    return /^\d{4}-\d{2}-\d{2}$/.test(y)?y:'';
+  }
+  if(/^\d{4}-\d{2}-\d{2}/.test(p))return p.slice(0,10);
+  const y=bizYMD(p);
+  return /^\d{4}-\d{2}-\d{2}$/.test(y)?y:'';
+}
+function ymdOnOrAfter(ymd, since){
+  if(!since)return true;
+  if(!ymd)return false;
+  return ymd>=since;
+}
+function jobPropertyKey(j){
+  return String(j&&j.address||'').trim().toLowerCase().replace(/[.,#]/g,' ').replace(/\s+/g,' ').trim();
+}
+function subPayAmount(j){return roundMoney(j&&j.sub_pay);}
+function jobMissingSubPay(j){
+  if(!jobIsCompletedWork(j))return false;
+  return j.sub_pay==null||j.sub_pay===''||subPayAmount(j)<=0;
+}
+function subKeyOf(j){return j&&j.subcontractor_id?j.subcontractor_id:'unassigned';}
+function subNameOf(subKey, sample){
+  if(!subKey||subKey==='unassigned')return 'Unassigned';
+  const s=(subs||[]).find(x=>x.id===subKey);
+  if(s&&s.name)return s.name;
+  const emb=sample&&sample.subcontractors;
+  if(emb&&!Array.isArray(emb)&&emb.name)return emb.name;
+  if(Array.isArray(emb)&&emb[0]&&emb[0].name)return emb[0].name;
+  return 'Sub';
+}
+function sumMoney(list, fn){
+  return roundMoney((list||[]).reduce((s,item)=>s+(fn?fn(item):0),0));
+}
+function compareJobs(a,b){
+  const d=jobWorkYMD(a).localeCompare(jobWorkYMD(b));
+  if(d)return d;
+  return String(a.job_number||'').localeCompare(String(b.job_number||''));
+}
+function duplicateRank(a,b){
+  const ac=jobIsCompletedWork(a)?0:1;
+  const bc=jobIsCompletedWork(b)?0:1;
+  if(ac!==bc)return ac-bc;
+  const ap=subPayAmount(a)>0?0:1;
+  const bp=subPayAmount(b)>0?0:1;
+  if(ap!==bp)return ap-bp;
+  const ad=String(a.created_at||'');
+  const bd=String(b.created_at||'');
+  if(ad!==bd)return ad.localeCompare(bd);
+  return String(a.id||'').localeCompare(String(b.id||''));
+}
+function duplicateJobIndex(list){
+  const buckets={};
+  (list||[]).forEach(j=>{
+    if(!j||jobIsDeleted(j)||jobIsCancelled(j))return;
+    const date=jobVisitYMD(j);
+    const prop=jobPropertyKey(j);
+    if(!date||!prop)return;
+    const key=subKeyOf(j)+'|'+prop+'|'+date;
+    if(!buckets[key])buckets[key]=[];
+    buckets[key].push(j);
+  });
+  const extra=new Set();
+  const flagged=new Set();
+  const groups=[];
+  Object.keys(buckets).forEach(key=>{
+    const g=buckets[key];
+    if(g.length<2)return;
+    const ranked=g.slice().sort(duplicateRank);
+    ranked.forEach(j=>flagged.add(j.id));
+    ranked.slice(1).forEach(j=>extra.add(j.id));
+    groups.push({key, jobs:ranked, keep:ranked[0]});
+  });
+  return {extra, flagged, groups};
+}
+function subPayCounts(j, extra){
+  return jobIsCompletedWork(j)&&!(extra&&extra.has&&extra.has(j.id));
+}
+function jobsForSub(subKey, list){
+  return (list||jobs||[]).filter(j=>subKeyOf(j)===subKey);
+}
+function clientCollections(){
+  const paid={}, billed={}, paidInvoices={};
+  const seen=new Set();
+  (invoiceItemJobLinks||[]).forEach(x=>{
+    if(!x||!x.job_id||!x.invoice_id)return;
+    const dedupe=[x.id||'', x.invoice_id, x.job_id, x.total, x.unit_price, x.quantity, x.description||''].join('|');
+    if(seen.has(dedupe))return;
+    seen.add(dedupe);
+    const inv=(invoices||[]).find(i=>i&&i.id===x.invoice_id);
+    if(!inv||invoiceIsVoid(inv))return;
+    const amt=lineAmounts(x.quantity, x.unit_price, x.total).total;
+    billed[x.job_id]=roundMoney((billed[x.job_id]||0)+amt);
+    if(String(inv.status||'').trim()==='Paid'){
+      paid[x.job_id]=roundMoney((paid[x.job_id]||0)+amt);
+      if(!paidInvoices[x.job_id])paidInvoices[x.job_id]=new Set();
+      paidInvoices[x.job_id].add(x.invoice_id);
+    }
+  });
+  return {paid, billed, paidInvoices};
+}
+function ledgerLinksFor(paymentId){
+  return (subPaymentJobs||[]).filter(l=>l&&l.sub_payment_id===paymentId);
+}
+function ledgerPaidOnJob(j){
+  if(!j||subPayIsPaid(j))return 0;
+  const cap=subPayAmount(j);
+  if(cap<=0)return 0;
+  const sum=(subPaymentJobs||[]).reduce((s,l)=>l&&l.job_id===j.id?s+moneyNum(l.amount):s,0);
+  return roundMoney(Math.min(cap, sum));
+}
+function jobOwedAmount(j){
+  if(!j||subPayIsPaid(j))return 0;
+  return roundMoney(Math.max(0, subPayAmount(j)-ledgerPaidOnJob(j)));
+}
+function ledgerCashExtra(p, extra){
+  // Linked dollars on a job already marked Paid are the same money as that job.
+  // Count the job by its paid date. Do not add the payout on top.
+  const amount=roundMoney(p&&p.amount);
+  const links=ledgerLinksFor(p&&p.id);
+  if(!links.length)return {extra:amount, untied:amount>0, swallowed:false};
+  let unexplained=amount;
+  links.forEach(l=>{
+    const j=(jobs||[]).find(x=>x.id===l.job_id);
+    if(j&&subPayCounts(j, extra)&&subPayIsPaid(j))unexplained=roundMoney(unexplained-moneyNum(l.amount));
+  });
+  if(unexplained<0)unexplained=0;
+  return {extra:unexplained, untied:false, swallowed:unexplained<=0.009};
+}
+function cashPaidInMonth(ym, extra, subKey){
+  let marked=0;
+  const undated=[];
+  const paidJobs=[];
+  (jobs||[]).forEach(j=>{
+    if(subKey&&subKeyOf(j)!==subKey)return;
+    if(!subPayCounts(j, extra)||!subPayIsPaid(j))return;
+    const paidOn=jobPaidYMD(j);
+    if(!paidOn){undated.push(j);return;}
+    if(paidOn.slice(0,7)!==ym)return;
+    marked=roundMoney(marked+subPayAmount(j));
+    paidJobs.push(j);
+  });
+  let ledgerExtra=0;
+  const ledgerRows=[];
+  (subPayments||[]).forEach(p=>{
+    if(!p)return;
+    if(subKey&&p.subcontractor_id!==subKey)return;
+    const on=String(p.paid_on||'').slice(0,10);
+    if(on.slice(0,7)!==ym)return;
+    ledgerRows.push(p);
+    const flag=ledgerCashExtra(p, extra);
+    if(flag.extra>0.009)ledgerExtra=roundMoney(ledgerExtra+flag.extra);
+  });
+  return {cash:roundMoney(marked+ledgerExtra), marked, ledger:ledgerExtra, undated, paidJobs, ledgerRows};
+}
+function completedInMonth(ym, extra){
+  return (jobs||[]).filter(j=>subPayCounts(j, extra)&&jobWorkMonth(j)===ym);
+}
+function earnedJobsSince(subKey, since, extra){
+  return jobsForSub(subKey).filter(j=>subPayCounts(j, extra)&&ymdOnOrAfter(jobWorkYMD(j), since));
+}
+function balanceForSub(subKey, since, extra){
+  const earnedList=earnedJobsSince(subKey, since, extra);
+  const earned=sumMoney(earnedList, subPayAmount);
+  const owed=sumMoney(earnedList, jobOwedAmount);
+  return {earned, paid:roundMoney(earned-owed), owed, jobs:earnedList};
+}
+function buildPayoutStatement(subKey, ym){
+  const dup=duplicateJobIndex(jobs);
+  const mine=jobsForSub(subKey);
+  const inWorkMonth=j=>jobWorkMonth(j)===ym;
+  const counted=mine.filter(j=>subPayCounts(j, dup.extra)&&inWorkMonth(j)).sort(compareJobs);
+  const extras=mine.filter(j=>jobIsCompletedWork(j)&&dup.extra.has(j.id)&&inWorkMonth(j)).sort(compareJobs);
+  const upcoming=mine.filter(j=>jobIsUpcomingWork(j)&&inWorkMonth(j)).sort(compareJobs);
+  const zero=counted.filter(jobMissingSubPay);
+  const earned=sumMoney(counted, subPayAmount);
+  const owed=sumMoney(counted, jobOwedAmount);
+  return {counted, extras, upcoming, zero, earned, owed, paid:roundMoney(earned-owed), dup};
+}
+function reportMonthValue(){
+  const el=document.getElementById('report-month');
+  if(el&&!el.value)el.value=bizYM();
+  const v=el&&el.value;
+  return /^\d{4}-\d{2}$/.test(v)?v:bizYM();
+}
+function syncReportSince(){
+  const el=document.getElementById('report-since');
+  if(!el)return '';
+  if(!el.dataset.ready){
+    el.dataset.ready='1';
+    try{
+      const saved=sessionStorage.getItem('sumak_report_since')||'';
+      if(/^\d{4}-\d{2}-\d{2}$/.test(saved))el.value=saved;
+    }catch(e){}
+  }
+  const v=/^\d{4}-\d{2}-\d{2}$/.test(el.value)?el.value:'';
+  try{sessionStorage.setItem('sumak_report_since', v);}catch(e){}
+  return v;
+}
+function clearReportSince(){
+  const el=document.getElementById('report-since');
+  if(el){el.dataset.ready='1';el.value='';}
+  try{sessionStorage.setItem('sumak_report_since','');}catch(e){}
+  renderPayments();
+}
+function subRollup(subKey, ym, since, dup, col){
+  const monthJobs=completedInMonth(ym, dup.extra).filter(j=>subKeyOf(j)===subKey);
+  const upcoming=(jobs||[]).filter(j=>subKeyOf(j)===subKey&&jobIsUpcomingWork(j)&&jobWorkMonth(j)===ym);
+  const bal=balanceForSub(subKey, since, dup.extra);
+  const cash=cashPaidInMonth(ym, dup.extra, subKey);
+  const owed=sumMoney(monthJobs, jobOwedAmount);
+  const clientPaid=roundMoney(monthJobs.reduce((s,j)=>s+moneyNum(col.paid[j.id]),0));
+  const revenue=sumMoney(monthJobs, j=>roundMoney(j.client_price));
+  const cost=sumMoney(monthJobs, subPayAmount);
+  const sample=monthJobs[0]||bal.jobs[0]||upcoming[0];
+  return {
+    subKey, monthJobs, upcoming, bal, cash, owed, clientPaid, revenue, cost,
+    profit:roundMoney(revenue-cost),
+    unbilled:monthJobs.filter(jobNeedsInvoice),
+    name:subNameOf(subKey, sample)
+  };
+}
+function subIdsForReport(){
+  const ids=new Set();
+  (jobs||[]).forEach(j=>{
+    if(jobIsDeleted(j)||jobIsCancelled(j))return;
+    if(jobIsCompletedWork(j)||jobIsUpcomingWork(j))ids.add(subKeyOf(j));
+  });
+  (subPayments||[]).forEach(p=>{if(p&&p.subcontractor_id)ids.add(p.subcontractor_id);});
+  return [...ids];
+}
+function overAllocatedJobs(extra){
+  const by={};
+  (subPaymentJobs||[]).forEach(l=>{
+    if(!l||!l.job_id)return;
+    by[l.job_id]=roundMoney((by[l.job_id]||0)+moneyNum(l.amount));
+  });
+  const rows=[];
+  Object.keys(by).forEach(id=>{
+    const j=(jobs||[]).find(x=>x.id===id);
+    if(!j||!jobIsCompletedWork(j))return;
+    if(extra&&extra.has(j.id))return;
+    const cap=subPayAmount(j);
+    if(by[id]>cap+0.009)rows.push({job:j, amount:by[id], cap});
+  });
+  return rows;
+}
+function payReportCard(j, mode, col, dup){
+  const isExtra=!!(dup&&dup.extra.has(j.id));
+  const flags=[];
+  if(isExtra)flags.push('Possible duplicate — left out of the totals');
+  if(mode==='upcoming')flags.push('Upcoming — not owed yet');
+  if(jobMissingSubPay(j))flags.push('Completed with no sub pay');
+  const paidOn=jobPaidYMD(j);
+  const part=!subPayIsPaid(j)?ledgerPaidOnJob(j):0;
+  const partNote=part>0?`${fmt(part)} of ${fmt(subPayAmount(j))} already paid`:'';
+  let clientNote='';
+  if(mode!=='upcoming'&&col){
+    const paidAmt=roundMoney(col.paid[j.id]||0);
+    const billedAmt=roundMoney(col.billed[j.id]||0);
+    const n=col.paidInvoices[j.id]?col.paidInvoices[j.id].size:0;
+    if(paidAmt>0)clientNote=`Client paid ${fmt(paidAmt)}`+(n>1?` on ${n} invoices`:'');
+    else if(billedAmt>0)clientNote=`Invoiced ${fmt(billedAmt)} · client has not paid`;
+    else clientNote='No invoice line for this job';
+  }
+  const profit=roundMoney(moneyNum(j.client_price)-subPayAmount(j));
+  const canMark=mode!=='upcoming'&&jobIsCompletedWork(j)&&!subPayIsPaid(j);
+  const when=jobVisitYMD(j)?fmtDate(jobVisitYMD(j)):(jobWorkYMD(j)?fmtDate(jobWorkYMD(j)):'No date');
+  return `<div class="card" style="cursor:pointer" onclick="openJobDetail('${j.id}')">
+    <div class="card-top"><div><div class="card-id">${esc(j.job_number||'')}</div><div class="card-title">${esc(j.title||'Job')}</div></div><span class="${pClass(subPayLabel(j))}">${subPayLabel(j)}</span></div>
+    <div class="card-meta"><span class="card-meta-item">${ICONS.wrench} ${esc(j.subcontractors?.name||subNameOf(subKeyOf(j), j))}</span><span class="card-meta-item">${ICONS.calendar} ${esc(when)}</span>${paidOn?`<span class="card-meta-item">${ICONS.creditCard} Paid ${esc(fmtDate(paidOn))}</span>`:''}${j.payment_method&&subPayIsPaid(j)?`<span class="card-meta-item">${esc(j.payment_method)}</span>`:''}</div>
+    ${flags.map(f=>`<div style="font-size:11px;color:var(--rose);font-weight:600;margin-top:4px">${esc(f)}</div>`).join('')}
+    <div class="card-footer"><div><div class="card-amount">${fmt(j.sub_pay)} sub pay</div>
+      ${partNote?`<div style="font-size:11px;color:var(--ink2);margin-top:2px">${esc(partNote)}</div>`:''}
+      ${clientNote?`<div style="font-size:11px;color:var(--ink2);margin-top:2px">${esc(clientNote)}</div>`:''}
+      ${mode==='upcoming'?'':`<div style="font-size:11px;font-weight:600;color:${profit>=0?'var(--green)':'var(--rose)'}">${fmt(profit)} profit</div>`}
+    </div>${canMark?`<button class="btn btn-sm btn-green" onclick="event.stopPropagation();markPaidDetail('${j.id}')">Mark Paid</button>`:''}</div></div>`;
+}
+function payoutCashCard(p, extra){
+  const flag=ledgerCashExtra(p, extra);
+  const links=ledgerLinksFor(p.id);
+  let tie=links.length?`Tied to ${plural(links.length,'job')}`:'Not tied to a job';
+  if(flag.swallowed)tie='Counted with the jobs marked paid — not added a second time';
+  else if(flag.untied)tie='Not tied to a job. Included in Paid to subs. Not subtracted from the balance.';
+  const ref=p.reference?` · ${p.reference}`:'';
+  return `<div class="card"><div class="card-top"><div><div class="card-id">${esc(fmtDate(p.paid_on))}</div><div class="card-title">${esc(subNameOf(p.subcontractor_id))}</div></div><span class="pill pill-paid">${fmt(p.amount)}</span></div><div class="card-meta"><span class="card-meta-item">${esc((p.method||'Payout')+ref)}</span></div><div style="font-size:11.5px;color:var(--ink3);margin-top:6px">${esc(tie)}</div>${p.notes?`<div style="font-size:11.5px;color:var(--ink3);margin-top:4px">${esc(p.notes)}</div>`:''}</div>`;
+}
+function renderPayments(){
+  if(currentProfile?.role==='sub')return;
+  if(!document.getElementById('report-month'))return;
+  const ym=reportMonthValue();
+  const since=syncReportSince();
+  const sinceLabel=since?`Since ${fmtDate(since)}`:'All time';
+  const dup=duplicateJobIndex(jobs);
+  const col=clientCollections();
+  const monthJobs=completedInMonth(ym, dup.extra);
+  const owed=sumMoney(monthJobs, jobOwedAmount);
+  const revenue=sumMoney(monthJobs, j=>roundMoney(j.client_price));
+  const cost=sumMoney(monthJobs, subPayAmount);
+  const profit=roundMoney(revenue-cost);
+  const margin=revenue>0?(profit/revenue*100):0;
+  const clientPaid=roundMoney(monthJobs.reduce((s,j)=>s+moneyNum(col.paid[j.id]),0));
+  const cashAll=cashPaidInMonth(ym, dup.extra);
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  set('pay-outstanding', fmt(owed));
+  set('pay-earned', fmt(cashAll.cash));
+  set('pay-client', fmt(clientPaid));
+  set('pay-profit', fmt(profit));
+  set('pay-margin', revenue>0?`${margin.toFixed(0)}% margin · ${fmt(revenue)} billed`:'completed work');
+  set('pay-revenue-note', `On this month's completed visits, clients have paid ${fmt(clientPaid)} and subs are still owed ${fmt(owed)}.`);
+  const ids=subIdsForReport();
+  const rows=ids.map(id=>subRollup(id, ym, since, dup, col)).filter(d=>{
+    return d.monthJobs.length||d.upcoming.length||d.bal.earned>0||d.bal.owed>0||d.cash.cash>0||(subPayments||[]).some(p=>p.subcontractor_id===d.subKey);
+  }).sort((a,b)=>b.owed-a.owed||b.bal.owed-a.bal.owed||a.name.localeCompare(b.name));
+  const unbilledAll=jobsNeedingInvoice();
+  const unbilledAllValue=sumMoney(unbilledAll, j=>roundMoney(j.client_price));
+  const allTimeNote=`<div style="font-size:12.5px;color:var(--ink2);padding:4px 2px 12px">${unbilledAll.length?`${plural(unbilledAll.length,'completed job','completed jobs')} not invoiced across every month · ${fmt(unbilledAllValue)}`:'Every completed job with a client charge is invoiced.'} <span style="color:var(--red);font-weight:600;cursor:pointer" onclick="focusAttention('needInvoice')">Review</span></div>`;
+  const subHtml=rows.map(d=>{
+    const billable=d.monthJobs.filter(j=>roundMoney(j.client_price)>0);
+    const unbilledValue=sumMoney(d.unbilled, j=>roundMoney(j.client_price));
+    const gap=d.unbilled.length
+      ?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">⚠ ${plural(d.unbilled.length,'job')} not billed to client (${fmt(unbilledValue)})</div>`
+      :(billable.length?`<div style="font-size:11px;color:var(--green);margin-top:3px">Completed work this month is billed</div>`
+        :(d.monthJobs.length?`<div style="font-size:11px;color:var(--ink3);margin-top:3px">No client charge on completed work this month</div>`
+          :`<div style="font-size:11px;color:var(--ink3);margin-top:3px">No completed jobs this month</div>`));
+    const clientLine=d.monthJobs.length
+      ?(d.owed>0.009&&d.clientPaid+0.009<d.owed
+        ?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">Client paid ${fmt(d.clientPaid)} · still owe sub ${fmt(d.owed)}</div>`
+        :`<div style="font-size:11px;color:var(--green);margin-top:3px">Client paid ${fmt(d.clientPaid)} on this month's work</div>`)
+      :'';
+    const dupHit=dup.groups.some(g=>g.jobs.some(j=>subKeyOf(j)===d.subKey&&jobWorkMonth(j)===ym));
+    const zeroN=d.monthJobs.filter(jobMissingSubPay).length;
+    return `<div class="detail-row" style="cursor:pointer" onclick="openSubReconcile('${d.subKey}','${ym}')">
+      <div><div style="font-weight:600;color:var(--ink);font-size:14px">${esc(d.name)}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${d.monthJobs.length} completed · ${d.upcoming.length} upcoming${d.cash.cash>0?` · paid out ${fmt(d.cash.cash)}`:''}</div>
+        <div style="font-size:11px;color:var(--ink2);margin-top:3px">${esc(sinceLabel)}: earned ${fmt(d.bal.earned)} · paid ${fmt(d.bal.paid)} · balance ${fmt(d.bal.owed)}</div>
+        ${gap}${clientLine}
+        ${dupHit?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">Possible duplicate this month</div>`:''}
+        ${zeroN?`<div style="font-size:11px;color:var(--rose);margin-top:3px;font-weight:600">${plural(zeroN,'completed visit','completed visits')} with no sub pay</div>`:''}
+      </div>
+      <div style="text-align:right;display:flex;align-items:center;gap:10px">
+        <div>${d.monthJobs.length?`<div style="font-weight:700;color:${d.profit>=0?'var(--green)':'var(--rose)'};font-size:16px;font-family:'Cormorant Garamond',serif">${fmt(d.profit)} profit</div><div style="font-size:11px;color:var(--ink3)">${fmt(d.revenue)} billed · ${fmt(d.cost)} sub pay</div>`:''}
+          <div style="font-size:11px;color:${d.owed>0?'var(--rose)':'var(--green)'}">${d.owed>0?fmt(d.owed)+' owed':'sub paid up this month'}</div>
+          <div style="font-size:11px;color:var(--ink2)">${fmt(d.clientPaid)} client paid</div>
+        </div>
+        ${d.subKey!=='unassigned'?`<button class="btn btn-sm btn-glass" style="padding:6px 8px" onclick="event.stopPropagation();printSubPayout('${d.subKey}')" title="Payout PDF">${ICONS.printer}</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  const bySub=document.getElementById('pay-by-sub');
+  if(bySub)bySub.innerHTML=allTimeNote+(subHtml||'<div style="color:var(--ink3);font-size:13px;padding:8px 0">No sub balances yet</div>');
+  const warnings=[];
+  if(!subPayLedgerReady)warnings.push('Lump-sum and partial payouts are not in the database yet. Mark as Paid on a job still works.');
+  dup.groups.forEach(g=>{
+    const who=esc(subNameOf(subKeyOf(g.keep), g.keep));
+    const when=esc(fmtDate(jobVisitYMD(g.keep)));
+    const place=esc(g.keep.address||'that property');
+    const nums=g.jobs.map(j=>esc(j.job_number||j.title||'Visit')).join(', ');
+    const left=g.jobs.filter(j=>j.id!==g.keep.id).map(j=>esc(j.job_number||j.title||'Visit')).join(', ');
+    const kept=esc(g.keep.job_number||g.keep.title||'One visit');
+    warnings.push(`${who} on ${when} at ${place}: ${nums}. ${kept} stays in the totals. Left out so it is not counted twice: ${left}.`);
+  });
+  const zeroAll=(jobs||[]).filter(j=>jobMissingSubPay(j)&&!dup.extra.has(j.id));
+  const zeroMonth=zeroAll.filter(j=>jobWorkMonth(j)===ym);
+  const zeroOlder=zeroAll.length-zeroMonth.length;
+  if(zeroMonth.length){
+    const nums=zeroMonth.map(j=>`${esc(j.job_number||j.title||'Visit')} (${esc(subNameOf(subKeyOf(j), j))})`).join(', ');
+    warnings.push(`Completed with no sub pay: ${nums}. These stay at $0 until you add pay on the job.${zeroOlder?` ${plural(zeroOlder,'older completed visit','older completed visits')} also ${zeroOlder===1?'has':'have'} no sub pay.`:''}`);
+  }else if(zeroOlder){
+    warnings.push(`${plural(zeroOlder,'older completed visit','older completed visits')} ${zeroOlder===1?'has':'have'} no sub pay.`);
+  }
+  if(cashAll.undated.length)warnings.push(`${plural(cashAll.undated.length,'completed visit','completed visits')} ${cashAll.undated.length===1?'is':'are'} marked paid with no paid date, so ${cashAll.undated.length===1?'it is':'they are'} not in this month's Paid to subs. ${cashAll.undated.length===1?'It still counts':'They still count'} as paid in the balance.`);
+  (subPayments||[]).forEach(p=>{
+    const flag=ledgerCashExtra(p, dup.extra);
+    if(!flag.untied)return;
+    warnings.push(`${esc(subNameOf(p.subcontractor_id))}: payout ${fmt(p.amount)} on ${esc(fmtDate(p.paid_on))} is not tied to jobs. It is included in Paid to subs and is not subtracted from the balance.`);
+  });
+  overAllocatedJobs(dup.extra).forEach(row=>{
+    warnings.push(`${esc(row.job.job_number||row.job.title||'A job')} has ${fmt(row.amount)} tied in payouts, which is more than its ${fmt(row.cap)} sub pay.`);
+  });
+  const cancelled=(jobs||[]).filter(j=>jobIsCancelled(j)&&jobWorkMonth(j)===ym);
+  const warnEl=document.getElementById('pay-warnings');
+  if(warnEl){
+    const boxes=warnings.map(t=>`<div style="background:rgba(224,87,74,0.1);border:1px solid var(--rose);border-radius:var(--rsm);padding:10px 12px;margin-top:8px;font-size:12.5px;color:var(--ink);line-height:1.45">${t}</div>`).join('');
+    const cancelNote=cancelled.length?`<div style="font-size:12px;color:var(--ink3);margin-top:8px">${plural(cancelled.length,'cancelled visit','cancelled visits')} this month ${cancelled.length===1?'is':'are'} not counted.</div>`:'';
+    warnEl.innerHTML=boxes+cancelNote;
+  }
+  const extraPayouts=cashAll.ledgerRows.filter(p=>ledgerCashExtra(p, dup.extra).extra>0.009);
+  const paidHtml=cashAll.paidJobs.map(j=>payReportCard(j, 'paidout', col, dup)).join('')+extraPayouts.map(p=>payoutCashCard(p, dup.extra)).join('');
+  const paidList=document.getElementById('payments-paid-list');
+  if(paidList)paidList.innerHTML=paidHtml||'<div class="empty"><div class="empty-sub">Nothing paid out this month</div></div>';
+  const doneList=document.getElementById('payments-list');
+  if(doneList)doneList.innerHTML=monthJobs.slice().sort(compareJobs).map(j=>payReportCard(j, 'completed', col, dup)).join('')||'<div class="empty"><div class="empty-sub">No completed visits this month</div></div>';
+  const upcoming=(jobs||[]).filter(j=>jobIsUpcomingWork(j)&&jobWorkMonth(j)===ym).sort(compareJobs);
+  const upList=document.getElementById('payments-upcoming');
+  if(upList)upList.innerHTML=upcoming.map(j=>payReportCard(j, 'upcoming', col, dup)).join('')||'<div class="empty"><div class="empty-sub">No upcoming visits this month</div></div>';
+}
+function reconcileJobRow(j, dup, col){
+  const isExtra=dup.extra.has(j.id);
+  const unpaid=jobIsCompletedWork(j)&&!subPayIsPaid(j)&&!isExtra&&jobOwedAmount(j)>0;
+  const paidAmt=roundMoney(col.paid[j.id]||0);
+  const billedAmt=roundMoney(col.billed[j.id]||0);
+  const client=paidAmt>0?`<div style="font-size:9.5px;color:var(--green);font-weight:600">Client paid ${fmt(paidAmt)}</div>`:(billedAmt>0?`<div style="font-size:9.5px;color:var(--rose);font-weight:600">Client has not paid</div>`:`<div style="font-size:9.5px;color:var(--ink3)">No invoice line</div>`);
+  const part=ledgerPaidOnJob(j);
+  const payLine=subPayIsPaid(j)?fmt(j.sub_pay):(part>0?`${fmt(part)} of ${fmt(subPayAmount(j))}`:fmt(j.sub_pay));
+  const flag=isExtra?'<div style="font-size:9.5px;color:var(--rose);font-weight:600">duplicate · not in totals</div>':(jobMissingSubPay(j)?'<div style="font-size:9.5px;color:var(--rose);font-weight:600">no sub pay</div>':'');
+  return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:9px;min-width:0;flex:1">
+      ${unpaid?`<input type="checkbox" class="bulk-pay-cb" data-jobid="${j.id}" onclick="event.stopPropagation();updateBulkPayBar()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--green)">`:'<div style="width:18px;flex-shrink:0"></div>'}
+      <div style="min-width:0;flex:1;cursor:pointer" onclick="closeTrash();openJobDetail('${j.id}')"><div style="font-size:12.5px;color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.title||'Job')}</div><div style="font-size:10.5px;color:var(--ink3)">${j.scheduled_date?fmtDate(j.scheduled_date):'no date'} · ${esc(customerNameOf(j)||'—')} · ${subPayLabel(j)}</div></div>
+    </div>
+    <div style="text-align:right;flex-shrink:0"><div style="font-size:12px;color:var(--ink2)">${payLine}</div>${client}${flag}</div>
+  </div>`;
+}
+function openSubReconcile(subKey, ym){
+  if(currentProfile?.role==='sub')return;
+  ym=ym||reportMonthValue();
+  const since=syncReportSince();
+  const sinceLabel=since?`Since ${fmtDate(since)}`:'All time';
+  const dup=duplicateJobIndex(jobs);
+  const col=clientCollections();
+  const pack=buildPayoutStatement(subKey, ym);
+  const bal=balanceForSub(subKey, since, dup.extra);
+  const subName=subNameOf(subKey, pack.counted[0]||bal.jobs[0]||pack.upcoming[0]);
+  const clientPaid=roundMoney(pack.counted.reduce((s,j)=>s+moneyNum(col.paid[j.id]),0));
+  const unbilled=pack.counted.filter(jobNeedsInvoice);
+  const unbilledValue=sumMoney(unbilled, j=>roundMoney(j.client_price));
   let overlay=document.getElementById('trash-overlay');
-  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
-  const [ymY,ymM]=ym.split('-').map(Number);
-  const monthLbl=new Date(Date.UTC(ymY,ymM-1,1)).toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'});
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='trash-overlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
+    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    document.body.appendChild(overlay);
+  }
+  const monthLbl=monthLabelFromYm(ym);
+  const hasUnpaid=pack.counted.some(j=>!subPayIsPaid(j)&&jobOwedAmount(j)>0);
+  const history=(subPayments||[]).filter(p=>p.subcontractor_id===subKey).slice(0,12);
+  const historyHtml=history.length?`<div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px">Payouts recorded</div>${history.map(p=>{
+    const links=ledgerLinksFor(p.id);
+    const tied=links.length?`tied to ${plural(links.length,'job')}`:'not tied to jobs';
+    return `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div style="font-size:12.5px;font-weight:600;color:var(--ink)">${fmt(p.amount)} · ${esc(p.method||'')}</div><div style="font-size:10.5px;color:var(--ink3)">${esc(fmtDate(p.paid_on))} · ${esc(tied)}${p.reference?' · '+esc(p.reference):''}</div></div><button class="btn btn-sm btn-glass" onclick="deleteSubPayment('${p.id}','${subKey}')">Remove</button></div>`;
+  }).join('')}`:(subPayLedgerReady?'':'');
+  overlay.dataset.sheet='reconcile';
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-      <div><div style="font-size:11px;color:var(--ink3)">${monthLbl} · reconciliation</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${subName}</div></div>
+      <div><div style="font-size:11px;color:var(--ink3)">${esc(monthLbl)} · reconciliation</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${esc(subName)}</div></div>
       <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span>
     </div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">${esc(sinceLabel)}: earned ${fmt(bal.earned)} · paid ${fmt(bal.paid)} · balance ${fmt(bal.owed)}</div>
     <div style="display:flex;gap:8px;margin:12px 0">
-      <div style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border-radius:var(--rxs);padding:10px"><div style="font-size:18px;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--ink)">${fmt(totalCost)}</div><div style="font-size:10px;color:var(--ink3)">you owe total</div></div>
-      <div style="flex:1;text-align:center;background:${owedToSub>0?'rgba(224,87,74,0.1)':'rgba(74,180,120,0.1)'};border-radius:var(--rxs);padding:10px"><div style="font-size:18px;font-weight:700;font-family:'Cormorant Garamond',serif;color:${owedToSub>0?'var(--rose)':'var(--green)'}">${fmt(owedToSub)}</div><div style="font-size:10px;color:var(--ink3)">still unpaid</div></div>
+      <div style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border-radius:var(--rxs);padding:10px"><div style="font-size:18px;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--ink)">${fmt(pack.earned)}</div><div style="font-size:10px;color:var(--ink3)">earned this month</div></div>
+      <div style="flex:1;text-align:center;background:${pack.owed>0?'rgba(224,87,74,0.1)':'rgba(74,180,120,0.1)'};border-radius:var(--rxs);padding:10px"><div style="font-size:18px;font-weight:700;font-family:'Cormorant Garamond',serif;color:${pack.owed>0?'var(--rose)':'var(--green)'}">${fmt(pack.owed)}</div><div style="font-size:10px;color:var(--ink3)">still owed</div></div>
+      <div style="flex:1;text-align:center;background:rgba(255,255,255,0.04);border-radius:var(--rxs);padding:10px"><div style="font-size:18px;font-weight:700;font-family:'Cormorant Garamond',serif;color:var(--ink)">${fmt(clientPaid)}</div><div style="font-size:10px;color:var(--ink3)">client paid</div></div>
     </div>
-    ${unbilled.length>0?`<div style="background:rgba(224,87,74,0.1);border:1px solid var(--rose);border-radius:var(--rsm);padding:12px;margin-bottom:12px">
-      <div style="font-weight:700;color:var(--rose);font-size:13px">⚠ ${unbilled.length} completed job${unbilled.length!==1?'s':''} not yet billed to a client</div>
-      <div style="font-size:11.5px;color:var(--ink2);margin-top:3px">That's ${fmt(unbilledValue)} of work you're paying ${subName} for but haven't invoiced your clients for. Bill these before paying out.</div>
-    </div>`:`<div style="background:rgba(74,180,120,0.1);border:1px solid var(--green);border-radius:var(--rsm);padding:10px;margin-bottom:12px;font-size:12.5px;color:var(--green);font-weight:600">✓ Every completed job is billed to a client — no gap</div>`}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3)">Jobs this month (${subJobs.length})</div>${subJobs.some(j=>j.payment_status==='Unpaid')?`<span style="font-size:11px;color:var(--red);font-weight:600;cursor:pointer" onclick="bulkPaySelectAll('${subKey}')">Select all unpaid</span>`:''}</div>
-    <div>${subJobs.map(j=>{
-      const billed=invoicedJobIds.has(j.id);
-      const isCompleteBillable=j.status==='Completed'&&roundMoney(j.client_price)>0;
-      const unpaid=j.payment_status==='Unpaid';
-      return`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)">
-        <div style="display:flex;align-items:center;gap:9px;min-width:0;flex:1">
-          ${unpaid?`<input type="checkbox" class="bulk-pay-cb" data-jobid="${j.id}" onclick="event.stopPropagation();updateBulkPayBar()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--green)">`:'<div style="width:18px;flex-shrink:0"></div>'}
-          <div style="min-width:0;flex:1;cursor:pointer" onclick="closeTrash();openJobDetail('${j.id}')"><div style="font-size:12.5px;color:var(--ink);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j.title}</div><div style="font-size:10.5px;color:var(--ink3)">${j.scheduled_date?fmtDate(j.scheduled_date):'no date'} · ${j.customers?.name||'—'}</div></div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:12px;color:var(--ink2)">${fmt(j.sub_pay)}</div>
-          ${isCompleteBillable?(billed?'<div style="font-size:9.5px;color:var(--green);font-weight:600">✓ billed</div>':'<div style="font-size:9.5px;color:var(--rose);font-weight:600">not billed</div>'):`<div style="font-size:9.5px;color:var(--ink3)">${j.status}</div>`}
-        </div>
-      </div>`;}).join('')}</div>
+    ${unbilled.length?`<div style="background:rgba(224,87,74,0.1);border:1px solid var(--rose);border-radius:var(--rsm);padding:12px;margin-bottom:12px"><div style="font-weight:700;color:var(--rose);font-size:13px">⚠ ${plural(unbilled.length,'completed job','completed jobs')} not yet billed to a client</div><div style="font-size:11.5px;color:var(--ink2);margin-top:3px">That's ${fmt(unbilledValue)} of work you're paying for but haven't invoiced. Bill these before paying out.</div></div>`:`<div style="background:rgba(74,180,120,0.1);border:1px solid var(--green);border-radius:var(--rsm);padding:10px;margin-bottom:12px;font-size:12.5px;color:var(--green);font-weight:600">${pack.counted.length?'Every completed job this month with a client charge is billed.':'No completed jobs this month.'}</div>`}
+    ${pack.owed>0&&clientPaid+0.009<pack.owed?`<div style="font-size:12px;color:var(--rose);font-weight:600;margin-bottom:10px">Clients have paid ${fmt(clientPaid)} on these visits. You still owe ${fmt(pack.owed)}.</div>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3)">Completed (${pack.counted.length})</div>${hasUnpaid?`<span style="font-size:11px;color:var(--red);font-weight:600;cursor:pointer" onclick="bulkPaySelectAll('${subKey}')">Select all unpaid</span>`:''}</div>
+    <div>${pack.counted.map(j=>reconcileJobRow(j, dup, col)).join('')||'<div style="font-size:12px;color:var(--ink3);padding:6px 0">No completed visits this month</div>'}</div>
+    ${pack.extras.length?`<div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--rose);margin:12px 0 6px">Possible duplicates — not in the totals</div><div>${pack.extras.map(j=>reconcileJobRow(j, dup, col)).join('')}</div>`:''}
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px">Upcoming — not owed yet (${pack.upcoming.length})</div>
+    <div>${pack.upcoming.map(j=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer" onclick="closeTrash();openJobDetail('${j.id}')"><div><div style="font-size:12.5px;color:var(--ink)">${esc(j.title||'Job')}</div><div style="font-size:10.5px;color:var(--ink3)">${j.scheduled_date?fmtDate(j.scheduled_date):'no date'} · ${esc(j.status||'Upcoming')}</div></div><div style="font-size:12px;color:var(--ink3)">${fmt(j.sub_pay)}</div></div>`).join('')||'<div style="font-size:12px;color:var(--ink3)">None this month</div>'}</div>
+    ${historyHtml}
     <div id="bulk-pay-bar" style="display:none;position:sticky;bottom:0;background:var(--white);padding:12px 0 4px;margin-top:8px;border-top:1px solid var(--line)">
       <button class="btn btn-green btn-full" onclick="bulkMarkPaid()"><span id="bulk-pay-label">Mark selected as paid</span></button>
     </div>
-    ${subKey!=='unassigned'?`<button class="btn btn-red btn-full" style="margin-top:10px" onclick="printSubPayout('${subKey}')">Generate Payout Statement (PDF)</button>`:''}
+    ${subKey!=='unassigned'?`<button class="btn btn-glass btn-full" style="margin-top:10px" onclick="openRecordPayout('${subKey}')">Record a payout</button>`:''}
+    ${subKey!=='unassigned'?`<button class="btn btn-red btn-full" style="margin-top:8px" onclick="printSubPayout('${subKey}')">Generate Payout Statement (PDF)</button>`:''}
     ${subKey!=='unassigned'?`<button class="btn btn-glass btn-full" style="margin-top:8px" onclick="shareSubPayout('${subKey}')">Share / Text Payout</button>`:''}
   </div>`;
   overlay.style.display='flex';
 }
+function raiseSheetModal(type){
+  const overlay=document.getElementById('modal-'+type);
+  if(!overlay)return;
+  overlay.style.zIndex='1000';
+  overlay.style.position='fixed';
+}
+function openRecordPayout(subKey){
+  if(currentProfile?.role!=='admin')return;
+  const sel=document.getElementById('sp-sub');
+  if(!sel)return;
+  const list=(subs||[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  sel.innerHTML='<option value="">Select sub...</option>'+list.map(s=>`<option value="${s.id}">${esc(s.name||'Sub')}</option>`).join('');
+  if(subKey&&subKey!=='unassigned'&&list.some(s=>s.id===subKey))sel.value=subKey;
+  else sel.value='';
+  document.getElementById('sp-date').value=bizYMD();
+  document.getElementById('sp-amount').value='';
+  document.getElementById('sp-method').value='Zelle';
+  document.getElementById('sp-ref').value='';
+  document.getElementById('sp-notes').value='';
+  renderPayoutJobPicks();
+  raiseSheetModal('subpay');
+  openModal('subpay');
+}
+function renderPayoutJobPicks(){
+  const box=document.getElementById('sp-jobs');
+  if(!box)return;
+  const subId=document.getElementById('sp-sub')?.value||'';
+  if(!subId){box.innerHTML='<div style="font-size:12px;color:var(--ink3)">Choose a sub to see completed visits that still have a balance.</div>';updatePayoutPickHint();return;}
+  const dup=duplicateJobIndex(jobs);
+  const rows=jobsForSub(subId).filter(j=>subPayCounts(j, dup.extra)&&!subPayIsPaid(j)&&jobOwedAmount(j)>0).sort(compareJobs);
+  if(!rows.length){box.innerHTML='<div style="font-size:12px;color:var(--ink3)">No completed visits still owe this sub. You can record the payout without tying it to a job.</div>';updatePayoutPickHint();return;}
+  box.innerHTML=rows.map(j=>`<label class="sp-job" data-jobid="${j.id}" data-owed="${jobOwedAmount(j)}" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink)">
+    <input type="checkbox" onclick="onPayoutJobToggle(this)" style="width:18px;height:18px;accent-color:var(--green)">
+    <span style="flex:1;min-width:0"><span style="font-weight:600">${esc(j.job_number||'')}</span> ${esc(j.title||'')} <span style="color:var(--ink3)">${jobWorkYMD(j)?fmtDate(jobWorkYMD(j)):''}</span></span>
+    <input class="form-input sp-amt" type="number" min="0" step="0.01" placeholder="${jobOwedAmount(j).toFixed(2)}" style="width:96px;padding:8px" oninput="updatePayoutPickHint()">
+  </label>`).join('');
+  updatePayoutPickHint();
+}
+function onPayoutJobToggle(cb){
+  const row=cb.closest('.sp-job');
+  if(!row)return;
+  const amt=row.querySelector('.sp-amt');
+  if(cb.checked&&amt&&amt.value==='')amt.value=Number(row.dataset.owed||0).toFixed(2);
+  if(!cb.checked&&amt)amt.value='';
+  updatePayoutPickHint();
+}
+function readPayoutPicks(){
+  const picks=[];
+  document.querySelectorAll('.sp-job').forEach(row=>{
+    const cb=row.querySelector('input[type=checkbox]');
+    if(!cb||!cb.checked)return;
+    const owed=roundMoney(row.dataset.owed);
+    const raw=row.querySelector('.sp-amt')?.value;
+    const amt=raw===''||raw==null?owed:roundMoney(raw);
+    picks.push({jobId:row.dataset.jobid, amt, owed});
+  });
+  return picks;
+}
+function updatePayoutPickHint(){
+  const el=document.getElementById('sp-hint');
+  if(!el)return;
+  const amount=roundMoney(document.getElementById('sp-amount')?.value);
+  const picks=readPayoutPicks();
+  const linked=roundMoney(picks.reduce((s,p)=>s+p.amt,0));
+  const left=roundMoney(amount-linked);
+  if(!picks.length){el.textContent=amount>0?'Nothing tied to a job yet. That amount will not reduce the balance.':'';return;}
+  if(left<-0.009)el.textContent=`The jobs add up to ${fmt(linked)}, which is more than the ${fmt(amount)} payout.`;
+  else if(left>0.009)el.textContent=`${fmt(linked)} tied to jobs. ${fmt(left)} is not tied, so it will not reduce the balance.`;
+  else el.textContent=`${fmt(linked)} covers the jobs you checked.`;
+}
+function fillPayoutFromAmount(){
+  const amount=roundMoney(document.getElementById('sp-amount')?.value);
+  if(amount<=0){toast('Enter the payout amount first');return;}
+  let left=amount;
+  document.querySelectorAll('.sp-job').forEach(row=>{
+    const cap=roundMoney(row.dataset.owed);
+    const cb=row.querySelector('input[type=checkbox]');
+    const amt=row.querySelector('.sp-amt');
+    if(!cb||!amt)return;
+    if(left<=0||cap<=0){cb.checked=false;amt.value='';return;}
+    const take=roundMoney(Math.min(cap, left));
+    cb.checked=true;
+    amt.value=take.toFixed(2);
+    left=roundMoney(left-take);
+  });
+  updatePayoutPickHint();
+}
+async function saveRecordPayout(){
+  if(currentProfile?.role!=='admin'||payoutSaving)return;
+  const subId=document.getElementById('sp-sub')?.value||'';
+  const date=document.getElementById('sp-date')?.value||'';
+  const amount=roundMoney(document.getElementById('sp-amount')?.value);
+  const method=document.getElementById('sp-method')?.value||'';
+  const reference=(document.getElementById('sp-ref')?.value||'').trim()||null;
+  const notes=(document.getElementById('sp-notes')?.value||'').trim()||null;
+  if(!subId){toast('Choose a sub');return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Choose the date you paid');return;}
+  if(amount<=0){toast('Enter an amount');return;}
+  const picks=readPayoutPicks();
+  if(picks.some(p=>p.amt<=0)){toast('Each tied job needs an amount');return;}
+  if(picks.some(p=>p.amt>p.owed+0.009)){toast('A job is tied for more than it still owes');return;}
+  const linked=roundMoney(picks.reduce((s,p)=>s+p.amt,0));
+  if(linked-amount>0.009){toast('The jobs add up to more than the payout');return;}
+  if(!subPayLedgerReady){toast('Lump-sum payouts are not set up yet. Mark as Paid on the job still works.');return;}
+  const name=subNameOf(subId);
+  const markIds=picks.filter(p=>p.owed>0&&p.amt+0.001>=p.owed).map(p=>p.jobId);
+  const partial=picks.length-markIds.length;
+  const left=roundMoney(amount-linked);
+  let msg=`Record ${fmt(amount)} to ${name} on ${fmtDate(date)} via ${method}?`;
+  if(markIds.length)msg+=` ${plural(markIds.length,'job')} will be marked paid.`;
+  if(partial)msg+=` ${plural(partial,'job')} stays unpaid with a partial payment.`;
+  if(left>0.009)msg+=` ${fmt(left)} is not tied to a job, so it will not reduce the balance.`;
+  if(!confirm(msg))return;
+  const sheet=document.getElementById('trash-overlay');
+  const reopen=!!(sheet&&sheet.style.display==='flex'&&sheet.dataset.sheet==='reconcile');
+  payoutSaving=true;
+  try{
+    const {data:pay, error}=await db.from('sub_payments').insert({
+      subcontractor_id:subId, paid_on:date, amount, method, reference, notes, created_by:currentUser?.id||null
+    }).select().single();
+    if(error){
+      subPayLedgerReady=false;
+      toast('Could not save that payout. Mark as Paid on the job still works.');
+      console.error('saveRecordPayout', error);
+      return;
+    }
+    if(picks.length){
+      const {error:linkErr}=await db.from('sub_payment_jobs').insert(picks.map(p=>({sub_payment_id:pay.id, job_id:p.jobId, amount:p.amt})));
+      if(linkErr){
+        toast('The payout was saved, but the jobs were not tied to it.');
+        console.error('saveRecordPayout links', linkErr);
+        await fetchSubPayments();
+        renderAll();
+        return;
+      }
+    }
+    if(markIds.length){
+      const {error:markErr}=await db.from('jobs').update({payment_status:'Paid', payment_method:method, paid_at:date}).in('id', markIds);
+      if(markErr)toast('Payout saved. Those jobs were not marked paid: '+markErr.message);
+    }
+    closeModal('subpay');
+    await fetchSubPayments();
+    await fetchJobs();
+    renderAll();
+    if(reopen)openSubReconcile(subId, reportMonthValue());
+    logActivity('Payout recorded', `${name} · ${fmt(amount)} · ${method}`, 'sub', subId);
+    toast(left>0.009?`Payout saved. ${fmt(left)} is not tied to a job.`:'Payout saved');
+  }finally{payoutSaving=false;}
+}
+async function deleteSubPayment(id, subKey){
+  if(currentProfile?.role!=='admin')return;
+  if(!confirm('Remove this payout? Jobs you already marked paid stay marked paid.'))return;
+  const {error}=await db.from('sub_payments').delete().eq('id', id);
+  if(error){toast('Error: '+error.message);return;}
+  await fetchSubPayments();
+  renderAll();
+  if(subKey&&document.getElementById('trash-overlay')?.dataset.sheet==='reconcile')openSubReconcile(subKey, reportMonthValue());
+  toast('Payout removed');
+}
+
 
 // ── ESTIMATES ─────────────────────────────────────────────────────────────
 function renderEstimates(){
@@ -3813,13 +4461,21 @@ function monthLabelFromYm(ym){
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   return`${months[parseInt(m)-1]} ${y}`;
 }
-function subPayoutDocHTML(sub,ym,subJobs){
-  const total=subJobs.reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const paid=subJobs.filter(j=>j.payment_status==='Paid').reduce((s,j)=>s+(parseFloat(j.sub_pay)||0),0);
-  const unpaid=total-paid;
-  const jobAddr=j=>{const c=customers.find(x=>x.id===j.customer_id);return j.address||c?.address||c?.city||j.customers?.name||'—';};
-  const rows=subJobs.map(j=>`<tr><td>${j.job_number}</td><td>${j.title}<div style="font-size:10px;color:#8a7f76;margin-top:2px">${jobAddr(j)}</div></td><td class="num">${j.scheduled_date?fmtDate(j.scheduled_date):'—'}</td><td class="num">${fmt(j.sub_pay)}</td><td class="num" style="color:${j.payment_status==='Paid'?'#2a6010':'#8B1A1A'};font-weight:600">${j.payment_status}</td></tr>`).join('');
-  return`<div class="pdf-doc">
+function subPayoutDocHTML(sub,ym,pack){
+  const statement=pack&&pack.counted?pack:buildPayoutStatement(sub&&sub.id, ym);
+  const jobAddr=j=>{const c=customers.find(x=>x.id===j.customer_id);return j.address||c?.address||c?.city||customerNameOf(j)||'—';};
+  const rows=statement.counted.map(j=>{
+    const zero=jobMissingSubPay(j)?'<div style="font-size:10px;color:#8B1A1A;margin-top:2px">No sub pay on file</div>':'';
+    const part=!subPayIsPaid(j)?ledgerPaidOnJob(j):0;
+    const partNote=part>0?`<div style="font-size:10px;color:#5a5250;margin-top:2px">${fmt(part)} already paid</div>`:'';
+    const color=subPayIsPaid(j)?'#2a6010':'#8B1A1A';
+    return `<tr><td>${esc(j.job_number||'')}</td><td>${esc(j.title||'')}${zero}<div style="font-size:10px;color:#8a7f76;margin-top:2px">${esc(jobAddr(j))}</div></td><td class="num">${jobWorkYMD(j)?fmtDate(jobWorkYMD(j)):'—'}</td><td class="num">${fmt(j.sub_pay)}${partNote}</td><td class="num" style="color:${color};font-weight:600">${esc(subPayLabel(j))}</td></tr>`;
+  }).join('');
+  const dupNotes=statement.extras.map(j=>`${esc(j.job_number||j.title||'Visit')} on ${fmtDate(jobVisitYMD(j)||jobWorkYMD(j))} at ${esc(j.address||'the property')} (${fmt(j.sub_pay)}) is left out as a possible duplicate.`).join(' ');
+  const up=statement.upcoming.length?`${plural(statement.upcoming.length,'upcoming visit','upcoming visits')} ${statement.upcoming.length===1?'is':'are'} not included.`:'';
+  const zero=statement.zero.length?`${plural(statement.zero.length,'completed visit','completed visits')} ${statement.zero.length===1?'has':'have'} no sub pay, so ${statement.zero.length===1?'it adds':'they add'} $0.`:'';
+  const notes=[dupNotes, up, zero].filter(Boolean).join(' ');
+  return `<div class="pdf-doc">
 <div class="letterhead">
   <div class="brand">
     <img class="logo-img" src="data:image/png;base64,${SUMAK_LOGO_B64}">
@@ -3831,26 +4487,28 @@ function subPayoutDocHTML(sub,ym,subJobs){
   </div>
   <div class="doc-meta">
     <div class="doc-title">Payout Statement</div>
-    <div class="doc-num">${monthLabelFromYm(ym)}</div>
+    <div class="doc-num">${esc(monthLabelFromYm(ym))}</div>
+    <div class="doc-date">Completed visits only</div>
   </div>
 </div>
 <div class="billto">
   <div class="billto-block">
     <div class="billto-lbl">Subcontractor</div>
-    <div class="billto-name">${sub.name}</div>
-    <div class="billto-detail">${[sub.phone,sub.email].filter(Boolean).join('<br>')}</div>
+    <div class="billto-name">${esc(sub.name||'')}</div>
+    <div class="billto-detail">${[sub.phone,sub.email].filter(Boolean).map(esc).join('<br>')}</div>
   </div>
 </div>
 <table>
   <thead><tr><th>Job #</th><th>Description</th><th class="num">Date</th><th class="num">Pay</th><th class="num">Status</th></tr></thead>
-  <tbody>${rows||'<tr><td colspan="5" style="color:#a09890;padding:16px 6px">No jobs this period</td></tr>'}</tbody>
+  <tbody>${rows||'<tr><td colspan="5" style="color:#a09890;padding:16px 6px">No completed visits this month</td></tr>'}</tbody>
 </table>
 <div class="totals">
-  <div class="trow"><span>Jobs</span><span>${subJobs.length}</span></div>
-  <div class="trow"><span>Paid</span><span>${fmt(paid)}</span></div>
-  <div class="trow"><span>Outstanding</span><span>${fmt(unpaid)}</span></div>
-  <div class="grand"><span class="grand-lbl">Total Payout</span><span class="grand-val">${fmt(total)}</span></div>
+  <div class="trow"><span>Completed visits</span><span>${statement.counted.length}</span></div>
+  <div class="trow"><span>Paid</span><span>${fmt(statement.paid)}</span></div>
+  <div class="trow"><span>Still owed</span><span>${fmt(statement.owed)}</span></div>
+  <div class="grand"><span class="grand-lbl">Total earned</span><span class="grand-val">${fmt(statement.earned)}</span></div>
 </div>
+${notes?`<div class="notes">${notes}</div>`:''}
 <div class="footer">
   <div class="thanks">Thank you for your work</div>
   <div class="footer-sub">Questions? Call or text 208-695-7239.</div>
@@ -3858,13 +4516,13 @@ function subPayoutDocHTML(sub,ym,subJobs){
 </div>`;
 }
 function printSubPayout(subId){
+  if(currentProfile?.role==='sub')return;
   const sub=subs.find(s=>s.id===subId);if(!sub)return;
-  const ym=document.getElementById('report-month').value||bizYM();
-  const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
-  const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
+  const ym=reportMonthValue();
+  const pack=buildPayoutStatement(subId, ym);
   const w=window.open('','_blank');
   if(!w){shareSubPayout(subId);return;}
-  w.document.write(`<!DOCTYPE html><html><head><title>Payout — ${sub.name}</title>
+  w.document.write(`<!DOCTYPE html><html><head><title>Payout — ${esc(sub.name)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>${invoiceCSS()}
@@ -3872,19 +4530,19 @@ function printSubPayout(subId){
 .print-btn{flex:1;padding:14px;background:#8B1A1A;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;}
 .close-btn{flex:1;padding:14px;background:#eee2d8;color:#5a5250;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;}
 @media print{.print-actions{display:none;}}
-</style></head><body>${subPayoutDocHTML(sub,ym,subJobs)}<div class="print-actions"><button class="close-btn" onclick="window.close()">‹ Close</button><button class="print-btn" onclick="window.print()">Print / Save as PDF</button></div></body></html>`);
+</style></head><body>${subPayoutDocHTML(sub,ym,pack)}<div class="print-actions"><button class="close-btn" onclick="window.close()">‹ Close</button><button class="print-btn" onclick="window.print()">Print / Save as PDF</button></div></body></html>`);
   w.document.close();
 }
 async function getSubPayoutPdf(subId){
+  if(currentProfile?.role==='sub')return null;
   const sub=subs.find(s=>s.id===subId);if(!sub)return null;
-  const ym=document.getElementById('report-month')?.value||bizYM();
-  const inMonth=j=>{const d=j.scheduled_date||j.completed_at;return d&&d.slice(0,7)===ym;};
-  const subJobs=jobs.filter(j=>j.subcontractor_id===subId&&inMonth(j));
+  const ym=reportMonthValue();
+  const pack=buildPayoutStatement(subId, ym);
   const container=document.createElement('div');
   container.style.cssText='position:fixed;left:-9999px;top:0;';
   const styleTag=document.createElement('style');styleTag.textContent=invoiceCSS();
   container.appendChild(styleTag);
-  container.insertAdjacentHTML('beforeend',subPayoutDocHTML(sub,ym,subJobs));
+  container.insertAdjacentHTML('beforeend',subPayoutDocHTML(sub,ym,pack));
   document.body.appendChild(container);
   const filename=`Payout-${sub.name.replace(/[^a-z0-9]/gi,'-')}-${ym}.pdf`;
   try{
@@ -3896,6 +4554,7 @@ async function getSubPayoutPdf(subId){
   }finally{document.body.removeChild(container);}
 }
 async function shareSubPayout(subId){
+  if(currentProfile?.role==='sub')return;
   toast('Preparing PDF…');
   const result=await getSubPayoutPdf(subId);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -3908,6 +4567,7 @@ async function shareSubPayout(subId){
   setTimeout(()=>URL.revokeObjectURL(url),4000);
   toast('PDF downloaded ✓');
 }
+
 async function openTrash(){
   const{data:djobs}=await db.from('jobs').select('*, customers(name)').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const{data:dcust}=await db.from('customers').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
@@ -3926,6 +4586,7 @@ async function openTrash(){
     <div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Items are permanently removed after 30 days.</div>
     ${html}
   </div>`;
+  overlay.dataset.sheet='trash';
   overlay.style.display='flex';
 }
 function closeTrash(){const o=document.getElementById('trash-overlay');if(o)o.style.display='none';}
@@ -5294,7 +5955,7 @@ async function openJobDetail(id){
       ${j.completed_at?`<div class="detail-row"><span class="detail-label">Completed</span><span class="detail-value">${fmtDate(j.completed_at)}</span></div>`:''}
       <div class="detail-row"><span class="detail-label">Assigned to</span><span class="detail-value">${j.subcontractors?.name||'<span style="color:var(--rose)">Unassigned</span>'}</span></div>
       ${j.estimate_id&&estimates.find(x=>x.id===j.estimate_id)?`<div class="detail-row"><span class="detail-label">From Estimate</span><span class="detail-value">${estimates.find(x=>x.id===j.estimate_id).estimate_number}</span></div>`:''}
-      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${jobProfitText(j)}</span></div><div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(j.payment_status)}">${j.payment_status}</span></span></div>${j.payment_status==='Paid'&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${j.payment_method}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}`:''}
+      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${jobProfitText(j)}</span></div><div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(subPayLabel(j))}">${subPayLabel(j)}</span></span></div>${subPayIsPaid(j)&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${j.payment_method}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}`:''}
       ${j.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${j.notes}</span></div>`:''}
     </div>
     ${addr?`<a class="dir-link" href="${mapsUrl(addr)}">${ICONS.mapPin} Get Directions</a><br><br>`:''}
@@ -5310,7 +5971,7 @@ async function openJobDetail(id){
     <div class="action-row">
       ${j.status==='Pending'?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
       ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${j.id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
-      ${isAdmin&&j.payment_status==='Unpaid'?`<button class="action-btn ab-red" onclick="markPaidDetail('${j.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${isAdmin&&!subPayIsPaid(j)?`<button class="action-btn ab-red" onclick="markPaidDetail('${j.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
       ${isAdmin&&j.status==='Completed'?jobInvoiceActionHTML(j):''}
       ${isAdmin&&j.subcontractor_id?`<button class="action-btn ab-glass" onclick="notifySubOfJob('${j.id}')">${ICONS.send} Notify Sub</button>`:''}
       ${isAdmin?`<button class="action-btn ab-glass" onclick="editJobFromDetail('${j.id}')">${ICONS.pencil} Edit Job</button><button class="action-btn ab-danger" onclick="deleteJob('${j.id}')">${ICONS.trash} Delete Job</button>`:''}
@@ -5417,7 +6078,7 @@ async function confirmMarkPaid(){
   if(id==='__BULK__'){
     const ids=window._bulkPayIds||[];
     if(!ids.length){closeModal('markpaid');return;}
-    const total=roundMoney(ids.reduce((s,i)=>s+moneyNum(jobs.find(x=>x.id===i)?.sub_pay),0));
+    const total=roundMoney(ids.reduce((s,i)=>s+jobOwedAmount(jobs.find(x=>x.id===i)),0));
     if(!confirm(`Mark ${plural(ids.length,'job')} paid · ${fmt(total)} via ${method} on ${fmtDate(date)}?`))return;
     const{error}=await db.from('jobs').update({payment_status:'Paid',payment_method:method,paid_at:date}).in('id',ids);
     if(error){toast('Error: '+error.message);return;}
@@ -5442,7 +6103,7 @@ function updateBulkPayBar(){
   const bar=document.getElementById('bulk-pay-bar');
   if(!bar)return;
   if(cbs.length===0){bar.style.display='none';return;}
-  let total=0;cbs.forEach(cb=>{const j=jobs.find(x=>x.id===cb.dataset.jobid);total+=parseFloat(j?.sub_pay)||0;});
+  let total=0;cbs.forEach(cb=>{const j=jobs.find(x=>x.id===cb.dataset.jobid);total+=jobOwedAmount(j);});
   bar.style.display='block';
   document.getElementById('bulk-pay-label').textContent=`Mark ${cbs.length} job${cbs.length!==1?'s':''} paid · ${fmt(total)}`;
 }
@@ -5456,7 +6117,7 @@ function bulkMarkPaid(){
   const ids=[...document.querySelectorAll('.bulk-pay-cb:checked')].map(cb=>cb.dataset.jobid);
   if(!ids.length){toast('Select at least one job');return;}
   window._bulkPayIds=ids;
-  let total=0;ids.forEach(i=>{const j=jobs.find(x=>x.id===i);total+=parseFloat(j?.sub_pay)||0;});
+  let total=0;ids.forEach(i=>{const j=jobs.find(x=>x.id===i);total+=jobOwedAmount(j);});
   document.getElementById('mp-job-id').value='__BULK__';
   document.getElementById('mp-method').value='Cash';
   document.getElementById('mp-date').value=bizYMD();
@@ -5801,7 +6462,7 @@ function closeModal(type){
   const modal=overlay.querySelector('.modal');
   if(modal)modal.style.transform='';
   overlay.classList.remove('open');
-  if(type==='markpaid'){overlay.style.zIndex='';overlay.style.position='';}
+  if(type==='markpaid'||type==='subpay'){overlay.style.zIndex='';overlay.style.position='';}
   if(type==='sendto')abandonSendPick();
   if(type==='dupinv')abandonDupInvoicePrompt();
 }
