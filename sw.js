@@ -1,6 +1,6 @@
 // Sumak Ops — push notifications + network-first app shell.
 // Cache name bumps on each change so a deploy does not keep serving an old index.html.
-const SHELL_CACHE = 'sumak-ops-shell-v2';
+const SHELL_CACHE = 'sumak-ops-shell-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
