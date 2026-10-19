@@ -358,25 +358,28 @@ GRANT EXECUTE ON FUNCTION public.respond_to_quote(text, text, text, text) TO ano
 NOTIFY pgrst, 'reload schema';
 
 -- =============================================================================
--- 3. Checks (read only — the editor shows the last result)
+-- 3. Check (read only — this is the result the SQL editor shows)
 -- =============================================================================
+-- Expect three "function" rows, all with detail = true. Those functions run
+-- with the owner's rights, so row security on estimates does not hide the
+-- quote from a client.
+-- "trigger" rows are only a warning. estimates_set_public_token is expected.
+-- If another trigger rewrites status, approving from the link fails closed
+-- and the client's answer is not saved.
 
--- Expect three rows, all with prosecdef = true (they run with the owner's
--- rights, so row security on estimates does not hide the quote from a client).
-SELECT p.proname, p.prosecdef, pg_get_function_identity_arguments(p.oid) AS args
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'public'
-  AND p.proname IN ('get_public_quote', 'mark_quote_viewed', 'respond_to_quote')
-ORDER BY p.proname;
-
--- Expect one row. If a trigger rewrites status, approving from the link can
--- fail closed. This list is only a warning, not a change.
-SELECT tgname
-FROM pg_trigger t
-JOIN pg_class c ON c.oid = t.tgrelid
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public'
-  AND c.relname = 'estimates'
-  AND NOT t.tgisinternal
-ORDER BY tgname;
+SELECT kind, name, detail FROM (
+  SELECT 'function' AS kind, p.proname AS name, p.prosecdef::text AS detail, 0 AS ord
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.proname IN ('get_public_quote', 'mark_quote_viewed', 'respond_to_quote')
+  UNION ALL
+  SELECT 'trigger', t.tgname, '', 1
+  FROM pg_trigger t
+  JOIN pg_class c ON c.oid = t.tgrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relname = 'estimates'
+    AND NOT t.tgisinternal
+) checks
+ORDER BY ord, name;
