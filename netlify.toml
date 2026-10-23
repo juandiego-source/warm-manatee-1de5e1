@@ -1,3 +1,25 @@
+# A client's approve link is /q/<token> (and older emails use /?quote=<token>).
+# That page is rendered by the public-quote function, with no login.
+# Every other path is the staff app.
+[[redirects]]
+  from = "/"
+  query = {quote = ":token"}
+  to = "/q/:token"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/quote/:token"
+  to = "/q/:token"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/q/*"
+  to = "/.netlify/functions/public-quote"
+  status = 200
+  force = true
+
 # History routes (/estimates/EST-0015, /jobs/SMK-97456, …) are handled in the app.
 # Serve index.html for any path that is not a real file so refresh does not 404.
 [[redirects]]

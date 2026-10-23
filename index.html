@@ -1186,7 +1186,8 @@ const ICONS={
 };
 const SB_URL='https://nrnnpprcshkgroghhbro.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ybm5wcHJjc2hrZ3JvZ2hoYnJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0MTAwOTYsImV4cCI6MjA5Mjk4NjA5Nn0.pRjE7f8h8xwibZG2X7prT-xOKhcKrBxB6VGs8zMYlNs';
-const db=supabase.createClient(SB_URL,SB_KEY);
+let db=null;
+try{db=supabase.createClient(SB_URL,SB_KEY);}catch(err){db=null;}
 
 let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices=[],estItems={},invItems={},recurring=[];
 let invoicedJobIds=new Set(),jobInvoiceMap={},jobInvoiceIds={},invoiceItemJobLinks=[],services=[],costRequests=[];
@@ -1539,7 +1540,7 @@ async function fetchSubs(){const{data,error}=await fetchAllRows(()=>db.from('sub
 async function fetchProfiles(){const{data,error}=await fetchAllRows(()=>db.from('profiles').select('*'));if(error)console.error('fetchProfiles',error);profiles=data||[];}
 async function fetchProperties(){const{data,error}=await fetchAllRows(()=>db.from('properties').select('*').order('address'));if(error)console.error('fetchProperties',error);properties=data||[];}
 async function fetchEstimates(){
-  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name), estimate_items(quantity, unit_price, total, is_optional)').order('created_at',{ascending:false}));
+  let {data,error}=await fetchAllRows(()=>db.from('estimates').select('*, customers(name), estimate_items(id, quantity, unit_price, total, is_optional)').order('created_at',{ascending:false}));
   if(error){
     console.error('fetchEstimates',error);
     const retry=await fetchAllRows(()=>db.from('estimates').select('*, customers(name)').order('created_at',{ascending:false}));
@@ -1612,6 +1613,20 @@ function lineAmounts(qty,unitPrice,storedTotal){
   return {unit,computed,total:hasStored?roundMoney(storedTotal):computed};
 }
 function lineIsOptional(item){return !!(item&&(item.isOptional||item.is_optional));}
+function clientAcceptedIds(est){
+  if(!est||est.client_response!=='Accepted'||est.client_selected_items==null||est.client_selected_items==='')return null;
+  let raw=est.client_selected_items;
+  for(let n=0;n<2&&typeof raw==='string';n++){
+    try{raw=JSON.parse(raw);}catch(e){return null;}
+  }
+  if(!Array.isArray(raw))return null;
+  return new Set(raw.map(x=>String(x)));
+}
+function lineCountsTowardApproved(item,ids){
+  if(!lineIsOptional(item))return true;
+  if(!ids||item==null||item.id==null)return false;
+  return ids.has(String(item.id));
+}
 function itemLineTotal(item){
   if(!item)return 0;
   const qty=item.qty!=null?item.qty:item.quantity;
@@ -1619,16 +1634,18 @@ function itemLineTotal(item){
   const stored=Object.prototype.hasOwnProperty.call(item,'storedTotal')?item.storedTotal:item.total;
   return lineAmounts(qty,price,item._recalc?null:stored).total;
 }
-function estimateMoneyFromItems(items,taxRate){
+function estimateMoneyFromItems(items,taxRate,est){
+  const ids=clientAcceptedIds(est);
   const list=items||[];
-  const sub=roundMoney(list.reduce((s,i)=>s+(lineIsOptional(i)?0:itemLineTotal(i)),0));
-  const optional=roundMoney(list.reduce((s,i)=>s+(lineIsOptional(i)?itemLineTotal(i):0),0));
+  const counts=i=>ids?lineCountsTowardApproved(i,ids):!lineIsOptional(i);
+  const sub=roundMoney(list.reduce((s,i)=>s+(counts(i)?itemLineTotal(i):0),0));
+  const optional=roundMoney(list.reduce((s,i)=>s+(lineIsOptional(i)&&!counts(i)?itemLineTotal(i):0),0));
   const tax=roundMoney(sub*(moneyNum(taxRate)/100));
   return {sub,tax,total:roundMoney(sub+tax),optional};
 }
 function estimateDisplayMoney(est,items){
   const lines=items!=null?items:(est&&est.estimate_items);
-  if(est&&Array.isArray(lines)&&lines.length)return estimateMoneyFromItems(lines,est.tax_rate);
+  if(est&&Array.isArray(lines)&&lines.length)return estimateMoneyFromItems(lines,est.tax_rate,est);
   return {sub:moneyNum(est&&est.subtotal),tax:moneyNum(est&&est.tax_amount),total:moneyNum(est&&est.total),optional:0};
 }
 function plural(n,one,many){return n+' '+(n===1?one:(many||one+'s'));}
@@ -4370,6 +4387,7 @@ async function openEstDetail(id){
   const body=document.getElementById('detail-est-body');
   if(!body)return;
   try{
+  const acceptedIds=clientAcceptedIds(e);
   body.innerHTML=`
     <div class="invoice-preview">
       <div class="inv-header">
@@ -4378,7 +4396,7 @@ async function openEstDetail(id){
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
-        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);const opt=lineIsOptional(i);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}${opt?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#8a6d3b">OPTIONAL</span>':''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
+        <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);const opt=lineIsOptional(i);const skipped=opt&&acceptedIds&&!lineCountsTowardApproved(i,acceptedIds);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}${opt?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#8a6d3b">OPTIONAL</span>':''}${skipped?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink3)">NOT CHOSEN</span>':''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
       </table>
       <div class="inv-totals">
         ${(()=>{const money=estimateDisplayMoney(e,items);return `<div class="inv-total-row"><span>Subtotal</span><span>${fmt(money.sub)}</span></div>
@@ -4393,7 +4411,7 @@ async function openEstDetail(id){
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${e.id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
       <button class="action-btn ab-glass" onclick="openMarkEstimateSent('${e.id}')">${e.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${e.id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
-      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${e.client_response}</b>${e.client_note?` — "${e.client_note}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&e.client_selected_items?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">Client chose ${(()=>{try{const sel=typeof e.client_selected_items==='string'?JSON.parse(e.client_selected_items):e.client_selected_items;return Array.isArray(sel)?sel.length+' item(s)':'the selected items';}catch(x){return 'the selected items';}})()} — review before invoicing if optional items were involved</div>`:''}</div>`:''}
+      ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${esc(e.client_response)}</b>${e.client_note?` — "${esc(e.client_note)}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&acceptedIds?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">The total above is what they accepted. Optional lines they left off are marked not chosen.</div>`:''}</div>`:''}
       <button class="action-btn ab-glass" onclick="printEstimate('${e.id}')">${ICONS.printer} Print / Save PDF</button>
       <button class="action-btn ab-glass" onclick="shareEstimatePdf('${e.id}')">${ICONS.send} Share / Text PDF</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-green" onclick="updateEstStatus('${e.id}','Approved')">${ICONS.check} Mark Approved</button>`:''}
@@ -4412,7 +4430,8 @@ function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
   const statusBg={Approved:'#eaf3de',Sent:'#e6f1fb',Draft:'#faeeda',Declined:'#fcebeb'}[est.status]||'#faeeda';
   const money=estimateDisplayMoney(est,items);
-  const rows=(items||[]).map(i=>{const opt=lineIsOptional(i);return `<tr><td><div class="item-title">${i.title||i.description||''}${opt?' · Optional':''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`;}).join('');
+  const acceptedIds=clientAcceptedIds(est);
+  const rows=(items||[]).map(i=>{const opt=lineIsOptional(i);const skipped=opt&&acceptedIds&&!lineCountsTowardApproved(i,acceptedIds);return `<tr><td><div class="item-title">${i.title||i.description||''}${opt?' · Optional':''}${skipped?' · not chosen':''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`;}).join('');
   return `<div class="pdf-doc">
 <div class="letterhead">
   <div class="brand">
@@ -4737,16 +4756,33 @@ async function getEstimatePdfFile(id){
     document.body.removeChild(container);
   }
 }
+function quotePageUrl(token){return location.origin+'/q/'+encodeURIComponent(token);}
+async function ensurePublicToken(est){
+  if(!est||!est.id)return null;
+  let token=String(est.public_token||'').trim();
+  if(!token){
+    const{data}=await db.from('estimates').select('public_token').eq('id',est.id).maybeSingle();
+    token=String(data&&data.public_token||'').trim();
+  }
+  if(token){est.public_token=token;return token;}
+  const bytes=new Uint8Array(16);
+  if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(bytes);
+  else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+  const created=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const saved=await db.from('estimates').update({public_token:created}).eq('id',est.id).or('public_token.is.null,public_token.eq.').select('public_token').maybeSingle();
+  token=String(saved.data&&saved.data.public_token||'').trim();
+  if(!token){
+    const again=await db.from('estimates').select('public_token').eq('id',est.id).maybeSingle();
+    token=String(again.data&&again.data.public_token||'').trim();
+  }
+  if(token)est.public_token=token;
+  return token||null;
+}
 async function copyQuoteLink(id){
   const est=estimates.find(e=>e.id===id);
-  let token=est?.public_token;
-  if(!token){
-    // fetch it (may not be in the in-memory copy)
-    const{data}=await db.from('estimates').select('public_token').eq('id',id).single();
-    token=data?.public_token;
-  }
+  const token=await ensurePublicToken(est||{id});
   if(!token){toast('No link available — try re-saving the estimate');return;}
-  const url=`${location.origin}/?quote=${token}`;
+  const url=quotePageUrl(token);
   try{
     await navigator.clipboard.writeText(url);
     toast('✓ Quote link copied — paste it to your client');
@@ -4910,19 +4946,19 @@ async function emailEstimate(id){
   toast('Preparing & sending…');
   const result=await getEstimatePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
-  // Get the interactive quote token so we can embed the Accept link
-  let token=est.public_token;
-  if(!token){const{data}=await db.from('estimates').select('public_token').eq('id',id).single();token=data?.public_token;}
-  const quoteUrl=token?`${location.origin}/?quote=${token}`:null;
+  // Get the interactive quote token so we can embed the Accept link.
+  // The path form survives mailboxes that drop a ?query= string.
+  const token=await ensurePublicToken(est);
+  const quoteUrl=token?quotePageUrl(token):null;
   const subject=`Estimate ${est.estimate_number} from Sumak Lawncare`;
   const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6;max-width:520px">
-    <p>Hi ${cust.name},</p>
+    <p>Hi ${esc(cust.name||'')},</p>
     <p>Thank you for the opportunity! Your estimate <strong>${est.estimate_number}</strong> comes to <strong>${fmt(estimateDisplayMoney(est).total)}</strong>${est.valid_until?`, valid until ${fmtDate(est.valid_until)}`:''}. The full details are attached as a PDF for your records.</p>
     ${quoteUrl?`<p>You can review and respond to your quote online with one tap:</p>
     <p style="text-align:center;margin:26px 0">
-      <a href="${quoteUrl}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">View &amp; Respond to Your Quote</a>
+      <a href="${escapeAttr(quoteUrl)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">View &amp; Respond to Your Quote</a>
     </p>
-    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${quoteUrl}</p>`:`<p>Just reply to this email or give us a call to move forward — we'd be glad to help!</p>`}
+    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(quoteUrl)}</p>`:`<p>Just reply to this email or give us a call to move forward — we'd be glad to help!</p>`}
     <p style="margin-top:24px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
   try{
@@ -5020,7 +5056,10 @@ async function createJobFromEstimate(estId){
   if(existing)return{job:existing,already:true};
   const e=estimates.find(x=>x.id===estId);if(!e)return null;
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
-  const title=(items&&items[0]?.description)?items[0].description.slice(0,80):`Work for ${e.customers?.name||'client'}`;
+  const acceptedIds=clientAcceptedIds(e);
+  const chosen=(items||[]).filter(i=>acceptedIds?lineCountsTowardApproved(i,acceptedIds):!lineIsOptional(i));
+  const first=chosen[0]||(items&&items[0])||{};
+  const title=(first.title||first.description||`Work for ${e.customers?.name||'client'}`).slice(0,80);
   const payload={job_number:'SMK-'+String(Date.now()).slice(-5),title,customer_id:e.customer_id,address:e.address||null,status:'Pending',subcontractor_id:null,client_price:estimateDisplayMoney(e,items).total||0,sub_pay:0,payment_status:'Unpaid',notes:e.notes||null,estimate_id:estId};
   const{data:job,error}=await db.from('jobs').insert(payload).select().single();
   if(error){toast('Error creating job: '+error.message);return null;}
@@ -5059,9 +5098,10 @@ async function convertEstToInvoice(estId){
   }
   const{data:items}=await db.from('estimate_items').select('*').eq('estimate_id',estId);
   const source=Array.isArray(items)?items:[];
-  const billable=source.filter(i=>!lineIsOptional(i));
-  if(source.length&&!billable.length){toast('Optional lines are not included. Add a required line before invoicing.');return;}
-  const money=source.length?estimateMoneyFromItems(billable,e.tax_rate):estimateDisplayMoney(e);
+  const acceptedIds=clientAcceptedIds(e);
+  const billable=source.filter(i=>acceptedIds?lineCountsTowardApproved(i,acceptedIds):!lineIsOptional(i));
+  if(source.length&&!billable.length){toast('Choose at least one line before invoicing. Optional lines the client left off are not included.');return;}
+  const money=source.length?estimateMoneyFromItems(source,e.tax_rate,e):estimateDisplayMoney(e);
   const due=addDaysYMD(bizYMD(),30);
   const{data:inv,error}=await db.from('invoices').insert({customer_id:e.customer_id,estimate_id:estId,subtotal:money.sub,tax_rate:e.tax_rate,tax_amount:money.tax,total:money.total,due_date:due,notes:e.notes}).select().single();
   if(error){toast('Error: '+error.message);return;}
@@ -6811,46 +6851,83 @@ if(inviteSubId){
   switchAuthTab('register',document.querySelectorAll('.auth-tab')[1]);
 }
 // ── PUBLIC CLIENT QUOTE PAGE ──
-// If the URL has ?quote=TOKEN, render the standalone client-facing quote view
-// (no login, no admin app). This must run before the normal app boots.
+// Email links are /q/TOKEN. Older emails use /?quote=TOKEN. Either one renders
+// this page with no login. The live site also server-renders /q/TOKEN so a
+// mailbox that does not run JavaScript still sees the estimate.
+function publicQuoteToken(){
+  const q=new URLSearchParams(location.search).get('quote');
+  if(q&&String(q).trim())return String(q).trim();
+  const m=location.pathname.match(/^\/(?:q|quote)\/([^/?#]+)/);
+  if(!m)return '';
+  try{return decodeURIComponent(m[1]).trim();}catch(e){return String(m[1]||'').trim();}
+}
+function quoteItemOptional(it){return !!(it&&(it.is_optional===true||it.is_optional==='true'||it.is_optional===1||it.isOptional));}
+function quoteAcceptedSet(q){
+  if(!q||q.client_response!=='Accepted'||q.client_selected_items==null)return null;
+  let raw=q.client_selected_items;
+  for(let n=0;n<2&&typeof raw==='string';n++){
+    try{raw=JSON.parse(raw);}catch(e){return new Set();}
+  }
+  return Array.isArray(raw)?new Set(raw.map(x=>String(x))):new Set();
+}
+function quoteMessage(title,msg){
+  return `<div style="max-width:560px;margin:0 auto;padding:60px 24px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28"><div style="font-size:20px;font-weight:600">${esc(title)}</div><div style="color:#8a7a6e;margin-top:8px;font-size:14px">${esc(msg)}</div></div>`;
+}
 async function maybeRenderPublicQuote(){
-  const params=new URLSearchParams(location.search);
-  const token=params.get('quote');
+  const token=publicQuoteToken();
   if(!token)return false;
-  document.getElementById('app').style.display='none';
+  hideSplash();
+  const appEl=document.getElementById('app');
+  if(appEl)appEl.style.display='none';
+  const auth=document.getElementById('auth-screen');
+  if(auth)auth.classList.add('hidden');
   const host=document.createElement('div');
   host.id='public-quote-host';
-  host.style.cssText='position:fixed;inset:0;overflow-y:auto;background:#F3ECE4;z-index:99999;';
+  host.style.cssText='position:fixed;inset:0;overflow:auto;background:#F3ECE4;z-index:99999;-webkit-overflow-scrolling:touch;';
   document.body.appendChild(host);
   host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:40px 20px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28">Loading your quote…</div>`;
+  if(!db){
+    host.innerHTML=quoteMessage('We could not open this quote','Please contact Sumak Lawncare at 208-695-7239.');
+    return true;
+  }
   try{
     const{data,error}=await db.rpc('get_public_quote',{p_token:token});
-    if(error||!data||data.error){
-      host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:60px 24px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28"><div style="font-size:20px;font-weight:600">Quote not found</div><div style="color:#8a7a6e;margin-top:8px;font-size:14px">This link may have expired. Please contact Sumak Lawncare at 208-695-7239.</div></div>`;
+    const quote=Array.isArray(data)?data[0]:data;
+    if(error||!quote||quote.error){
+      host.innerHTML=quoteMessage('Quote not found','This link may be incomplete. Please contact Sumak Lawncare at 208-695-7239.');
       return true;
     }
-    // Log that the client opened it (fire and forget — never blocks rendering)
-    db.rpc('mark_quote_viewed',{p_token:token}).catch(()=>{});
-    renderPublicQuote(host,token,data);
+    try{await db.rpc('mark_quote_viewed',{p_token:token});}catch(e){}
+    renderPublicQuote(host,token,quote);
   }catch(e){
-    host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:60px 24px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28"><div style="font-size:18px;font-weight:600">Something went wrong</div><div style="color:#8a7a6e;margin-top:8px;font-size:14px">Please contact Sumak Lawncare at 208-695-7239.</div></div>`;
+    host.innerHTML=quoteMessage('Something went wrong','Please contact Sumak Lawncare at 208-695-7239.');
   }
   return true;
 }
 function renderPublicQuote(host,token,q){
   const money=(n)=>fmt(n);
   const already=q.client_response;
-  const items=q.items||[];
-  // compute total live from selected items
+  const items=Array.isArray(q.items)?q.items:[];
+  const acceptedSet=quoteAcceptedSet(q);
   window._pqSelected={};
-  items.forEach(it=>{window._pqSelected[it.id]=!it.is_optional;});
-  function calcTotal(){
+  items.forEach(it=>{
+    const id=String(it.id);
+    const optional=quoteItemOptional(it);
+    window._pqSelected[id]=optional?(acceptedSet?acceptedSet.has(id):false):true;
+  });
+  function calc(){
     let sub=0;
-    items.forEach(it=>{if(window._pqSelected[it.id])sub+=Number(it.total)||0;});
-    return sub;
+    items.forEach(it=>{if(window._pqSelected[String(it.id)])sub+=Number(it.total)||0;});
+    sub=Math.round(sub*100)/100;
+    const rate=Number(q.tax_rate)||0;
+    const tax=Math.round(sub*rate)/100;
+    return {sub,tax,total:Math.round((sub+tax)*100)/100,rate};
   }
   function draw(){
-    const total=calcTotal();
+    const totals=calc();
+    const today=bizYMD();
+    const until=q.valid_until?String(q.valid_until).slice(0,10):'';
+    const expired=until&&today&&until<today;
     host.innerHTML=`
     <div style="max-width:560px;margin:0 auto;padding:28px 18px 60px;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28">
       <div style="text-align:center;margin-bottom:24px">
@@ -6859,82 +6936,93 @@ function renderPublicQuote(host,token,q){
       </div>
       <div style="background:#fff;border-radius:16px;padding:22px;box-shadow:0 4px 20px rgba(0,0,0,0.06)">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-          <div><div style="font-size:12px;color:#8a7a6e">Estimate</div><div style="font-size:18px;font-weight:700">${q.estimate_number||''}</div></div>
-          <div style="text-align:right"><div style="font-size:12px;color:#8a7a6e">Prepared for</div><div style="font-weight:600">${q.client_name||''}</div></div>
+          <div><div style="font-size:12px;color:#8a7a6e">Estimate</div><div style="font-size:18px;font-weight:700">${esc(q.estimate_number||'')}</div></div>
+          <div style="text-align:right"><div style="font-size:12px;color:#8a7a6e">Prepared for</div><div style="font-weight:600">${esc(q.client_name||'')}</div></div>
         </div>
-        ${q.address?`<div style="font-size:12.5px;color:#6a5c50;margin-bottom:14px">📍 ${q.address}</div>`:''}
+        ${q.address?`<div style="font-size:12.5px;color:#6a5c50;margin-bottom:14px">${esc(q.address)}</div>`:''}
         <div style="border-top:1px solid #eee;margin:10px 0"></div>
         ${items.map(it=>{
-          const on=window._pqSelected[it.id];
-          return`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f2ede8">
-            <div style="flex:1">
-              ${it.is_optional?`<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-                <input type="checkbox" ${on?'checked':''} ${already?'disabled':''} onchange="window._pqToggle('${it.id}',this.checked)" style="margin-top:3px;width:16px;height:16px;accent-color:#7B1A1A">
-                <span><span style="font-weight:600">${it.title||'Item'}</span> <span style="font-size:10px;background:#f0e6da;color:#8a6d3b;padding:1px 6px;border-radius:8px;font-weight:600">OPTIONAL</span>${it.description?`<div style="font-size:12px;color:#8a7a6e;margin-top:2px">${it.description}</div>`:''}</span>
-              </label>`:`<div><span style="font-weight:600">${it.title||'Item'}</span>${it.description?`<div style="font-size:12px;color:#8a7a6e;margin-top:2px">${it.description}</div>`:''}</div>`}
-            </div>
-            <div style="font-weight:600;white-space:nowrap;${it.is_optional&&!on?'opacity:0.35':''}">${money(it.total)}</div>
-          </div>`;}).join('')}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:2px solid #3a2f28">
-          <div style="font-size:16px;font-weight:700">Total</div>
-          <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:#7B1A1A">${money(total)}</div>
+          const id=String(it.id);
+          const optional=quoteItemOptional(it);
+          const on=!!window._pqSelected[id];
+          const title=esc(it.title||'Item');
+          const desc=it.description?`<div style="font-size:12px;color:#8a7a6e;margin-top:2px">${esc(it.description)}</div>`:'';
+          const flag=optional?(already?(on?' <span style="font-size:10px;background:#f0e6da;color:#8a6d3b;padding:1px 6px;border-radius:8px;font-weight:600">OPTIONAL · INCLUDED</span>':' <span style="font-size:10px;background:#f0e6da;color:#8a6d3b;padding:1px 6px;border-radius:8px;font-weight:600">OPTIONAL · NOT INCLUDED</span>'):' <span style="font-size:10px;background:#f0e6da;color:#8a6d3b;padding:1px 6px;border-radius:8px;font-weight:600">OPTIONAL</span>'):'';
+          const body=already||!optional
+            ?`<div><span style="font-weight:600">${title}</span>${flag}${desc}</div>`
+            :`<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" data-pq-id="${escapeAttr(id)}" ${on?'checked':''} style="margin-top:3px;width:16px;height:16px;accent-color:#7B1A1A"><span><span style="font-weight:600">${title}</span>${flag}${desc}</span></label>`;
+          return`<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #f2ede8;${optional&&!on?'opacity:.55':''}"><div style="flex:1">${body}</div><div style="font-weight:600;white-space:nowrap">${money(it.total)}</div></div>`;
+        }).join('')}
+        <div style="margin-top:16px;padding-top:14px;border-top:2px solid #3a2f28">
+          <div style="display:flex;justify-content:space-between;font-size:14px;color:#5a463c;padding:3px 0"><span>Subtotal</span><span>${money(totals.sub)}</span></div>
+          ${totals.rate>0?`<div style="display:flex;justify-content:space-between;font-size:14px;color:#5a463c;padding:3px 0"><span>Tax (${esc(String(totals.rate))}%)</span><span>${money(totals.tax)}</span></div>`:''}
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px"><div style="font-size:16px;font-weight:700">Total</div><div id="pq-total" style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;color:#7B1A1A">${money(totals.total)}</div></div>
         </div>
-        ${q.notes?`<div style="font-size:12.5px;color:#6a5c50;margin-top:14px;padding:12px;background:#faf6f0;border-radius:10px">${q.notes}</div>`:''}
+        ${q.notes?`<div style="font-size:12.5px;color:#6a5c50;margin-top:14px;padding:12px;background:#faf6f0;border-radius:10px;white-space:pre-wrap">${esc(q.notes)}</div>`:''}
+        ${until?`<div style="font-size:12px;color:#8a7a6e;margin-top:10px">Valid until ${esc(fmtDate(until))}${expired?'. That date has passed. You can still respond and we will confirm the price.':''}</div>`:''}
       </div>
-
       ${already?`
         <div style="text-align:center;margin-top:22px;padding:18px;background:#fff;border-radius:14px">
-          <div style="font-size:16px;font-weight:700;color:${already==='Accepted'?'#2a6010':already==='Declined'?'#8B1A1A':'#8a6d3b'}">
-            ${already==='Accepted'?'✓ You accepted this quote':already==='Declined'?'This quote was declined':'✎ Changes requested'}
-          </div>
-          <div style="font-size:13px;color:#8a7a6e;margin-top:6px">Thank you! We'll be in touch. Questions? Call 208-695-7239.</div>
+          <div style="font-size:16px;font-weight:700;color:${already==='Accepted'?'#2a6010':already==='Declined'?'#8B1A1A':'#8a6d3b'}">${already==='Accepted'?'You accepted this quote':already==='Declined'?'This quote was declined':'Changes were requested'}</div>
+          <div style="font-size:13px;color:#8a7a6e;margin-top:6px">Thank you. Questions? Call 208-695-7239.</div>
         </div>
       `:`
         <div style="margin-top:22px">
-          <button onclick="window._pqRespond('Accepted')" style="width:100%;padding:16px;background:#7B1A1A;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">Accept This Quote</button>
+          <button id="pq-accept" style="width:100%;padding:16px;background:#7B1A1A;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">Accept This Quote</button>
+          ${items.some(quoteItemOptional)?'<div style="font-size:12px;color:#8a7a6e;margin:-4px 0 10px">Optional lines stay off until you check them, so the total starts at the amount in the email. Required work is already included.</div>':''}
           <div style="display:flex;gap:10px">
-            <button onclick="window._pqShowChanges()" style="flex:1;padding:13px;background:#fff;color:#3a2f28;border:1.5px solid #d8cec4;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Request Changes</button>
-            <button onclick="window._pqRespond('Declined')" style="flex:1;padding:13px;background:#fff;color:#8B1A1A;border:1.5px solid #e5c4c4;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Decline</button>
+            <button id="pq-changes-btn" style="flex:1;padding:13px;background:#fff;color:#3a2f28;border:1.5px solid #d8cec4;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Request Changes</button>
+            <button id="pq-decline" style="flex:1;padding:13px;background:#fff;color:#8B1A1A;border:1.5px solid #e5c4c4;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Decline</button>
           </div>
           <div id="pq-changes" style="display:none;margin-top:12px">
             <textarea id="pq-note" placeholder="What would you like changed?" style="width:100%;box-sizing:border-box;padding:12px;border:1.5px solid #d8cec4;border-radius:10px;font-family:inherit;font-size:14px;min-height:70px"></textarea>
-            <button onclick="window._pqRespond('Changes Requested')" style="width:100%;padding:13px;background:#8a6d3b;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px">Send Request</button>
+            <button id="pq-send-changes" style="width:100%;padding:13px;background:#8a6d3b;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px">Send Request</button>
           </div>
         </div>
       `}
       <div style="text-align:center;margin-top:24px;font-size:11.5px;color:#a89a8c">Sumak Lawncare · 208-695-7239 · office@sumaklawncare.com</div>
     </div>`;
+    host.querySelectorAll('input[data-pq-id]').forEach(el=>{
+      el.addEventListener('change',()=>{window._pqSelected[el.getAttribute('data-pq-id')]=el.checked;draw();});
+    });
+    const accept=document.getElementById('pq-accept');
+    if(accept)accept.addEventListener('click',()=>window._pqRespond('Accepted'));
+    const decline=document.getElementById('pq-decline');
+    if(decline)decline.addEventListener('click',()=>window._pqRespond('Declined'));
+    const changesBtn=document.getElementById('pq-changes-btn');
+    if(changesBtn)changesBtn.addEventListener('click',()=>{const el=document.getElementById('pq-changes');if(el)el.style.display=el.style.display==='block'?'none':'block';});
+    const sendChanges=document.getElementById('pq-send-changes');
+    if(sendChanges)sendChanges.addEventListener('click',()=>window._pqRespond('Changes Requested'));
   }
-  window._pqToggle=(id,on)=>{window._pqSelected[id]=on;draw();};
-  window._pqShowChanges=()=>{const el=document.getElementById('pq-changes');if(el)el.style.display='block';};
   window._pqRespond=async(response)=>{
-    const note=document.getElementById('pq-note')?.value||null;
+    const noteEl=document.getElementById('pq-note');
+    const note=noteEl?noteEl.value:null;
     const selected=Object.keys(window._pqSelected).filter(k=>window._pqSelected[k]);
     host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:60px 24px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28">Sending…</div>`;
     try{
       const{data,error}=await db.rpc('respond_to_quote',{p_token:token,p_response:response,p_note:note,p_selected:JSON.stringify(selected)});
-      if(error||data?.error){
-        if(data?.error==='already_responded'){q.client_response=data.response;showConfirmation(data.response);return;}
-        throw new Error('failed');
-      }
-      showConfirmation(response);
+      if(error||(data&&data.error&&data.error!=='already_responded'))throw new Error('failed');
+      const saved=(data&&data.error==='already_responded')?(data.response||response):response;
+      const approved=data&&data.total!=null?Number(data.total):null;
+      showConfirmation(saved,approved);
     }catch(e){
-      host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:60px 24px;text-align:center;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28"><div style="font-size:16px;font-weight:600">Couldn't send your response</div><div style="color:#8a7a6e;margin-top:8px;font-size:14px">Please call Sumak Lawncare at 208-695-7239.</div></div>`;
+      host.innerHTML=quoteMessage("Couldn't send your response",'Please call Sumak Lawncare at 208-695-7239.');
     }
   };
-  function showConfirmation(response){
+  function showConfirmation(response,approvedTotal){
     const cfg={
-      'Accepted':{icon:'🎉',color:'#2a6010',title:'Quote Accepted — Thank You!',msg:"We've received your acceptance and will be in touch shortly to schedule your service. We appreciate your business!"},
-      'Declined':{icon:'',color:'#8B1A1A',title:'Quote Declined',msg:"Thanks for letting us know. If anything changes or you have questions, we're just a call away."},
-      'Changes Requested':{icon:'✎',color:'#8a6d3b',title:'Changes Requested',msg:"Thank you! We've received your request and will review it and get back to you soon."}
-    }[response]||{icon:'',color:'#3a2f28',title:'Thank You',msg:'Your response has been received.'};
+      'Accepted':{color:'#2a6010',title:'Quote accepted — thank you',msg:'We have your acceptance and will be in touch to schedule.'},
+      'Declined':{color:'#8B1A1A',title:'Quote declined',msg:'Thanks for letting us know. If anything changes, call us.'},
+      'Changes Requested':{color:'#8a6d3b',title:'Changes requested',msg:'We have your note and will get back to you.'}
+    }[response]||{color:'#3a2f28',title:'Thank you',msg:'Your response has been received.'};
+    const totalLine=response==='Accepted'&&approvedTotal!=null?`<div style="margin-top:14px;font-size:18px;font-weight:700">Approved total ${money(approvedTotal)}</div>`:'';
     host.innerHTML=`<div style="max-width:560px;margin:0 auto;padding:60px 22px;font-family:'Plus Jakarta Sans',sans-serif;color:#3a2f28;text-align:center">
       <div style="font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;color:#7B1A1A;margin-bottom:30px">Sumak Lawncare</div>
       <div style="background:#fff;border-radius:16px;padding:36px 24px;box-shadow:0 4px 20px rgba(0,0,0,0.06)">
-        ${cfg.icon?`<div style="font-size:44px;margin-bottom:10px">${cfg.icon}</div>`:''}
-        <div style="font-size:21px;font-weight:700;color:${cfg.color}">${cfg.title}</div>
-        <div style="font-size:14px;color:#6a5c50;margin-top:12px;line-height:1.6">${cfg.msg}</div>
-        <div style="font-size:13px;color:#8a7a6e;margin-top:20px;padding-top:18px;border-top:1px solid #f2ede8">Estimate ${q.estimate_number} · ${q.client_name||''}</div>
+        <div style="font-size:21px;font-weight:700;color:${cfg.color}">${esc(cfg.title)}</div>
+        <div style="font-size:14px;color:#6a5c50;margin-top:12px;line-height:1.6">${esc(cfg.msg)}</div>
+        ${totalLine}
+        <div style="font-size:13px;color:#8a7a6e;margin-top:20px;padding-top:18px;border-top:1px solid #f2ede8">Estimate ${esc(q.estimate_number||'')} · ${esc(q.client_name||'')}</div>
       </div>
       <div style="text-align:center;margin-top:24px;font-size:11.5px;color:#a89a8c">Sumak Lawncare · 208-695-7239 · office@sumaklawncare.com</div>
     </div>`;
