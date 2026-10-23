@@ -1112,6 +1112,32 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
   </div>
 </div>
 
+<!-- MARK INVOICE PAID -->
+<div class="modal-overlay" id="modal-invpaid" onclick="overlayClose(event,'invpaid')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="invpaid-title">Mark as Paid</div>
+    <p id="invpaid-sub" style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5"></p>
+    <div class="form-group"><label class="form-label">Payment method *</label>
+      <select class="form-input" id="invpaid-method">
+        <option value="">Select method...</option>
+        <option>Check</option>
+        <option>Venmo</option>
+        <option>Zelle</option>
+        <option>Cash</option>
+        <option>ACH/bank deposit</option>
+        <option>Card</option>
+        <option>Other</option>
+      </select>
+    </div>
+    <div class="form-group"><label class="form-label">Reference / note <span style="font-weight:400;color:var(--ink3)">(optional)</span></label><input class="form-input" id="invpaid-ref" type="text" placeholder="Check #, confirmation code" autocomplete="off" maxlength="500"></div>
+    <div class="form-group"><label class="form-label">Date paid *</label><input class="form-input" id="invpaid-date" type="date"></div>
+    <div id="invpaid-error" style="display:none;font-size:12.5px;color:var(--rose);font-weight:600;margin:-2px 0 12px;line-height:1.4"></div>
+    <button class="btn btn-red btn-full" id="invpaid-save" onclick="confirmInvoicePaid()">Confirm Payment</button>
+    <button class="btn btn-full btn-full-ghost" onclick="closeModal('invpaid')">Cancel</button>
+  </div>
+</div>
+
 <!-- MARK INVOICE SENT -->
 <div class="modal-overlay" id="modal-markinv" onclick="overlayClose(event,'markinv')">
   <div class="modal">
@@ -5134,7 +5160,7 @@ function invoiceListCard(i,onclick){
   const displayStatus=overdue&&i.status!=='Paid'&&i.status!=='Cancelled'?'Overdue':i.status;
   return `<div class="card" data-type="invoice" data-id="${esc(i.id)}" data-number="${esc(i.invoice_number||'')}" onclick="${onclick}">
     <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
-    <div class="card-meta">${cardWhenHTML(i)}${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${invoiceDueCue(i)}</div>
+    <div class="card-meta">${cardWhenHTML(i)}${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${invoiceDueCue(i)}${invoicePaidCardHTML(i)}</div>
     <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
   </div>`;
 }
@@ -5285,6 +5311,56 @@ async function createBatchInvoices(){
 
 function filterInv(el,val){invFilter=val;document.querySelectorAll('#view-invoices .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderInvoices();}
 
+const INVOICE_PAY_METHODS=['Check','Venmo','Zelle','Cash','ACH/bank deposit','Card','Other'];
+function invoicePaymentRecorded(inv){
+  if(!inv||inv.status!=='Paid')return false;
+  if(String(inv.payment_method||'').trim())return true;
+  if(String(inv.payment_reference||'').trim())return true;
+  return isDateOnly(String(inv.paid_on||'').slice(0,10));
+}
+function invoicePaidYMD(inv){
+  if(!inv)return '';
+  const on=String(inv.paid_on||'').slice(0,10);
+  if(isDateOnly(on))return on;
+  const at=coerceTimestamp(inv.paid_at);
+  if(!at)return '';
+  if(isDateOnly(at))return at;
+  return bizYMD(at)||'';
+}
+function invoicePaidPhrase(inv){
+  if(!inv||inv.status!=='Paid')return '';
+  const ymd=invoicePaidYMD(inv);
+  let when='';
+  if(ymd){
+    when=shortBizDate(ymd)||'';
+    const year=ymd.slice(0,4);
+    if(when&&year&&year!==bizYMD().slice(0,4))when+=', '+year;
+  }
+  const method=String(inv.payment_method||'').trim();
+  let s='Paid';
+  if(when)s+=' '+when;
+  if(method)s+=' via '+method;
+  return s;
+}
+function invoicePaymentDetailHTML(inv){
+  if(!invoicePaymentRecorded(inv))return '';
+  const phrase=invoicePaidPhrase(inv);
+  const ref=String(inv.payment_reference||'').trim();
+  if((!phrase||phrase==='Paid')&&!ref)return '';
+  return `<div style="margin-top:2px;font-weight:600">${esc(phrase||'Paid')}</div>${ref?`<div style="font-size:11px;color:var(--ink2)">${esc(ref)}</div>`:''}`;
+}
+function invoicePaidCardHTML(inv){
+  if(!invoicePaymentRecorded(inv))return '';
+  const phrase=invoicePaidPhrase(inv);
+  if(!phrase||phrase==='Paid')return '';
+  return `<span class="card-meta-item">${ICONS.creditCard} ${esc(phrase)}</span>`;
+}
+function invoicePaidTimelineStep(inv){
+  if(!inv||inv.status!=='Paid')return {label:'Payment',done:false,time:'',icon:'$'};
+  if(!invoicePaymentRecorded(inv))return {label:'Paid',done:true,time:tlTime(inv.paid_at),icon:'$'};
+  const ref=String(inv.payment_reference||'').trim();
+  return {label:esc(invoicePaidPhrase(inv)||'Paid'),done:true,time:ref?esc(ref):'',icon:'$'};
+}
 function invoiceTimelineHTML(inv){
   const overdue=(typeof invIsOverdue==='function')&&invIsOverdue(inv);
   const steps=[];
@@ -5293,7 +5369,7 @@ function invoiceTimelineHTML(inv){
   if(overdue&&inv.status!=='Paid'){
     steps.push({label:'Overdue (30+ days)',done:true,time:'',icon:'!',overdue:true});
   }
-  steps.push({label:inv.status==='Paid'?'Paid':'Payment',done:inv.status==='Paid',time:tlTime(inv.paid_at),icon:'$'});
+  steps.push(invoicePaidTimelineStep(inv));
   return`<div class="tl-wrap">
     <div class="tl-title">Invoice Timeline</div>
     ${steps.map(s=>`<div class="tl-step ${s.done?'done':''}">
@@ -5325,7 +5401,7 @@ async function openInvDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${inv.sent_at?sentHeaderHTML(inv):(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${invoicePaymentDetailHTML(inv)}${inv.sent_at?sentHeaderHTML(inv):(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
       </div>
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -5340,7 +5416,8 @@ async function openInvDetail(id){
     </div>
     ${invoiceTimelineHTML(inv)}
     <div class="action-row">
-      ${inv.status==='Unpaid'?`<button class="action-btn ab-green" onclick="markInvPaid('${inv.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${inv.status!=='Paid'&&inv.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="openInvoicePaid('${inv.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${inv.status==='Paid'?`<button class="action-btn ab-glass" onclick="openInvoicePaid('${inv.id}')">${ICONS.pencil} Edit payment</button>`:''}
       ${inv.status==='Unpaid'?`<button class="action-btn ab-red" onclick="markInvOverdue('${inv.id}')">${ICONS.alert} Mark Overdue</button>`:''}
       <button class="action-btn ab-glass" onclick="printInvoice('${inv.id}')">${ICONS.printer} Print / Save PDF</button>
       <button class="action-btn ab-glass" onclick="shareInvoicePdf('${inv.id}')">${ICONS.send} Share / Text PDF</button>
@@ -5352,7 +5429,8 @@ async function openInvDetail(id){
     </div>`;
   }catch(err){
     console.error('openInvDetail',err);
-    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(inv)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(inv.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(inv.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded. The invoice is still ${esc(inv.invoice_number||'on file')}.</div></div>`;
+    const payLine=invoicePaymentRecorded(inv)?`<div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value">${esc([invoicePaidPhrase(inv),String(inv.payment_reference||'').trim()].filter(Boolean).join(' · '))}</span></div>`:'';
+    body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(inv)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(inv.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(inv.status||'')}</span></div>${payLine}<div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded. The invoice is still ${esc(inv.invoice_number||'on file')}.</div></div>${invoiceTimelineHTML(inv)}`;
   }
 }
 function invoiceCSS(){
@@ -5422,6 +5500,7 @@ function invoiceDocHTML(inv,items,cust){
     <div class="doc-date">Issued ${fmtDate(inv.created_at||bizYMD())}</div>
     ${inv.due_date?`<div class="doc-date">Due ${fmtDate(inv.due_date)}</div>`:''}
     <div class="status-pill" style="color:${statusColor};background:${statusBg}">${inv.status}</div>
+    ${invoiceDocPaymentHTML(inv)}
   </div>
 </div>
 <div class="billto">
@@ -5646,12 +5725,91 @@ async function applyMarkInvoiceSent(id,toList,ccList,note,inv){
   if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
   toast(phrase?(already?'Recipients saved · ':'Marked as sent · ')+phrase:(already?'Recipients saved':'Marked as sent ✓'));
 }
-async function markInvPaid(id){
+function invoiceDocPaymentHTML(inv){
+  if(!invoicePaymentRecorded(inv))return '';
+  const phrase=invoicePaidPhrase(inv);
+  const ref=String(inv.payment_reference||'').trim();
+  if((!phrase||phrase==='Paid')&&!ref)return '';
+  return `<div class="doc-date">${esc([phrase,ref].filter(Boolean).join(' · '))}</div>`;
+}
+let _invPaidId=null,invPaidSaving=false;
+function setInvoicePaidError(msg){
+  const el=document.getElementById('invpaid-error');
+  if(!el)return;
+  el.textContent=msg||'';
+  el.style.display=msg?'block':'none';
+}
+function openInvoicePaid(id){
+  const inv=invoices.find(x=>x.id===id);if(!inv||inv.status==='Cancelled')return;
+  _invPaidId=id;
+  const editing=inv.status==='Paid';
+  const title=document.getElementById('invpaid-title');
+  if(title)title.textContent=editing?'Edit payment':'Mark as Paid';
+  const sub=document.getElementById('invpaid-sub');
+  const who=`${inv.invoice_number||'This invoice'} · ${fmt(inv.total)}`;
+  if(sub)sub.textContent=editing?`${who}. Update the method, reference, or date. The amount stays the same.`:`${who}. Choose how it was paid. The date defaults to today.`;
+  const methodEl=document.getElementById('invpaid-method');
+  const refEl=document.getElementById('invpaid-ref');
+  const dateEl=document.getElementById('invpaid-date');
+  const method=String(inv.payment_method||'').trim();
+  if(methodEl)methodEl.value=INVOICE_PAY_METHODS.includes(method)?method:'';
+  if(refEl)refEl.value=String(inv.payment_reference||'');
+  if(dateEl)dateEl.value=(editing?invoicePaidYMD(inv):'')||bizYMD();
+  const save=document.getElementById('invpaid-save');
+  if(save){save.disabled=false;save.textContent=editing?'Save payment':'Confirm Payment';}
+  setInvoicePaidError('');
+  openModal('invpaid');
+}
+function markInvPaid(id){openInvoicePaid(id);}
+function invoicePaymentColumnsMissing(error){
+  const msg=String(error&&(error.message||error.details||error.hint)||'');
+  return /payment_method|payment_reference|paid_on/i.test(msg);
+}
+async function confirmInvoicePaid(){
+  if(invPaidSaving)return;
+  const id=_invPaidId;if(!id)return;
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  if(!confirm(`Mark ${inv.invoice_number} paid · ${fmt(inv.total)}?`))return;
-  await db.from('invoices').update({status:'Paid',paid_at:new Date().toISOString()}).eq('id',id);
-  logActivity('Invoice marked paid',`${inv.invoice_number} — ${inv.customers?.name||''} · ${fmt(inv.total)}`.trim(),'invoice',id);
-  await fetchInvoices();renderInvoices();openInvDetail(id);toast('Invoice marked paid ✓');
+  const method=String(document.getElementById('invpaid-method')?.value||'').trim();
+  const ref=String(document.getElementById('invpaid-ref')?.value||'').trim();
+  const date=String(document.getElementById('invpaid-date')?.value||'').trim();
+  if(!INVOICE_PAY_METHODS.includes(method)){setInvoicePaidError('Choose a payment method.');document.getElementById('invpaid-method')?.focus();return;}
+  if(!isDateOnly(date)){setInvoicePaidError('Choose the date paid.');document.getElementById('invpaid-date')?.focus();return;}
+  setInvoicePaidError('');
+  const editing=inv.status==='Paid';
+  const payload={payment_method:method,payment_reference:ref||null,paid_on:date};
+  if(!editing){
+    payload.status='Paid';
+    payload.paid_at=new Date().toISOString();
+  }
+  const save=document.getElementById('invpaid-save');
+  invPaidSaving=true;
+  if(save)save.disabled=true;
+  try{
+    const {error}=await db.from('invoices').update(payload).eq('id',id);
+    if(error){
+      const msg=invoicePaymentColumnsMissing(error)
+        ?'Payment details are not in the database yet. Run the invoice payment SQL in the Supabase SQL Editor, then try again.'
+        :'Could not save payment: '+error.message;
+      setInvoicePaidError(msg);
+      toast(msg);
+      return;
+    }
+    const phrase=invoicePaidPhrase({status:'Paid',payment_method:method,payment_reference:ref,paid_on:date,paid_at:inv.paid_at});
+    const bits=[inv.invoice_number||'',customerNameOf(inv)||'',fmt(inv.total),phrase,ref].filter(Boolean);
+    logActivity(editing?'Invoice payment updated':'Invoice marked paid',bits.join(' · '),'invoice',id);
+    _invPaidId=null;
+    closeModal('invpaid');
+    await fetchInvoices();renderInvoices();
+    if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
+    toast(editing?'Payment updated ✓':'Invoice marked paid ✓');
+  }catch(e){
+    const msg='Could not save payment: '+(e&&e.message||'update failed');
+    setInvoicePaidError(msg);
+    toast(msg);
+  }finally{
+    invPaidSaving=false;
+    if(save)save.disabled=false;
+  }
 }
 async function markInvOverdue(id){await db.from('invoices').update({status:'Overdue'}).eq('id',id);await fetchInvoices();renderInvoices();openInvDetail(id);toast('Marked overdue');}
 async function deleteInv(id){if(!confirm('Delete this invoice?'))return;await db.from('invoice_items').delete().eq('invoice_id',id);const{error}=await db.from('invoices').delete().eq('id',id);if(error){toast('Could not delete: '+error.message);return;}closeDetail('inv');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();toast('Invoice deleted ✓');}
