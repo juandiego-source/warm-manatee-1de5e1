@@ -73,6 +73,12 @@ ON CONFLICT (id) DO UPDATE SET public = true, name = EXCLUDED.name;
 GRANT SELECT ON storage.buckets TO authenticated, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated, anon;
 
+-- Hosted Supabase already enables this. The production script must not,
+-- because the SQL editor cannot ALTER storage.objects. This local table
+-- is owned by postgres, so the test turns the lock on here.
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY,
   email text,

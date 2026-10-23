@@ -13,6 +13,10 @@
 -- The one data change is storage: the job-photos bucket is marked private
 -- so an old public link no longer opens a photo. Deploy the website in
 -- the same change so the app loads photos with a signed link.
+-- Do not ALTER storage.objects. The SQL editor runs as postgres, and that
+-- table is owned by supabase_storage_admin (42501). Row level security
+-- is already on. postgres can still update storage.buckets and create
+-- or drop policies on storage.objects.
 --
 -- After this file:
 --   An admin still uses the jobs table (and the rest of the office tables).
@@ -926,7 +930,9 @@ BEGIN
 END
 $bucket$;
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- storage.objects already has row level security on hosted Supabase.
+-- ALTER TABLE storage.objects is not allowed for postgres (42501:
+-- must be owner of table objects). Policies below are allowed.
 
 DO $drop_storage$
 DECLARE r record;
