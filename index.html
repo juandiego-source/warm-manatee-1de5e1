@@ -381,7 +381,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 .sub-hero{padding:20px 18px 16px;}
 .sub-hero-name{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--ink);}
 .sub-hero-sub{font-size:12px;color:var(--ink3);margin-top:2px;font-weight:300;}
-.sub-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 14px 12px;}
+.sub-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 14px 12px;}
 .sub-stat{background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--rsm);padding:12px 8px;text-align:center;backdrop-filter:var(--blur);box-shadow:var(--gshadow);}
 .sub-stat-val{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--ink);}
 .sub-stat-lbl{font-size:10px;color:var(--ink3);font-weight:600;letter-spacing:0.05em;text-transform:uppercase;margin-top:2px;}
@@ -460,7 +460,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="auth-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" /> <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" /></svg></div>
   <div class="auth-brand">Sumak Ops</div>
   <div class="auth-tagline">Treasure Valley, Idaho</div>
-  <div id="invite-banner" style="display:none;background:var(--red-l);border:1px solid var(--red);border-radius:var(--rsm);padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--ink2);text-align:center">You've been invited to join <strong style="color:var(--ink)">Sumak Ops</strong> — register below to get started.</div>
+  <div id="invite-banner" style="display:none;background:var(--red-l);border:1px solid var(--red);border-radius:var(--rsm);padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--ink2);text-align:center">You've been invited to join <strong style="color:var(--ink)">Sumak Ops</strong>. Register below. This link ties your login to that subcontractor, as long as nobody else is already linked.</div>
   <div class="auth-card">
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchAuthTab('login',this)">Sign In</div>
@@ -470,6 +470,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <div class="auth-fg"><label class="auth-lbl">Email</label><input class="auth-inp" id="login-email" type="email" placeholder="your@email.com" autocomplete="email"></div>
       <div class="auth-fg"><label class="auth-lbl">Password</label><input class="auth-inp" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
       <button class="auth-btn" onclick="doLogin()">Sign In</button>
+      <button type="button" onclick="doForgotPassword()" style="background:none;border:none;color:var(--ink3);font-size:12px;margin-top:12px;cursor:pointer;font-family:inherit;width:100%;text-align:center">Forgot password?</button>
       <div class="auth-msg" id="login-msg"></div>
     </div>
     <div id="auth-register" style="display:none">
@@ -479,8 +480,13 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <button class="auth-btn" onclick="doRegister()">Create Account</button>
       <div class="auth-msg" id="reg-msg"></div>
     </div>
+    <div id="auth-recover" style="display:none">
+      <div class="auth-fg"><label class="auth-lbl">New password</label><input class="auth-inp" id="new-password" type="password" placeholder="Min. 6 characters" autocomplete="new-password"></div>
+      <button class="auth-btn" onclick="doSetNewPassword()">Save password</button>
+      <div class="auth-msg" id="recover-msg"></div>
+    </div>
   </div>
-  <div class="auth-note">Subcontractors: register with your email.<br>Your admin will link your account.</div>
+  <div class="auth-note">Subcontractors: open the invite link from your admin, then register. That links your login to that subcontractor if nobody else is already linked. Without the link, the account stays pending until an admin uses Link Accounts. After you are linked, refresh or sign out and back in.</div>
 </div>
 
 <!-- TOPBAR -->
@@ -693,7 +699,8 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div class="sub-stats">
       <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-active">—</div><div class="sub-stat-lbl">Active</div></div>
       <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-done">—</div><div class="sub-stat-lbl">Done</div></div>
-      <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-total">—</div><div class="sub-stat-lbl">Total</div></div>
+      <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-owed" style="font-size:20px">—</div><div class="sub-stat-lbl">Owed</div></div>
+      <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-paid" style="font-size:20px">—</div><div class="sub-stat-lbl">Paid</div></div>
     </div>
     <div style="display:flex;gap:8px;padding:0 14px 10px">
       <button class="btn btn-sm sub-mode-btn active-mode" data-mode="jobs" style="flex:1;justify-content:center" onclick="switchSubMode('jobs')">My Jobs</button>
@@ -702,6 +709,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div style="display:flex;gap:8px;padding:0 14px 10px">
       <button class="btn btn-sm sub-time-btn active-mode" data-time="week" style="flex:1;justify-content:center" onclick="setSubTimeframe('week')">This Week</button>
       <button class="btn btn-sm btn-glass sub-time-btn" data-time="all" style="flex:1;justify-content:center" onclick="setSubTimeframe('all')">All Upcoming</button>
+      <button class="btn btn-sm btn-glass sub-time-btn" data-time="done" style="flex:1;justify-content:center" onclick="setSubTimeframe('done')">Done</button>
     </div>
     <div class="filters" id="sub-filters">
       <div class="fchip active" onclick="filterSubJobs(this,'all')">All</div>
@@ -1053,7 +1061,8 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-subpay" onclick="overlayClose(event,'subpay')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Record a payout</div>
+    <div class="modal-title" id="sp-title">Record a payout</div>
+    <input type="hidden" id="sp-id" value="">
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5">Money you paid a sub. Mark as Paid on a job still works by itself. A job is marked paid here only when the amount tied to it covers the rest of its sub pay.</p>
     <div class="form-group"><label class="form-label">Sub</label><select class="form-input" id="sp-sub" onchange="renderPayoutJobPicks()"></select></div>
     <div class="form-row">
@@ -1062,7 +1071,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     </div>
     <div class="form-group"><label class="form-label">Method</label>
       <select class="form-input" id="sp-method">
-        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Direct Deposit</option><option>Other</option>
+        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Direct Deposit</option><option>Bank transfer</option><option>Other</option>
       </select>
     </div>
     <div class="form-group"><label class="form-label">Reference</label><input class="form-input" id="sp-ref" placeholder="Check number, Zelle confirmation..."></div>
@@ -1086,7 +1095,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <input type="hidden" id="mp-job-id">
     <div class="form-group"><label class="form-label">Paid Via</label>
       <select class="form-input" id="mp-method">
-        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Direct Deposit</option><option>Other</option>
+        <option>Cash</option><option>Check</option><option>Zelle</option><option>Venmo</option><option>Direct Deposit</option><option>Bank transfer</option><option>Other</option>
       </select>
     </div>
     <div class="form-group"><label class="form-label">Date Paid</label><input class="form-input" id="mp-date" type="date"></div>
@@ -1219,6 +1228,11 @@ let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices
 let invoicedJobIds=new Set(),jobInvoiceMap={},jobInvoiceIds={},invoiceItemJobLinks=[],services=[],costRequests=[];
 let subPayments=[],subPaymentJobs=[],subPayLedgerReady=false,payoutSaving=false;
 const inviteSubId=new URLSearchParams(window.location.search).get('invite');
+let recoveryMode=false;
+function authRecoveryPending(){
+  const blob=(location.hash||'')+(location.search||'');
+  return /type=recovery/.test(blob);
+}
 let notifications=[],notifChannel=null;
 let jobFilter='all',subJobFilter='all',estFilter='all',invFilter='all';
 let attnFocus=null; // when set, a list filters to just the flagged items from the dashboard
@@ -1238,12 +1252,20 @@ async function initAuth(){
       if(!currentProfile)showAuthScreen();
     }
   },8000);
+  if(authRecoveryPending())recoveryMode=true;
   try{
     const{data:{session}}=await db.auth.getSession();
-    if(session)await afterLogin(session.user);
+    if(recoveryMode)showRecoveryScreen();
+    else if(session)await afterLogin(session.user);
     else showAuthScreen();
   }catch(e){console.error('init',e);showAuthScreen();}
-  db.auth.onAuthStateChange(async(_,session)=>{
+  db.auth.onAuthStateChange(async(event,session)=>{
+    if(event==='PASSWORD_RECOVERY'){
+      recoveryMode=true;
+      showRecoveryScreen();
+      return;
+    }
+    if(recoveryMode)return;
     if(session)await afterLogin(session.user);
     else showAuthScreen();
   });
@@ -1255,9 +1277,18 @@ async function afterLogin(user){
   try{
     const{data:prof}=await db.from('profiles').select('*').eq('id',user.id).single();
     if(gen!==loginEpoch)return;
-    currentProfile=prof;
+    let profile=prof;
+    if(profile&&profile.role!=='admin'&&!profile.subcontractor_id){
+      const claimed=await db.rpc('claim_subcontractor_invite');
+      if(!claimed.error){
+        const again=await db.from('profiles').select('*').eq('id',user.id).single();
+        if(gen!==loginEpoch)return;
+        if(again.data)profile=again.data;
+      }
+    }
+    currentProfile=profile;
     clearTimeout(window._splashFailsafe);
-      if(prof?.role==='admin'){
+      if(profile?.role==='admin'){
       showApp('admin');
       await loadAll();
       if(gen!==loginEpoch)return;
@@ -1266,8 +1297,8 @@ async function afterLogin(user){
       await applyRoute(location.pathname);
       history.replaceState({sumak:true,path:location.pathname+location.search},'',location.pathname+location.search);
       await initNotifications();
-    }else if(prof?.subcontractor_id){
-      currentSubId=prof.subcontractor_id;
+    }else if(profile?.subcontractor_id){
+      currentSubId=profile.subcontractor_id;
       showApp('sub');
       await loadAll();
       if(gen!==loginEpoch)return;
@@ -1434,7 +1465,7 @@ function showApp(role){
     document.getElementById('navbar').style.display='flex';showView('sub-portal',document.querySelector('.nav-item'));
   }else{
     document.getElementById('navbar').style.display='none';
-    document.getElementById('content').innerHTML=`<div class="empty" style="padding-top:80px"><div class="empty-icon">${ICONS.hourglass}</div><div class="empty-title">Account pending</div><div class="empty-sub">Your account was created.<br>Your admin needs to link it to your profile.</div><button class="btn btn-glass btn-sm" style="margin-top:20px" onclick="doSignOut()">Sign out</button></div>`;
+    document.getElementById('content').innerHTML=`<div class="empty" style="padding-top:80px"><div class="empty-icon">${ICONS.hourglass}</div><div class="empty-title">Account pending</div><div class="empty-sub">Your login is not linked to a subcontractor yet.<br><br>If you registered from an invite link, sign out and back in. If you registered without the link, ask your admin to use Link Accounts. After that, refresh or sign out and back in.</div><button class="btn btn-glass btn-sm" style="margin-top:20px" onclick="doSignOut()">Sign out</button></div>`;
   }
   routeSilent=false;
 }
@@ -1458,16 +1489,89 @@ async function doRegister(){
   if(error){msg.textContent=error.message;msg.className='auth-msg';}
   else{msg.textContent='Account created! Signing you in...';msg.className='auth-msg ok';}
 }
-async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];notifications=[];subPayments=[];subPaymentJobs=[];subPayLedgerReady=false;currentUser=null;currentProfile=null;currentSubId=null;}
+async function doForgotPassword(){
+  const email=document.getElementById('login-email').value.trim();
+  const msg=document.getElementById('login-msg');
+  if(!email){msg.textContent='Enter your email first';msg.className='auth-msg';return;}
+  msg.textContent='Sending a reset link...';msg.className='auth-msg';
+  const redirectTo=window.location.origin+window.location.pathname;
+  const{error}=await db.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error){msg.textContent=error.message;msg.className='auth-msg';return;}
+  msg.textContent='If that email has an account, a reset link is on its way. Open it on this device to choose a new password.';
+  msg.className='auth-msg ok';
+}
+function showRecoveryScreen(){
+  hideSplash();
+  const screen=document.getElementById('auth-screen');
+  if(screen)screen.classList.remove('hidden');
+  const login=document.getElementById('auth-login');
+  const reg=document.getElementById('auth-register');
+  const recover=document.getElementById('auth-recover');
+  if(login)login.style.display='none';
+  if(reg)reg.style.display='none';
+  if(recover)recover.style.display='block';
+  document.querySelectorAll('.auth-tab').forEach(t=>{t.style.display='none';});
+}
+async function doSetNewPassword(){
+  const pass=document.getElementById('new-password').value;
+  const msg=document.getElementById('recover-msg');
+  if(pass.length<6){msg.textContent='Password must be at least 6 characters';msg.className='auth-msg';return;}
+  msg.textContent='Saving...';msg.className='auth-msg';
+  const{error}=await db.auth.updateUser({password:pass});
+  if(error){msg.textContent=error.message;msg.className='auth-msg';return;}
+  recoveryMode=false;
+  try{history.replaceState({},'',location.pathname);}catch(e){}
+  msg.textContent='Password saved. Signing you in...';msg.className='auth-msg ok';
+  const{data:{session}}=await db.auth.getSession();
+  if(session)await afterLogin(session.user);
+}
+async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}recoveryMode=false;await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];recurring=[];services=[];costRequests=[];invoiceItemJobLinks=[];notifications=[];subPayments=[];subPaymentJobs=[];subPayLedgerReady=false;currentUser=null;currentProfile=null;currentSubId=null;}
 function switchAuthTab(tab,el){
-  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');
+  document.querySelectorAll('.auth-tab').forEach(t=>{t.classList.remove('active');t.style.display='';});
+  if(el)el.classList.add('active');
   document.getElementById('auth-login').style.display=tab==='login'?'block':'none';
   document.getElementById('auth-register').style.display=tab==='register'?'block':'none';
+  const recover=document.getElementById('auth-recover');
+  if(recover)recover.style.display='none';
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────
-async function loadAll(){await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchSubPayments(),fetchServices(),fetchCostRequests()]);}
-async function fetchCostRequests(){const{data,error}=await fetchAllRows(()=>db.from('cost_requests').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchCostRequests',error);costRequests=data||[];}
+async function loadAll(){
+  if(currentProfile?.role==='admin'){
+    await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchSubPayments(),fetchServices(),fetchCostRequests()]);
+    return;
+  }
+  customers=[];profiles=[];properties=[];estimates=[];invoices=[];recurring=[];services=[];subPayments=[];subPaymentJobs=[];invoiceItemJobLinks=[];
+  await Promise.allSettled([fetchJobs(),fetchOwnSub(),fetchCostRequests()]);
+}
+async function fetchOwnSub(){
+  if(!currentSubId){subs=[];return;}
+  const{data,error}=await db.from('subcontractors').select('id,name').eq('id',currentSubId);
+  if(error){console.error('fetchOwnSub',error);return;}
+  subs=data||[];
+}
+function asSubJob(row){
+  if(!row)return null;
+  const copy={...row};
+  delete copy.client_price;
+  delete copy.margin;
+  delete copy.margin_pct;
+  delete copy.cost;
+  if(!copy.customers&&copy.customer_name)copy.customers={name:copy.customer_name};
+  if(!copy.subcontractors&&copy.subcontractor_name)copy.subcontractors={name:copy.subcontractor_name};
+  return copy;
+}
+async function fetchCostRequests(){
+  if(currentProfile?.role!=='admin'){
+    const{data,error}=await fetchAllRows(()=>db.from('sub_cost_requests').select('*').order('created_at',{ascending:false}));
+    if(error)console.error('fetchCostRequests',error);
+    costRequests=(data||[]).map(r=>({...r,customers:r.customer_name?{name:r.customer_name}:null}));
+    return;
+  }
+  const{data,error}=await fetchAllRows(()=>db.from('cost_requests').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));
+  if(error)console.error('fetchCostRequests',error);
+  costRequests=data||[];
+}
 async function fetchServices(){const{data,error}=await fetchAllRows(()=>db.from('services').select('*').eq('active',true).order('name'));if(error)console.error('fetchServices',error);services=data||[];}
 async function fetchRecurring(){const{data,error}=await fetchAllRows(()=>db.from('recurring_services').select('*, customers(name), subcontractors(name)').order('created_at',{ascending:false}));if(error)console.error('fetchRecurring',error);recurring=data||[];}
 async function fetchInvoicedJobIds(){
@@ -1555,8 +1659,13 @@ function nonVoidInvoicesForJob(jobId,links){
 }
 async function fetchJobs(){
   const isAdmin=currentProfile?.role==='admin';
-  const source=isAdmin?'jobs':'sub_jobs';
-  const{data,error}=await fetchAllRows(()=>db.from(source).select('*, customers(name), subcontractors(name)').is('deleted_at',null).order('created_at',{ascending:false}));
+  if(!isAdmin){
+    const{data,error}=await fetchAllRows(()=>db.from('sub_jobs').select('*').order('created_at',{ascending:false}));
+    if(error)console.error('fetchJobs',error);
+    jobs=(data||[]).map(asSubJob).filter(Boolean);
+    return;
+  }
+  const{data,error}=await fetchAllRows(()=>db.from('jobs').select('*, customers(name), subcontractors(name)').is('deleted_at',null).order('created_at',{ascending:false}));
   if(error)console.error('fetchJobs',error);
   jobs=data||[];
   indexInvoicedJobs();
@@ -1910,10 +2019,11 @@ function jobCard(j,fn,showPay=true,forSub=false){
   const addr=j.address||'';
   if(forSub&&j.subcontractor_id&&!j.accepted_at){
     return`<div class="card" style="border:1.5px solid var(--amber);background:var(--amber-bg);cursor:default">
-      <div class="card-top"><div><div class="card-id">${j.job_number}${j.recurring_service_id?' · 🔁':''}</div><div class="card-title">${j.title}</div></div><span class="pill pill-pending">Needs Accept</span></div>
+      <div class="card-top"><div><div class="card-id">${esc(j.job_number||'')}${j.recurring_service_id?' · 🔁':''}</div><div class="card-title">${esc(j.title||'')}</div></div><span class="pill pill-pending">Needs Accept</span></div>
       <div class="card-meta">${j.scheduled_date?`<span class="card-meta-item">${ICONS.calendar} ${fmtDate(j.scheduled_date)}</span>`:''}</div>
-      ${addr?`<div class="card-meta" style="margin-top:4px"><span class="card-meta-item">${ICONS.mapPin} ${addr}</span></div>`:''}
-      ${j.description?`<div style="font-size:12.5px;color:var(--ink2);margin-top:8px;line-height:1.4">${j.description}</div>`:''}
+      ${addr?`<div class="card-meta" style="margin-top:4px"><span class="card-meta-item">${ICONS.mapPin} ${esc(addr)}</span></div>`:''}
+      ${j.description?`<div style="font-size:12.5px;color:var(--ink2);margin-top:8px;line-height:1.4">${esc(j.description)}</div>`:''}
+      ${subPayFooter(j)}
       <button class="btn btn-red btn-full" style="margin-top:12px" onclick="event.stopPropagation();acceptJob('${j.id}')">Accept Job</button>
     </div>`;
   }
@@ -1930,11 +2040,14 @@ function jobCard(j,fn,showPay=true,forSub=false){
     </div>
     ${addr?`<a class="dir-link" href="${mapsUrl(addr)}" onclick="event.stopPropagation()">${ICONS.mapPin} ${esc(addr)} — Directions</a>`:''}
     ${needsInvoicing?`<div style="margin-top:8px;padding:6px 10px;background:rgba(200,160,60,0.12);border-radius:var(--rxs);font-size:11px;font-weight:600;color:var(--gold);display:inline-block">🧾 Requires invoicing · ${clientAmt}${j.customer_id?'':' · no client'}</div>`:''}
-    ${showPay?`<div class="card-footer"><div><div class="card-amount">${clientAmt}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Client charge · sub ${subAmt}</div></div><span class="${pClass(j.payment_status)}">${j.payment_status}</span></div>`:''}
+    ${forSub?subPayFooter(j):(showPay?`<div class="card-footer"><div><div class="card-amount">${clientAmt}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Client charge · sub ${subAmt}</div></div><span class="${pClass(j.payment_status)}">${j.payment_status}</span></div>`:'')}
   </div>`;
 }
+function subPayFooter(j){
+  return `<div class="card-footer"><div><div class="card-amount">${fmt(j.sub_pay)}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">Your pay</div></div><span class="${pClass(subPayLabel(j))}">${subPayLabel(j)}</span></div>`;
+}
 async function acceptJob(id){
-  const{error}=await db.from('jobs').update({accepted_at:new Date().toISOString()}).eq('id',id);
+  const{error}=await db.rpc('sub_accept_job',{p_job_id:id});
   if(error){toast('Error: '+error.message);return;}
   const j=jobs.find(x=>x.id===id);
   logActivity('Job accepted',j?`${j.title} — ${j.customers?.name||''} ${j.address||''}`.trim():null,'job',id);
@@ -2150,9 +2263,9 @@ function renderSubQuoteRequests(){
   if(!el)return;
   el.innerHTML=mine.length?mine.map(r=>`
     <div class="card" style="cursor:default">
-      <div class="card-top"><div><div class="card-id">${r.status==='Submitted'?'Sent to admin':'Needs your cost'}</div><div class="card-title">${r.title}</div></div><span class="pill ${r.status==='Submitted'?'pill-approved':'pill-pending'}">${r.status}</span></div>
-      <div class="card-meta">${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${r.address}</span>`:''}</div>
-      ${r.description?`<div style="font-size:12.5px;color:var(--ink2);margin-top:8px;line-height:1.4">${r.description}</div>`:''}
+      <div class="card-top"><div><div class="card-id">${r.status==='Submitted'?'Sent to admin':'Needs your cost'}</div><div class="card-title">${esc(r.title||'')}</div></div><span class="pill ${r.status==='Submitted'?'pill-approved':'pill-pending'}">${esc(r.status||'')}</span></div>
+      <div class="card-meta">${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(r.address)}</span>`:''}</div>
+      ${r.description?`<div style="font-size:12.5px;color:var(--ink2);margin-top:8px;line-height:1.4">${esc(r.description)}</div>`:''}
       ${r.status==='Requested'?`
         <div style="margin-top:12px">
           <input class="form-input" id="cr-cost-${r.id}" type="number" placeholder="Your cost $" style="margin-bottom:8px">
@@ -2168,7 +2281,7 @@ async function submitCostRequest(id){
   const cost=parseFloat(costEl.value)||0;
   if(cost<=0){toast(`${ICONS.alert} Enter your cost`);return;}
   const notes=document.getElementById(`cr-notes-${id}`).value.trim();
-  const{error}=await db.from('cost_requests').update({status:'Submitted',submitted_cost:cost,submitted_notes:notes||null,submitted_at:new Date().toISOString()}).eq('id',id);
+  const{error}=await db.rpc('sub_submit_cost',{p_id:id,p_cost:cost,p_notes:notes||null});
   if(error){toast('Error: '+error.message);return;}
   const cr=costRequests.find(x=>x.id===id);
   logActivity('Sub submitted a cost',cr?`${cr.title} — ${fmt(cost)}${notes?' · '+notes:''}`:fmt(cost),'costreq',id);
@@ -3355,7 +3468,7 @@ function openInvitePicker(){
     :`<div style="padding:20px 0;text-align:center;color:var(--ink3);font-size:13px">${subs.length?'Every subcontractor already has an account linked.':'No subcontractors yet — add one first with "+ New", then come back here to invite them.'}</div>`;
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:75vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Invite a Subcontractor</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
-    <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">The link is shown below each name — tap the box to select it, or use Copy Link. Text or email it to them. Opening it walks them through registering and auto-links their account.</div>
+    <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">Text or email this link. When they open it and register, the login links to that subcontractor if nobody else is already linked. Registering without the link leaves the account pending until you use Link Accounts. After you link them, they refresh or sign out and back in.</div>
     ${list}
   </div>`;
   overlay.style.display='flex';
@@ -3372,10 +3485,13 @@ function copyInviteLink(url,btnEl){
     toast('Tap the link box above and select it manually');
   }
 }
+function unlinkedPortalProfiles(){
+  return profiles.filter(p=>p.role!=='admin'&&!p.subcontractor_id);
+}
 function renderSubsList(){
-  const unlinked=profiles.filter(p=>p.role==='sub'&&!p.subcontractor_id);
+  const unlinked=unlinkedPortalProfiles();
   let banner='';
-  if(unlinked.length){banner=`<div class="warn-banner"><div class="warn-title">${ICONS.alert} ${unlinked.length} unlinked account${unlinked.length>1?'s':''}</div><div class="warn-sub">${unlinked.map(p=>p.email).join(', ')} registered but not linked.</div><button class="btn btn-sm" style="background:var(--amber);color:white;margin-top:10px;border-radius:8px" onclick="openAssignModal()">Link Accounts</button></div>`;}
+  if(unlinked.length){banner=`<div class="warn-banner"><div class="warn-title">${ICONS.alert} ${unlinked.length} unlinked account${unlinked.length>1?'s':''}</div><div class="warn-sub">${unlinked.map(p=>esc(p.email||p.full_name||'Account')).join(', ')} registered without a linked subcontractor. Use Link Accounts, then they refresh or sign out and back in.</div><button class="btn btn-sm" style="background:var(--amber);color:white;margin-top:10px;border-radius:8px" onclick="openAssignModal()">Link Accounts</button></div>`;}
   document.getElementById('subs-list').innerHTML=banner+(subs.length?subs.map(s=>{
     const initials=s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const linked=profiles.find(p=>p.subcontractor_id===s.id);
@@ -3405,9 +3521,9 @@ async function deleteSub(id,name,jobCount,e){
   await fetchSubs();renderSubsList();toast('Subcontractor deleted');
 }
 
-function checkUnlinked(){const u=profiles.filter(p=>p.role==='sub'&&!p.subcontractor_id);if(u.length)renderSubsList();}
+function checkUnlinked(){const u=unlinkedPortalProfiles();if(u.length)renderSubsList();}
 function openAssignModal(){
-  const unlinked=profiles.filter(p=>p.role==='sub'&&!p.subcontractor_id);
+  const unlinked=unlinkedPortalProfiles();
   const unlinkedSubs=subs.filter(s=>!profiles.find(p=>p.subcontractor_id===s.id));
   document.getElementById('assign-list').innerHTML=unlinked.map(p=>`
     <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)">
@@ -3420,7 +3536,8 @@ function openAssignModal(){
 async function linkSubAccount(profileId){
   const subId=document.getElementById(`assign-${profileId}`).value;
   if(!subId){toast('Select a profile');return;}
-  await db.from('profiles').update({subcontractor_id:subId}).eq('id',profileId);
+  const{error}=await db.from('profiles').update({subcontractor_id:subId,role:'sub'}).eq('id',profileId);
+  if(error){toast('Could not link: '+error.message);return;}
   toast('Account linked ✓');closeModal('assign');await loadAll();renderAll();
 }
 
@@ -3906,7 +4023,7 @@ function openSubReconcile(subKey, ym){
   const historyHtml=history.length?`<div style="font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px">Payouts recorded</div>${history.map(p=>{
     const links=ledgerLinksFor(p.id);
     const tied=links.length?`tied to ${plural(links.length,'job')}`:'not tied to jobs';
-    return `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div style="font-size:12.5px;font-weight:600;color:var(--ink)">${fmt(p.amount)} · ${esc(p.method||'')}</div><div style="font-size:10.5px;color:var(--ink3)">${esc(fmtDate(p.paid_on))} · ${esc(tied)}${p.reference?' · '+esc(p.reference):''}</div></div><button class="btn btn-sm btn-glass" onclick="deleteSubPayment('${p.id}','${subKey}')">Remove</button></div>`;
+    return `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><div><div style="font-size:12.5px;font-weight:600;color:var(--ink)">${fmt(p.amount)} · ${esc(p.method||'')}</div><div style="font-size:10.5px;color:var(--ink3)">${esc(fmtDate(p.paid_on))} · ${esc(tied)}${p.notes?' · '+esc(p.notes):''}${p.reference?' · '+esc(p.reference):''}</div></div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-glass" onclick="openEditPayout('${p.id}','${subKey}')">Edit</button><button class="btn btn-sm btn-glass" onclick="deleteSubPayment('${p.id}','${subKey}')">Remove</button></div></div>`;
   }).join('')}`:(subPayLedgerReady?'':'');
   overlay.dataset.sheet='reconcile';
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
@@ -3943,14 +4060,60 @@ function raiseSheetModal(type){
   overlay.style.zIndex='1000';
   overlay.style.position='fixed';
 }
+function payoutEditId(){return document.getElementById('sp-id')?.value||'';}
+function payoutLinkAmount(paymentId, jobId){
+  if(!paymentId||!jobId)return 0;
+  return roundMoney(ledgerLinksFor(paymentId).reduce((s,l)=>l&&l.job_id===jobId?s+moneyNum(l.amount):s,0));
+}
+function payoutTieCap(j, editId){
+  if(!j)return 0;
+  const mine=payoutLinkAmount(editId, j.id);
+  if(subPayIsPaid(j))return mine>0?subPayAmount(j):0;
+  return roundMoney(Math.max(0, jobOwedAmount(j)+mine));
+}
+function jobMarkedByPayout(j, pay){
+  if(!j||!pay||!subPayIsPaid(j))return false;
+  if(String(j.payment_method||'')!==String(pay.method||''))return false;
+  const paidOn=String(pay.paid_on||'').slice(0,10);
+  return !!paidOn&&jobPaidYMD(j)===paidOn;
+}
+function otherPayoutsCover(j, exceptPaymentId){
+  const cap=subPayAmount(j);
+  if(!j||cap<=0)return false;
+  const sum=(subPaymentJobs||[]).reduce((s,l)=>{
+    if(!l||l.job_id!==j.id)return s;
+    if(exceptPaymentId&&l.sub_payment_id===exceptPaymentId)return s;
+    return s+moneyNum(l.amount);
+  },0);
+  return roundMoney(sum)+0.001>=cap;
+}
+function ensureMethodOption(id, value){
+  const sel=document.getElementById(id);
+  if(!sel)return;
+  const v=value||'';
+  if(v&&![...sel.options].some(o=>o.value===v)){
+    const opt=document.createElement('option');
+    opt.value=v;
+    opt.textContent=v;
+    sel.appendChild(opt);
+  }
+  if(v)sel.value=v;
+}
 function openRecordPayout(subKey){
   if(currentProfile?.role!=='admin')return;
   const sel=document.getElementById('sp-sub');
   if(!sel)return;
   const list=(subs||[]).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||'')));
+  sel.disabled=false;
   sel.innerHTML='<option value="">Select sub...</option>'+list.map(s=>`<option value="${s.id}">${esc(s.name||'Sub')}</option>`).join('');
   if(subKey&&subKey!=='unassigned'&&list.some(s=>s.id===subKey))sel.value=subKey;
   else sel.value='';
+  const title=document.getElementById('sp-title');
+  const save=document.getElementById('sp-save');
+  const edit=document.getElementById('sp-id');
+  if(title)title.textContent='Record a payout';
+  if(save)save.textContent='Save payout';
+  if(edit)edit.value='';
   document.getElementById('sp-date').value=bizYMD();
   document.getElementById('sp-amount').value='';
   document.getElementById('sp-method').value='Zelle';
@@ -3960,19 +4123,55 @@ function openRecordPayout(subKey){
   raiseSheetModal('subpay');
   openModal('subpay');
 }
+function openEditPayout(id, subKey){
+  if(currentProfile?.role!=='admin')return;
+  const pay=(subPayments||[]).find(p=>p.id===id);
+  if(!pay){toast('That payout is not loaded');return;}
+  openRecordPayout(pay.subcontractor_id||subKey);
+  const edit=document.getElementById('sp-id');
+  if(edit)edit.value=pay.id;
+  const title=document.getElementById('sp-title');
+  const save=document.getElementById('sp-save');
+  const sel=document.getElementById('sp-sub');
+  if(title)title.textContent='Edit payout';
+  if(save)save.textContent='Save changes';
+  if(sel)sel.disabled=true;
+  document.getElementById('sp-date').value=String(pay.paid_on||'').slice(0,10);
+  document.getElementById('sp-amount').value=roundMoney(pay.amount).toFixed(2);
+  ensureMethodOption('sp-method', pay.method||'Zelle');
+  document.getElementById('sp-ref').value=pay.reference||'';
+  document.getElementById('sp-notes').value=pay.notes||'';
+  renderPayoutJobPicks();
+}
 function renderPayoutJobPicks(){
   const box=document.getElementById('sp-jobs');
   if(!box)return;
   const subId=document.getElementById('sp-sub')?.value||'';
+  const editId=payoutEditId();
   if(!subId){box.innerHTML='<div style="font-size:12px;color:var(--ink3)">Choose a sub to see completed visits that still have a balance.</div>';updatePayoutPickHint();return;}
   const dup=duplicateJobIndex(jobs);
-  const rows=jobsForSub(subId).filter(j=>subPayCounts(j, dup.extra)&&!subPayIsPaid(j)&&jobOwedAmount(j)>0).sort(compareJobs);
+  const rows=jobsForSub(subId).filter(j=>subPayCounts(j, dup.extra)&&payoutTieCap(j, editId)>0).sort(compareJobs);
   if(!rows.length){box.innerHTML='<div style="font-size:12px;color:var(--ink3)">No completed visits still owe this sub. You can record the payout without tying it to a job.</div>';updatePayoutPickHint();return;}
-  box.innerHTML=rows.map(j=>`<label class="sp-job" data-jobid="${j.id}" data-owed="${jobOwedAmount(j)}" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink)">
+  const existing={};
+  if(editId)ledgerLinksFor(editId).forEach(l=>{existing[l.job_id]=roundMoney(l.amount);});
+  box.innerHTML=rows.map(j=>{
+    const cap=payoutTieCap(j, editId);
+    return `<label class="sp-job" data-jobid="${j.id}" data-owed="${cap}" style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--ink)">
     <input type="checkbox" onclick="onPayoutJobToggle(this)" style="width:18px;height:18px;accent-color:var(--green)">
     <span style="flex:1;min-width:0"><span style="font-weight:600">${esc(j.job_number||'')}</span> ${esc(j.title||'')} <span style="color:var(--ink3)">${jobWorkYMD(j)?fmtDate(jobWorkYMD(j)):''}</span></span>
-    <input class="form-input sp-amt" type="number" min="0" step="0.01" placeholder="${jobOwedAmount(j).toFixed(2)}" style="width:96px;padding:8px" oninput="updatePayoutPickHint()">
-  </label>`).join('');
+    <input class="form-input sp-amt" type="number" min="0" step="0.01" placeholder="${cap.toFixed(2)}" style="width:96px;padding:8px" oninput="updatePayoutPickHint()">
+  </label>`;
+  }).join('');
+  if(editId){
+    document.querySelectorAll('.sp-job').forEach(row=>{
+      const tied=existing[row.dataset.jobid];
+      if(!(tied>0))return;
+      const cb=row.querySelector('input[type=checkbox]');
+      const amt=row.querySelector('.sp-amt');
+      if(cb)cb.checked=true;
+      if(amt)amt.value=tied.toFixed(2);
+    });
+  }
   updatePayoutPickHint();
 }
 function onPayoutJobToggle(cb){
@@ -4026,6 +4225,7 @@ function fillPayoutFromAmount(){
 }
 async function saveRecordPayout(){
   if(currentProfile?.role!=='admin'||payoutSaving)return;
+  const editId=payoutEditId();
   const subId=document.getElementById('sp-sub')?.value||'';
   const date=document.getElementById('sp-date')?.value||'';
   const amount=roundMoney(document.getElementById('sp-amount')?.value);
@@ -4042,11 +4242,21 @@ async function saveRecordPayout(){
   if(linked-amount>0.009){toast('The jobs add up to more than the payout');return;}
   if(!subPayLedgerReady){toast('Lump-sum payouts are not set up yet. Mark as Paid on the job still works.');return;}
   const name=subNameOf(subId);
-  const markIds=picks.filter(p=>p.owed>0&&p.amt+0.001>=p.owed).map(p=>p.jobId);
-  const partial=picks.length-markIds.length;
+  const old=editId?(subPayments||[]).find(p=>p.id===editId):null;
+  const oldLinks=editId?ledgerLinksFor(editId):[];
+  const fullIds=picks.filter(p=>p.owed>0&&p.amt+0.001>=p.owed).map(p=>p.jobId);
+  const toUnmark=editId?oldLinks.map(l=>l.job_id).filter(id=>{
+    const j=(jobs||[]).find(x=>x.id===id);
+    if(!jobMarkedByPayout(j, old))return false;
+    if(fullIds.includes(id))return false;
+    if(otherPayoutsCover(j, editId))return false;
+    return true;
+  }):[];
+  const partial=picks.length-fullIds.length;
   const left=roundMoney(amount-linked);
-  let msg=`Record ${fmt(amount)} to ${name} on ${fmtDate(date)} via ${method}?`;
-  if(markIds.length)msg+=` ${plural(markIds.length,'job')} will be marked paid.`;
+  let msg=editId?`Save this ${fmt(amount)} payout for ${name} on ${fmtDate(date)} via ${method}?`:`Record ${fmt(amount)} to ${name} on ${fmtDate(date)} via ${method}?`;
+  if(fullIds.length)msg+=` ${plural(fullIds.length,'job')} will be marked paid.`;
+  if(toUnmark.length)msg+=` ${plural(toUnmark.length,'job')} will be marked unpaid.`;
   if(partial)msg+=` ${plural(partial,'job')} stays unpaid with a partial payment.`;
   if(left>0.009)msg+=` ${fmt(left)} is not tied to a job, so it will not reduce the balance.`;
   if(!confirm(msg))return;
@@ -4054,17 +4264,26 @@ async function saveRecordPayout(){
   const reopen=!!(sheet&&sheet.style.display==='flex'&&sheet.dataset.sheet==='reconcile');
   payoutSaving=true;
   try{
-    const {data:pay, error}=await db.from('sub_payments').insert({
-      subcontractor_id:subId, paid_on:date, amount, method, reference, notes, created_by:currentUser?.id||null
-    }).select().single();
-    if(error){
-      subPayLedgerReady=false;
-      toast('Could not save that payout. Mark as Paid on the job still works.');
-      console.error('saveRecordPayout', error);
-      return;
+    let payId=editId;
+    if(editId){
+      const {error}=await db.from('sub_payments').update({paid_on:date, amount, method, reference, notes}).eq('id', editId);
+      if(error){toast('Could not save that payout. '+error.message);console.error('saveRecordPayout', error);return;}
+      const {error:delErr}=await db.from('sub_payment_jobs').delete().eq('sub_payment_id', editId);
+      if(delErr){toast('The payout was saved, but the job ties could not be replaced.');console.error('saveRecordPayout links', delErr);return;}
+    }else{
+      const {data:pay, error}=await db.from('sub_payments').insert({
+        subcontractor_id:subId, paid_on:date, amount, method, reference, notes, created_by:currentUser?.id||null
+      }).select().single();
+      if(error){
+        subPayLedgerReady=false;
+        toast('Could not save that payout. Mark as Paid on the job still works.');
+        console.error('saveRecordPayout', error);
+        return;
+      }
+      payId=pay.id;
     }
     if(picks.length){
-      const {error:linkErr}=await db.from('sub_payment_jobs').insert(picks.map(p=>({sub_payment_id:pay.id, job_id:p.jobId, amount:p.amt})));
+      const {error:linkErr}=await db.from('sub_payment_jobs').insert(picks.map(p=>({sub_payment_id:payId, job_id:p.jobId, amount:p.amt})));
       if(linkErr){
         toast('The payout was saved, but the jobs were not tied to it.');
         console.error('saveRecordPayout links', linkErr);
@@ -4073,8 +4292,12 @@ async function saveRecordPayout(){
         return;
       }
     }
-    if(markIds.length){
-      const {error:markErr}=await db.from('jobs').update({payment_status:'Paid', payment_method:method, paid_at:date}).in('id', markIds);
+    if(toUnmark.length){
+      const {error:unmarkErr}=await db.from('jobs').update({payment_status:'Unpaid', payment_method:null, paid_at:null}).in('id', toUnmark);
+      if(unmarkErr)toast('Payout saved. Some jobs stayed marked paid: '+unmarkErr.message);
+    }
+    if(fullIds.length){
+      const {error:markErr}=await db.from('jobs').update({payment_status:'Paid', payment_method:method, paid_at:date}).in('id', fullIds);
       if(markErr)toast('Payout saved. Those jobs were not marked paid: '+markErr.message);
     }
     closeModal('subpay');
@@ -4082,16 +4305,27 @@ async function saveRecordPayout(){
     await fetchJobs();
     renderAll();
     if(reopen)openSubReconcile(subId, reportMonthValue());
-    logActivity('Payout recorded', `${name} · ${fmt(amount)} · ${method}`, 'sub', subId);
+    logActivity(editId?'Payout edited':'Payout recorded', `${name} · ${fmt(amount)} · ${method}`, 'sub', subId);
     toast(left>0.009?`Payout saved. ${fmt(left)} is not tied to a job.`:'Payout saved');
   }finally{payoutSaving=false;}
 }
 async function deleteSubPayment(id, subKey){
   if(currentProfile?.role!=='admin')return;
-  if(!confirm('Remove this payout? Jobs you already marked paid stay marked paid.'))return;
+  const pay=(subPayments||[]).find(p=>p.id===id);
+  const links=ledgerLinksFor(id);
+  const unmark=(pay?links:[]).map(l=>(jobs||[]).find(j=>j.id===l.job_id)).filter(j=>j&&jobMarkedByPayout(j, pay)&&!otherPayoutsCover(j, id));
+  const msg=unmark.length
+    ?`Remove this payout? ${plural(unmark.length,'job')} it marked paid will be marked unpaid.`
+    :'Remove this payout? Jobs still covered by another payout stay paid.';
+  if(!confirm(msg))return;
+  if(unmark.length){
+    const {error:unmarkErr}=await db.from('jobs').update({payment_status:'Unpaid', payment_method:null, paid_at:null}).in('id', unmark.map(j=>j.id));
+    if(unmarkErr){toast('Could not unmark those jobs, so the payout was kept. '+unmarkErr.message);return;}
+  }
   const {error}=await db.from('sub_payments').delete().eq('id', id);
   if(error){toast('Error: '+error.message);return;}
   await fetchSubPayments();
+  await fetchJobs();
   renderAll();
   if(subKey&&document.getElementById('trash-overlay')?.dataset.sheet==='reconcile')openSubReconcile(subKey, reportMonthValue());
   toast('Payout removed');
@@ -6006,6 +6240,20 @@ async function editInv(id){
 }
 
 // ── PHOTOS ────────────────────────────────────────────────────────────────
+function jobPhotoStoragePath(url){
+  const s=String(url||'');
+  const marker='/job-photos/';
+  const at=s.indexOf(marker);
+  if(at<0)return '';
+  const rest=s.slice(at+marker.length).split('?')[0];
+  try{return decodeURIComponent(rest);}catch(e){return rest;}
+}
+async function signedJobPhotoUrl(path){
+  if(!path)return '';
+  const{data,error}=await db.storage.from('job-photos').createSignedUrl(path,60*60);
+  if(error||!data?.signedUrl)return '';
+  return data.signedUrl;
+}
 function setupPhotoUpload(jobId){
   currentPhotoJobId=jobId;
   const input=document.getElementById('photo-file-input');
@@ -6015,7 +6263,7 @@ function setupPhotoUpload(jobId){
     toast('Uploading...');
     let uploaded=0;
     for(const file of files){
-      const ext=file.name.split('.').pop();
+      const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').slice(0,8)||'jpg';
       const path=`${jobId}/${Date.now()}-${uploaded}.${ext}`;
       const{error}=await db.storage.from('job-photos').upload(path,file,{contentType:file.type});
       if(error){toast('Upload error: '+error.message);continue;}
@@ -6025,7 +6273,6 @@ function setupPhotoUpload(jobId){
     }
     input.value='';
     await renderJobPhotos(jobId);
-    // One summary notification for the whole batch (the per-row DB trigger is disabled)
     if(uploaded>0){
       const job=jobs.find(j=>j.id===jobId);
       const who=currentProfile?.role==='sub'?(subs.find(s=>s.id===currentSubId)?.name||'A sub'):'Admin';
@@ -6052,7 +6299,7 @@ function renderSiteReport(job){
     body.innerHTML=SITE_REPORT_ITEMS.map(item=>{
       const st=report.items?.[item]||'—';
       return`<div class="detail-row"><span class="detail-label">${item}</span><span class="detail-value" style="color:${stateColor[st]||'var(--ink2)'};font-weight:600">${st}</span></div>`;
-    }).join('')+(report.notes?`<div style="margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:var(--rxs);font-size:12.5px;color:var(--ink2)">${report.notes}</div>`:'')+
+    }).join('')+(report.notes?`<div style="margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:var(--rxs);font-size:12.5px;color:var(--ink2)">${esc(report.notes)}</div>`:'')+
     (report.submitted_at?`<div style="font-size:10.5px;color:var(--ink3);margin-top:6px">Submitted ${fmtDate(report.submitted_at)}</div>`:'');
     return;
   }
@@ -6066,7 +6313,7 @@ function renderSiteReport(job){
         ${['Good','Watch','Problem'].map(st=>`<button class="sr-btn" data-item="${item}" data-state="${st}" onclick="pickSiteState('${item}','${st}')" style="flex:1;padding:8px;border-radius:var(--rxs);border:1.5px solid var(--line);background:${siteReportDraft[item]===st?stateColor[st]:'transparent'};color:${siteReportDraft[item]===st?'#fff':'var(--ink3)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">${st}</button>`).join('')}
       </div>
     </div>`).join('')+`
-    <textarea class="form-input" id="site-report-notes" placeholder="Notes (e.g. sprinkler head broken in zone 3)" style="margin-top:6px;min-height:60px">${draftNotes}</textarea>
+    <textarea class="form-input" id="site-report-notes" placeholder="Notes (e.g. sprinkler head broken in zone 3)" style="margin-top:6px;min-height:60px">${escapeAttr(draftNotes)}</textarea>
     <button class="btn btn-red btn-full" style="margin-top:8px" onclick="submitSiteReport('${job.id}')">Submit Site Report</button>`;
 }
 function pickSiteState(item,state){
@@ -6081,7 +6328,7 @@ function pickSiteState(item,state){
 async function submitSiteReport(jobId){
   const notes=document.getElementById('site-report-notes')?.value.trim()||'';
   const report={items:{...siteReportDraft},notes,submitted_at:new Date().toISOString()};
-  const{error}=await db.from('jobs').update({site_report:report}).eq('id',jobId);
+  const{error}=await db.rpc('sub_save_site_report',{p_job_id:jobId,p_report:report});
   if(error){toast('Error: '+error.message);return;}
   // Notify admin ONLY if something is flagged Watch or Problem
   const flagged=SITE_REPORT_ITEMS.filter(i=>siteReportDraft[i]==='Watch'||siteReportDraft[i]==='Problem');
@@ -6097,10 +6344,20 @@ async function submitSiteReport(jobId){
 }
 async function renderJobPhotos(jobId){
   const{data:photos}=await db.from('job_photos').select('*').eq('job_id',jobId).order('created_at');
-  currentJobPhotos=photos||[];
+  const rows=photos||[];
+  const signed=await Promise.all(rows.map(async p=>{
+    const path=jobPhotoStoragePath(p.url);
+    const signedUrl=await signedJobPhotoUrl(path);
+    return {...p,signedUrl};
+  }));
+  currentJobPhotos=signed.filter(p=>p.signedUrl);
   const container=document.getElementById(`photos-${jobId}`);
   if(!container)return;
-  container.innerHTML=currentJobPhotos.map((p,i)=>`<div class="photo-thumb"><img src="${p.url}" loading="lazy" onclick="openLightbox(${i})"><button class="photo-del" onclick="event.stopPropagation();deletePhoto('${p.id}','${jobId}')">×</button></div>`).join('');
+  if(!currentJobPhotos.length){
+    container.innerHTML=rows.length?'<div style="font-size:12px;color:var(--ink3)">Photos could not be opened.</div>':'';
+    return;
+  }
+  container.innerHTML=currentJobPhotos.map((p,i)=>`<div class="photo-thumb"><img src="${escapeAttr(p.signedUrl)}" loading="lazy" onclick="openLightbox(${i})"><button class="photo-del" onclick="event.stopPropagation();deletePhoto('${p.id}','${jobId}')">×</button></div>`).join('');
 }
 
 function openLightbox(idx){
@@ -6115,12 +6372,19 @@ function lightboxNav(dir){
   updateLightboxImg();
 }
 function updateLightboxImg(){
-  document.getElementById('photo-lightbox-img').src=currentJobPhotos[currentLightboxIdx].url;
+  const photo=currentJobPhotos[currentLightboxIdx];
+  document.getElementById('photo-lightbox-img').src=photo?.signedUrl||'';
   document.getElementById('photo-lightbox-count').textContent=currentJobPhotos.length>1?`${currentLightboxIdx+1} / ${currentJobPhotos.length}`:'';
   document.getElementById('photo-lightbox-nav').style.display=currentJobPhotos.length>1?'flex':'none';
 }
 
 async function deletePhoto(photoId,jobId){
+  const photo=(currentJobPhotos||[]).find(p=>p.id===photoId);
+  const path=jobPhotoStoragePath(photo?.url);
+  if(path){
+    const removed=await db.storage.from('job-photos').remove([path]);
+    if(removed.error)console.error('deletePhoto storage',removed.error);
+  }
   await db.from('job_photos').delete().eq('id',photoId);
   closeLightbox();
   await renderJobPhotos(jobId);toast('Photo removed');
@@ -6144,17 +6408,18 @@ async function openJobDetail(id){
   try{
   jobBody.innerHTML=`
     <div class="detail-card">
-      <div style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;margin-bottom:14px">${j.title}</div>
+      <div style="font-size:20px;font-weight:600;font-family:'Cormorant Garamond',serif;margin-bottom:14px">${esc(j.title||'')}</div>
       <div class="detail-section-lbl">Details</div>
-      <div class="detail-row"><span class="detail-label">Customer</span><span class="detail-value">${j.customers?.name||'—'}</span></div>
-      ${addr?`<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value" style="max-width:55%"><a href="${mapsUrl(addr)}" style="color:var(--blue)">${addr}</a></span></div>`:''}
-      ${j.description?`<div class="detail-row"><span class="detail-label">Scope</span><span class="detail-value" style="max-width:55%">${j.description}</span></div>`:''}
+      <div class="detail-row"><span class="detail-label">Customer</span><span class="detail-value">${esc(j.customers?.name||'—')}</span></div>
+      ${addr?`<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value" style="max-width:55%"><a href="${mapsUrl(addr)}" style="color:var(--blue)">${esc(addr)}</a></span></div>`:''}
+      ${j.description?`<div class="detail-row"><span class="detail-label">Scope</span><span class="detail-value" style="max-width:55%">${esc(j.description)}</span></div>`:''}
       <div class="detail-row"><span class="detail-label">Scheduled</span><span class="detail-value">${j.scheduled_date?fmtDate(j.scheduled_date):'Not scheduled'}</span></div>
       ${j.completed_at?`<div class="detail-row"><span class="detail-label">Completed</span><span class="detail-value">${fmtDate(j.completed_at)}</span></div>`:''}
-      <div class="detail-row"><span class="detail-label">Assigned to</span><span class="detail-value">${j.subcontractors?.name||'<span style="color:var(--rose)">Unassigned</span>'}</span></div>
-      ${j.estimate_id&&estimates.find(x=>x.id===j.estimate_id)?`<div class="detail-row"><span class="detail-label">From Estimate</span><span class="detail-value">${estimates.find(x=>x.id===j.estimate_id).estimate_number}</span></div>`:''}
-      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${jobProfitText(j)}</span></div><div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(subPayLabel(j))}">${subPayLabel(j)}</span></span></div>${subPayIsPaid(j)&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${j.payment_method}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}`:''}
-      ${j.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${j.notes}</span></div>`:''}
+      <div class="detail-row"><span class="detail-label">Assigned to</span><span class="detail-value">${j.subcontractors?.name?esc(j.subcontractors.name):'<span style="color:var(--rose)">Unassigned</span>'}</span></div>
+      ${j.estimate_id&&estimates.find(x=>x.id===j.estimate_id)?`<div class="detail-row"><span class="detail-label">From Estimate</span><span class="detail-value">${esc(estimates.find(x=>x.id===j.estimate_id).estimate_number||'')}</span></div>`:''}
+      ${isAdmin?`<div class="detail-row"><span class="detail-label">Client Charges</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.client_price)}</span></div><div class="detail-row"><span class="detail-label">Sub Pay</span><span class="detail-value" style="color:var(--red);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div><div class="detail-row"><span class="detail-label">Profit</span><span class="detail-value" style="color:${(j.client_price-j.sub_pay)>=0?'var(--green)':'var(--rose)'};font-weight:700">${jobProfitText(j)}</span></div>`:`<div class="detail-row"><span class="detail-label">Your pay</span><span class="detail-value" style="color:var(--ink);font-family:'Cormorant Garamond',serif;font-size:18px">${fmt(j.sub_pay)}</span></div>`}
+      <div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value"><span class="${pClass(subPayLabel(j))}">${subPayLabel(j)}</span></span></div>${subPayIsPaid(j)&&j.payment_method?`<div class="detail-row"><span class="detail-label">Paid Via</span><span class="detail-value">${esc(j.payment_method)}${j.paid_at?' · '+fmtDate(j.paid_at):''}</span></div>`:''}
+      ${j.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${esc(j.notes)}</span></div>`:''}
     </div>
     ${addr?`<a class="dir-link" href="${mapsUrl(addr)}">${ICONS.mapPin} Get Directions</a><br><br>`:''}
     <div class="detail-card" id="site-report-card">
@@ -6167,7 +6432,7 @@ async function openJobDetail(id){
       <button class="photo-upload-btn" onclick="setupPhotoUpload('${j.id}')">${ICONS.camera} Upload Photos</button>
     </div>
     <div class="action-row">
-      ${j.status==='Pending'?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
+      ${(j.status==='Pending'||j.status==='Scheduled')?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
       ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${j.id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
       ${isAdmin&&!subPayIsPaid(j)?`<button class="action-btn ab-red" onclick="markPaidDetail('${j.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
       ${isAdmin&&j.status==='Completed'?jobInvoiceActionHTML(j):''}
@@ -6197,6 +6462,25 @@ async function refreshJobViews(id){
   if(id&&document.getElementById('job-detail')?.classList.contains('open'))openJobDetail(id);
 }
 async function updateStatus(id,status){
+  if(status==='Completed'&&!confirm('Mark this job completed? You cannot undo this.'))return;
+  const isSub=currentProfile?.role!=='admin';
+  if(isSub){
+    const previous=jobs.find(x=>x.id===id)?.status??null;
+    const{data,error}=await db.rpc('sub_set_job_status',{p_job_id:id,p_status:status});
+    if(error){toast('Could not update status: '+error.message);return;}
+    const landed=statusChangeLanded(previous,status,data?.status);
+    if(!landed){
+      await refreshJobViews(id);
+      toast('Status did not change.');
+      return;
+    }
+    await fetchJobs();
+    renderAll();
+    if(currentSubId)renderSubPortal();
+    openJobDetail(id);
+    toast('Status updated ✓');
+    return;
+  }
   const source=jobReadSource();
   let previous=jobs.find(x=>x.id===id)?.status??null;
   if(!previous){
@@ -6347,31 +6631,41 @@ function setSubTimeframe(tf){
   });
   renderSubPortal();
 }
+function subJobIsOpen(j){
+  return !!j&&j.status!=='Completed'&&j.status!=='Cancelled';
+}
+function subJobInThisWeek(j){
+  if(!subJobIsOpen(j))return false;
+  if(j.status==='In Progress')return true;
+  const today=bizYMD();
+  const ymd=jobVisitYMD(j);
+  if(!ymd)return false;
+  return ymd>=today&&ymd<=addDaysYMD(today,7);
+}
 function renderSubPortal(){
   const myJobs=jobs.filter(j=>j.subcontractor_id===currentSubId);
-  const needsAccept=myJobs.filter(j=>!j.accepted_at).length;
-  document.getElementById('sub-stat-active').textContent=myJobs.filter(j=>j.status==='Pending'||j.status==='In Progress').length;
+  const openJobs=myJobs.filter(subJobIsOpen);
+  const doneJobs=myJobs.filter(j=>j.status==='Completed'||j.status==='Cancelled');
+  const needsAccept=myJobs.filter(j=>!j.accepted_at&&subJobIsOpen(j)).length;
+  const owed=roundMoney(myJobs.filter(j=>j.status==='Completed'&&!subPayIsPaid(j)).reduce((s,j)=>s+moneyNum(j.sub_pay),0));
+  const paid=roundMoney(myJobs.filter(j=>j.status==='Completed'&&subPayIsPaid(j)).reduce((s,j)=>s+moneyNum(j.sub_pay),0));
+  document.getElementById('sub-stat-active').textContent=openJobs.length;
   document.getElementById('sub-stat-done').textContent=myJobs.filter(j=>j.status==='Completed').length;
-  document.getElementById('sub-stat-total').textContent=myJobs.length;
-  // Timeframe: "week" shows anything scheduled up through 7 days out (plus anything overdue/unscheduled
-  // and anything still needing accept, so nothing important gets hidden). "all" shows everything.
-  let timed=myJobs;
-  if(subTimeframe==='week'){
-    const todayStr=bizYMD();
-    const weekEnd=addDaysYMD(todayStr,7);
-    timed=myJobs.filter(j=>{
-      if(!j.accepted_at)return true;
-      if(j.status==='In Progress')return true;
-      if(!j.scheduled_date)return true;
-      return j.scheduled_date<=weekEnd;
-    });
-  }
+  const owedEl=document.getElementById('sub-stat-owed');
+  const paidEl=document.getElementById('sub-stat-paid');
+  if(owedEl)owedEl.textContent=fmt(owed);
+  if(paidEl)paidEl.textContent=fmt(paid);
+  let timed=openJobs;
+  if(subTimeframe==='week')timed=myJobs.filter(subJobInThisWeek);
+  else if(subTimeframe==='done')timed=doneJobs;
   const filtered=subJobFilter==='all'?timed:timed.filter(j=>j.status===subJobFilter);
-  const hidden=myJobs.length-timed.length;
-  const hiddenNote=(subTimeframe==='week'&&hidden>0)?`<div style="text-align:center;padding:10px;font-size:11.5px;color:var(--ink3)">${hidden} more upcoming visit${hidden!==1?'s':''} · tap "All Upcoming" to see your full schedule</div>`:'';
+  const hidden=openJobs.length-myJobs.filter(subJobInThisWeek).length;
+  const hiddenNote=(subTimeframe==='week'&&hidden>0)?`<div style="text-align:center;padding:10px;font-size:11.5px;color:var(--ink3)">${hidden} more open visit${hidden!==1?'s':''} · tap "All Upcoming" or "Done"</div>`:'';
+  const emptyTitle=subTimeframe==='week'?'Nothing open this week':(subTimeframe==='done'?'No completed jobs yet':'No jobs here');
+  const emptySub=subTimeframe==='week'&&hidden>0?'Tap "All Upcoming" for the rest of your schedule':(subTimeframe==='done'?'Finished visits show here':'Check back with your admin');
   document.getElementById('sub-jobs-list').innerHTML=(needsAccept?`<div class="warn-banner" style="margin-bottom:14px"><div class="warn-title">${ICONS.alert} ${needsAccept} job${needsAccept!==1?'s':''} waiting on your accept</div></div>`:'')+
     (filtered.length?filtered.map(j=>jobCard(j,`openJobDetail('${j.id}')`,false,true)).join('')+hiddenNote
-    :`<div class="empty"><div class="empty-icon">${ICONS.checkCircle}</div><div class="empty-title">${subTimeframe==='week'?'Nothing this week':'No jobs here'}</div><div class="empty-sub">${subTimeframe==='week'&&hidden>0?'Tap "All Upcoming" to see what\'s scheduled':'Check back with your admin'}</div></div>`);
+    :`<div class="empty"><div class="empty-icon">${ICONS.checkCircle}</div><div class="empty-title">${emptyTitle}</div><div class="empty-sub">${emptySub}</div></div>`);
 }
 function filterSubJobs(el,val){subJobFilter=val;document.querySelectorAll('#sub-filters .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderSubPortal();}
 
@@ -6786,7 +7080,11 @@ async function applyRoute(pathname){
     document.title='My Jobs · Sumak Ops';
     if(head==='jobs'&&slug&&dataReady){
       let j=findBySlug(jobs,'job_number',slug);
-      if(!j){j=await fetchBySlug('jobs','job_number',slug);if(j)jobs.push(j);}
+      if(!j){
+        const raw=await fetchBySlug('sub_jobs','job_number',slug);
+        j=asSubJob(raw);
+        if(j)jobs.push(j);
+      }
       if(j){recentRecordOpens.delete(String(j.id));openJobDetail(j.id);}else toast('Job not found');
     }
     return;
