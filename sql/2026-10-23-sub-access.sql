@@ -7,9 +7,16 @@
 -- It does not email, text, or invite anyone.
 -- It does not insert, update, or delete any job, customer, invoice,
 -- estimate, payout, or photo row.
+-- It does drop and recreate public.sub_jobs and public.sub_cost_requests.
+-- Those views hold no rows. CREATE OR REPLACE cannot change their column
+-- order (production error 42P16), so they are dropped first.
 -- The one data change is storage: the job-photos bucket is marked private
 -- so an old public link no longer opens a photo. Deploy the website in
 -- the same change so the app loads photos with a signed link.
+-- Do not ALTER storage.objects. The SQL editor runs as postgres, and that
+-- table is owned by supabase_storage_admin (42501). Row level security
+-- is already on. postgres can still update storage.buckets and create
+-- or drop policies on storage.objects.
 --
 -- After this file:
 --   An admin still uses the jobs table (and the rest of the office tables).
@@ -540,6 +547,16 @@ GRANT EXECUTE ON FUNCTION public.sub_submit_cost(uuid, numeric, text) TO authent
 -- security_invoker false: the view owner reads the jobs table, then the
 -- WHERE clause keeps only this sub's rows. A direct select on jobs is
 -- still empty for a sub because of the policies below.
+--
+-- Drop first. CREATE OR REPLACE cannot rename or reorder columns.
+-- Production already has sub_jobs with customer_id where this view has
+-- address (42P16). Nothing else in this project depends on these views:
+-- no view, function, or policy reads them. The app selects them only
+-- after this script recreates them. No CASCADE, so an unexpected
+-- dependent stops the script instead of being deleted with the view.
+DROP VIEW IF EXISTS public.sub_jobs;
+DROP VIEW IF EXISTS public.sub_cost_requests;
+
 CREATE OR REPLACE VIEW public.sub_jobs
 WITH (security_barrier = true, security_invoker = false) AS
 SELECT
@@ -576,6 +593,10 @@ ALTER VIEW public.sub_jobs OWNER TO postgres;
 
 REVOKE ALL ON TABLE public.sub_jobs FROM PUBLIC, anon;
 GRANT SELECT ON TABLE public.sub_jobs TO authenticated;
+
+-- Drop again in case this section is run on its own. Do not drop
+-- sub_jobs here: the statements above just created it.
+DROP VIEW IF EXISTS public.sub_cost_requests;
 
 CREATE OR REPLACE VIEW public.sub_cost_requests
 WITH (security_barrier = true, security_invoker = false) AS
@@ -909,7 +930,9 @@ BEGIN
 END
 $bucket$;
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- storage.objects already has row level security on hosted Supabase.
+-- ALTER TABLE storage.objects is not allowed for postgres (42501:
+-- must be owner of table objects). Policies below are allowed.
 
 DO $drop_storage$
 DECLARE r record;

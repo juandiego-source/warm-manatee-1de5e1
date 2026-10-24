@@ -1,0 +1,5 @@
+# Deploy job-comms with the gateway JWT check off. The function checks
+# the signed-in user itself, and the 6pm/7pm jobs authenticate with
+# CRON_SECRET. See the header of supabase/functions/job-comms/index.ts.
+[functions.job-comms]
+verify_jwt = false

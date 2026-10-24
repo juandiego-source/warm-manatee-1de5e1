@@ -12,6 +12,9 @@ sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE sumak_s
 sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f test/sub-access-setup.sql
 sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f sql/2026-10-23-sub-access.sql >/tmp/sub-access-migrate.log
 sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f test/sub-access-assert.sql
+sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f sql/2026-10-24-sub-office-comms.sql >/tmp/sub-comms-migrate.log
+sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f sql/2026-10-24-sub-office-comms.sql >/tmp/sub-comms-migrate-again.log
+sudo -u postgres psql -d sumak_sub_access -v ON_ERROR_STOP=1 -f test/sub-comms-assert.sql
 
 # HTTP proof through PostgREST, the same check the hosted API makes.
 # PostgREST rejects an HS256 secret shorter than 32 characters.
