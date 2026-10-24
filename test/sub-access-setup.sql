@@ -73,6 +73,12 @@ ON CONFLICT (id) DO UPDATE SET public = true, name = EXCLUDED.name;
 GRANT SELECT ON storage.buckets TO authenticated, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated, anon;
 
+-- Hosted Supabase already enables this. The production script must not,
+-- because the SQL editor cannot ALTER storage.objects. This local table
+-- is owned by postgres, so the test turns the lock on here.
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY,
   email text,
@@ -370,3 +376,14 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.activity_log (id, actor_role, action, detail) VALUES
   ('f6f6f6f6-f6f6-46f6-86f6-f6f6f6f6f6f6', 'admin', 'Invoice created', 'client price 400')
 ON CONFLICT (id) DO NOTHING;
+
+-- Same column-order mismatch that failed in production (42P16): the
+-- address position is still named customer_id. The migration must drop
+-- these views before it creates the new ones. Nothing else depends on them.
+CREATE VIEW public.sub_jobs AS
+SELECT id, job_number, title, description, customer_id, address
+FROM public.jobs;
+
+CREATE VIEW public.sub_cost_requests AS
+SELECT id, title, description, customer_id, address
+FROM public.cost_requests;

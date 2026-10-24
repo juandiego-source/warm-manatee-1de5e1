@@ -90,6 +90,17 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 #push-banner-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;}
 #push-banner-sub{font-size:11.5px;color:var(--ink2);margin-bottom:10px;line-height:1.4;}
 #push-banner-actions{display:flex;gap:8px;}
+.job-thread{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-bottom:10px}
+.job-thread-empty{font-size:12px;color:var(--ink3);padding:4px 0}
+.job-msg{align-self:flex-start;max-width:85%;background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.job-msg.mine{align-self:flex-end;background:var(--red-l);border-color:transparent}
+.job-msg-who{font-size:10px;font-weight:700;color:var(--ink3);margin-bottom:2px}
+.job-msg-body{font-size:13px;color:var(--ink);line-height:1.4;white-space:pre-wrap;word-break:break-word}
+.job-msg img{display:block;margin-top:6px;max-width:180px;border-radius:8px}
+.job-msg-time{font-size:10px;color:var(--ink3);margin-top:4px}
+.job-thread-compose textarea{min-height:64px}
+.job-thread-actions{display:flex;gap:8px;margin-top:8px}
+.job-thread-photo{font-size:11px;color:var(--ink3);margin-top:6px}
 
 /* CONTENT & NAV */
 #stage{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden;}
@@ -513,7 +524,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div id="push-banner-title">Turn on notifications?</div>
   <div id="push-banner-sub">Get alerted the moment something happens — even with the app closed.</div>
   <div id="push-banner-actions">
-    <button class="btn btn-red btn-sm" onclick="enablePushNotifications()">Enable</button>
+    <button class="btn btn-red btn-sm" onclick="enablePushNotifications()">Enable notifications</button>
     <button class="btn btn-glass btn-sm" onclick="dismissPushBanner()">Not now</button>
   </div>
 </div>
@@ -695,7 +706,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 
   <!-- SUB PORTAL -->
   <div class="view" id="view-sub-portal">
-    <div class="sub-hero"><div class="sub-hero-name" id="sub-welcome-name">Welcome</div><div class="sub-hero-sub">Your assigned jobs</div><div style="margin-top:8px"><span style="font-size:11px;color:var(--ink3);text-decoration:underline;cursor:pointer" onclick="openNotifDiagnostics()">Notification Status</span></div></div>
+    <div class="sub-hero"><div class="sub-hero-name" id="sub-welcome-name">Welcome</div><div class="sub-hero-sub">Your assigned jobs</div><div style="margin-top:8px"><span style="font-size:11px;color:var(--ink3);text-decoration:underline;cursor:pointer" onclick="openNotifDiagnostics()">Notification Status</span></div><button class="btn btn-red btn-sm" id="sub-enable-push" style="margin-top:10px" onclick="enablePushNotifications()">Enable notifications</button></div>
     <div class="sub-stats">
       <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-active">—</div><div class="sub-stat-lbl">Active</div></div>
       <div class="sub-stat"><div class="sub-stat-val" id="sub-stat-done">—</div><div class="sub-stat-lbl">Done</div></div>
@@ -775,6 +786,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 
 <!-- hidden file input for photos -->
 <input type="file" id="photo-file-input" accept="image/*" multiple>
+<input type="file" id="job-message-file" accept="image/*">
 
 <!-- JOB MODAL -->
 <div class="modal-overlay" id="modal-job" onclick="overlayClose(event,'job')">
@@ -795,6 +807,13 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
       <div class="form-group"><label class="form-label">Status</label><select class="form-input" id="job-status"><option>Pending</option><option>In Progress</option><option>Completed</option><option>Cancelled</option></select></div>
     </div>
     <div class="form-group"><label class="form-label">Subcontractor</label><select class="form-input" id="job-sub"><option value="">Unassigned</option></select></div>
+    <div class="form-group" id="job-notify-row">
+      <label class="form-label" style="display:flex;gap:8px;align-items:flex-start;font-weight:500;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="job-skip-notify" style="margin-top:2px">
+        <span>Skip email and push to the sub</span>
+      </label>
+      <div style="font-size:11px;color:var(--ink3);margin-top:4px;line-height:1.4">Leave this off to email the sub when you assign them, change the date, or cancel. The email includes the job, a map link, and their pay.</div>
+    </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Client Charges ($)</label><input class="form-input" id="job-client-price" type="number" placeholder="0.00" step="0.01" min="0" oninput="updateJobMarginPreview()"></div>
       <div class="form-group"><label class="form-label">Sub Pay ($)</label><input class="form-input" id="job-pay" type="number" placeholder="0.00" step="0.01" min="0" oninput="updateJobMarginPreview()"></div>
@@ -1241,6 +1260,7 @@ let currentUser=null,currentProfile=null,currentSubId=null;
 const BIZ_TZ='America/Boise';
 let calYear=Number(bizYMD().slice(0,4)),calMonth=Number(bizYMD().slice(5,7))-1,calSelected=null;
 let currentPhotoJobId=null;
+let jobMessageWatchId=null,jobMessagePoll=null,jobMessageChannel=null,jobMessagePhotoPath=null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
 async function initAuth(){
@@ -1335,7 +1355,24 @@ function urlBase64ToUint8Array(base64String){
   const raw=atob(base64);
   return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
 }
+function refreshSubPushButton(){
+  const btn=document.getElementById('sub-enable-push');
+  if(!btn)return;
+  const granted=typeof Notification!=='undefined'&&Notification.permission==='granted';
+  btn.style.display=granted?'none':'inline-flex';
+}
+function showPushBannerCopy(){
+  const titleEl=document.getElementById('push-banner-title');
+  const subEl=document.getElementById('push-banner-sub');
+  if(titleEl)titleEl.textContent='Enable notifications';
+  if(subEl){
+    subEl.textContent=currentProfile?.role==='sub'
+      ?'Get a push when the office assigns a job, changes the date, cancels it, or sends a message.'
+      :'Get a push when a sub accepts, starts, finishes, adds photos, or sends a message.';
+  }
+}
 async function initPush(){
+  refreshSubPushButton();
   if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
   try{
     const reg=await navigator.serviceWorker.register('/sw.js');
@@ -1343,6 +1380,7 @@ async function initPush(){
       const sub=await reg.pushManager.getSubscription();
       if(sub)await savePushSubscription(sub);
     }else if(Notification.permission==='default'&&!localStorage.getItem('sumak_push_dismissed')){
+      showPushBannerCopy();
       document.getElementById('push-banner').classList.add('show');
     }
   }catch(e){console.error('push init failed',e);}
@@ -1355,6 +1393,7 @@ async function enablePushNotifications(){
     const reg=await navigator.serviceWorker.ready;
     const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
     await savePushSubscription(sub);
+    refreshSubPushButton();
     toast('Notifications enabled ✓');
   }catch(e){console.error(e);toast('⚠ Could not enable notifications');}
 }
@@ -2053,6 +2092,7 @@ async function acceptJob(id){
   logActivity('Job accepted',j?`${j.title} — ${j.customers?.name||''} ${j.address||''}`.trim():null,'job',id);
   await fetchJobs();renderSubPortal();
   toast('Job accepted ✓');
+  await notifyOfficeOfSubEvent(id,'accept');
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────
@@ -3407,12 +3447,8 @@ async function testLocalNotification(){
 }
 async function testServerPush(){
   try{
-    const role=currentProfile?.role||'admin';
-    const payload={recipient_role:role,message:'Test #2 — real push from the server ✓',link_type:'test'};
-    if(role==='sub')payload.recipient_sub_id=currentSubId;
-    const{error}=await db.from('notifications').insert(payload);
-    if(error){toast('Test #2 failed: '+error.message);return;}
-    toast('Server notified — a push should arrive shortly if the pipeline is working');
+    await invokeJobComms({action:'test_push'});
+    toast('Push sent to this account ✓');
   }catch(e){toast('Test #2 failed: '+e.message);}
 }
 function openMoreMenu(){
@@ -6273,12 +6309,15 @@ function setupPhotoUpload(jobId){
     }
     input.value='';
     await renderJobPhotos(jobId);
-    if(uploaded>0){
+    if(uploaded>0&&currentProfile?.role==='sub'){
       const job=jobs.find(j=>j.id===jobId);
-      const who=currentProfile?.role==='sub'?(subs.find(s=>s.id===currentSubId)?.name||'A sub'):'Admin';
-      await db.from('notifications').insert({recipient_role:'admin',message:`${who} added ${uploaded} photo${uploaded!==1?'s':''} to ${job?.title||'a job'}`,link_type:'job',link_id:jobId});
-    }
-    toast('Photos uploaded ✓');
+      logActivity('Photos uploaded',`${uploaded} on ${job?.title||'a job'}`,'job',jobId);
+      const noted=await notifyOfficeOfSubEvent(jobId,'photo',uploaded);
+      if(!noted){
+        const who=subs.find(s=>s.id===currentSubId)?.name||'A sub';
+        await db.from('notifications').insert({recipient_role:'admin',message:`${who} added ${uploaded} photo${uploaded!==1?'s':''} to ${job?.title||'a job'}`,link_type:'job',link_id:jobId});
+      }else toast('Photos uploaded ✓');
+    }else toast('Photos uploaded ✓');
   };
   input.click();
 }
@@ -6431,6 +6470,18 @@ async function openJobDetail(id){
       <div class="photo-grid" id="photos-${j.id}"></div>
       <button class="photo-upload-btn" onclick="setupPhotoUpload('${j.id}')">${ICONS.camera} Upload Photos</button>
     </div>
+    <div class="detail-card" id="job-thread-card">
+      <div class="detail-section-lbl">Messages</div>
+      <div id="job-thread" class="job-thread"><div class="job-thread-empty">Loading messages…</div></div>
+      <div class="job-thread-compose">
+        <textarea id="job-thread-body" class="form-input" maxlength="4000" placeholder="${isAdmin?'Message the sub…':'Message the office…'}"></textarea>
+        <div class="job-thread-actions">
+          <button class="btn btn-glass btn-sm" type="button" onclick="pickJobMessagePhoto('${j.id}')">Photo</button>
+          <button class="btn btn-red btn-sm" type="button" onclick="postJobMessage('${j.id}')">Send</button>
+        </div>
+        <div id="job-thread-photo" class="job-thread-photo"></div>
+      </div>
+    </div>
     <div class="action-row">
       ${(j.status==='Pending'||j.status==='Scheduled')?`<button class="action-btn ab-red" onclick="updateStatus('${j.id}','In Progress')">${ICONS.play} Start Job</button>`:''}
       ${j.status!=='Completed'&&j.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="updateStatus('${j.id}','Completed')">${ICONS.check} Mark Completed</button>`:''}
@@ -6445,6 +6496,7 @@ async function openJobDetail(id){
   }
   await renderJobPhotos(j.id);
   renderSiteReport(j);
+  watchJobMessages(j.id);
 }
 function jobReadSource(){return currentProfile?.role==='admin'?'jobs':'sub_jobs';}
 function statusChangeLanded(previous,requested,actual){
@@ -6474,11 +6526,14 @@ async function updateStatus(id,status){
       toast('Status did not change.');
       return;
     }
+    const landedJob=jobs.find(x=>x.id===id);
+    logActivity(status==='In Progress'?'Job started':'Job completed',`${landedJob?.job_number||''} ${landedJob?.title||''}`.trim(),'job',id);
     await fetchJobs();
     renderAll();
     if(currentSubId)renderSubPortal();
     openJobDetail(id);
     toast('Status updated ✓');
+    if(status==='In Progress'||status==='Completed')await notifyOfficeOfSubEvent(id,status==='In Progress'?'start':'complete');
     return;
   }
   const source=jobReadSource();
@@ -6663,6 +6718,7 @@ function renderSubPortal(){
   const hiddenNote=(subTimeframe==='week'&&hidden>0)?`<div style="text-align:center;padding:10px;font-size:11.5px;color:var(--ink3)">${hidden} more open visit${hidden!==1?'s':''} · tap "All Upcoming" or "Done"</div>`:'';
   const emptyTitle=subTimeframe==='week'?'Nothing open this week':(subTimeframe==='done'?'No completed jobs yet':'No jobs here');
   const emptySub=subTimeframe==='week'&&hidden>0?'Tap "All Upcoming" for the rest of your schedule':(subTimeframe==='done'?'Finished visits show here':'Check back with your admin');
+  refreshSubPushButton();
   document.getElementById('sub-jobs-list').innerHTML=(needsAccept?`<div class="warn-banner" style="margin-bottom:14px"><div class="warn-title">${ICONS.alert} ${needsAccept} job${needsAccept!==1?'s':''} waiting on your accept</div></div>`:'')+
     (filtered.length?filtered.map(j=>jobCard(j,`openJobDetail('${j.id}')`,false,true)).join('')+hiddenNote
     :`<div class="empty"><div class="empty-icon">${ICONS.checkCircle}</div><div class="empty-title">${emptyTitle}</div><div class="empty-sub">${emptySub}</div></div>`);
@@ -6676,12 +6732,14 @@ async function saveJob(){
   const custId=document.getElementById('job-customer').value;
   if(!custId){toast(`${ICONS.alert} Select a customer`);document.getElementById('job-customer')?.focus();return;}
   const editId=document.getElementById('job-edit-id').value;
-  const prevSubId=editId?(jobs.find(j=>j.id===editId)?.subcontractor_id||null):null;
+  const prev=editId?jobs.find(j=>j.id===editId):null;
+  const skipNotify=!!document.getElementById('job-skip-notify')?.checked;
   const selAddr=document.getElementById('job-prop-select').value;
   const manualAddr=document.getElementById('job-address').value.trim();
   const addr=manualAddr||(selAddr||null);
   const newSubId=document.getElementById('job-sub').value||null;
   const payload={title,customer_id:custId,address:addr,description:document.getElementById('job-description').value.trim()||null,scheduled_date:document.getElementById('job-date').value||null,status:document.getElementById('job-status').value,subcontractor_id:newSubId,client_price:roundMoney(document.getElementById('job-client-price').value),sub_pay:roundMoney(document.getElementById('job-pay').value),payment_status:document.getElementById('job-paystatus').value,notes:document.getElementById('job-notes').value.trim()||null};
+  const prevSubId=prev?.subcontractor_id||null;
   if(newSubId&&newSubId!==prevSubId)payload.accepted_at=null;
   try{
     let err,jobId=editId;
@@ -6693,21 +6751,174 @@ async function saveJob(){
     const subName2=payload.subcontractor_id?(subs.find(s=>s.id===payload.subcontractor_id)?.name||''):'unassigned';
     logActivity(editId?'Job edited':'Job created',`${payload.title} — ${custName} · ${subName2} · ${fmt(payload.client_price)}`.trim(),'job',jobId);
     closeModal('job');await fetchJobs();renderAll();if(calSelected)renderCalDay(calSelected);
-    if(newSubId&&newSubId!==prevSubId){
-      const subName=subs.find(s=>s.id===newSubId)?.name||'the sub';
-      toast(`Job assigned to ${subName}`,'notifySubOfJob',jobId,'Notify');
-    }else{
+    const reason=jobNotifyReason(prev,payload);
+    if(!reason){
       toast(editId?'Job updated ✓':'Job created ✓');
+    }else if(reason==='cancelled-unassigned'){
+      toast('Saved. No sub is assigned, so nobody was emailed.');
+    }else if(skipNotify){
+      toast('Saved. Email and push skipped.');
+    }else{
+      try{
+        const data=await sendJobNotice(jobId,reason);
+        toast(jobNoticeToast('Saved, and the sub was emailed ✓',data));
+      }catch(e){
+        toast('Saved, but the sub was not emailed: '+e.message);
+      }
     }
   }catch(e){toast('Error: '+e.message);}
 }
-function notifySubOfJob(jobId){
-  const j=jobs.find(x=>x.id===jobId);if(!j)return;
-  const sub=subs.find(s=>s.id===j.subcontractor_id);
-  if(!sub?.email){toast(`${ICONS.alert} This sub has no email on file`);return;}
-  const subject=`New job assigned: ${j.title}`;
-  const body=`Hi ${sub.name},\n\nYou've been assigned a new job:\n\n${j.title}\n${j.address?j.address+'\n':''}${j.scheduled_date?'Date: '+fmtDate(j.scheduled_date)+'\n':''}${j.sub_pay?'Pay: '+fmt(j.sub_pay)+'\n':''}\nLog into the Sumak Ops app for full details.\n\nThanks,\nJuan Diego\nSumak`;
-  window.location.href=`mailto:${sub.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+function jobNotifyReason(prev,payload){
+  const newSub=payload.subcontractor_id||null;
+  const oldSub=prev?.subcontractor_id||null;
+  const newStatus=payload.status;
+  const oldStatus=prev?.status||null;
+  const newDate=payload.scheduled_date||null;
+  const oldDate=prev?.scheduled_date||null;
+  if(newStatus==='Cancelled'&&oldStatus!=='Cancelled'){
+    if(newSub)return 'cancelled';
+    if(oldSub)return 'cancelled-unassigned';
+    return null;
+  }
+  if(!newSub||newStatus==='Cancelled')return null;
+  if(!prev||newSub!==oldSub)return prev&&oldSub?'reassigned':'assigned';
+  if(newDate!==oldDate)return 'rescheduled';
+  return null;
+}
+function jobNoticeToast(base,data){
+  if(data&&data.push==='unconfigured')return base+' Push is not set up on the server yet.';
+  if(data&&data.push==='failed')return base+' The push did not go through.';
+  return base;
+}
+async function invokeJobComms(body){
+  const{data,error}=await db.functions.invoke('job-comms',{body});
+  if(error){
+    let msg=error.message||'The office mailer did not answer';
+    try{
+      const res=error.context;
+      if(res&&typeof res.clone==='function'){
+        const j=await res.clone().json();
+        if(j&&j.error)msg=j.error;
+      }else if(res&&typeof res.json==='function'){
+        const j=await res.json();
+        if(j&&j.error)msg=j.error;
+      }
+    }catch(e){}
+    throw new Error(msg);
+  }
+  if(data&&data.error&&data.ok!==true)throw new Error(data.error);
+  return data||{};
+}
+async function sendJobNotice(jobId,reason){
+  return invokeJobComms({action:'job_email',job_id:jobId,reason:reason||'manual'});
+}
+async function notifySubOfJob(jobId){
+  const j=jobs.find(x=>x.id===jobId);if(!j){toast('Job not found');return;}
+  if(!j.subcontractor_id){toast('This job has no subcontractor');return;}
+  toast('Sending…');
+  try{
+    const data=await sendJobNotice(jobId,'manual');
+    toast(jobNoticeToast('Sent to the sub ✓',data));
+  }catch(e){
+    toast('Could not email the sub: '+e.message);
+  }
+}
+async function notifyOfficeOfSubEvent(jobId,kind,count){
+  try{
+    const body={action:'status',job_id:jobId,kind};
+    if(kind==='photo')body.count=count||1;
+    await invokeJobComms(body);
+    return true;
+  }catch(e){
+    toast('Saved, but the office was not notified: '+e.message);
+    return false;
+  }
+}
+function stopJobMessages(){
+  jobMessageWatchId=null;
+  jobMessagePhotoPath=null;
+  if(jobMessagePoll){clearInterval(jobMessagePoll);jobMessagePoll=null;}
+  if(jobMessageChannel){
+    try{db.removeChannel(jobMessageChannel);}catch(e){}
+    jobMessageChannel=null;
+  }
+}
+function jobMessageWhen(s){
+  const dt=new Date(s);
+  if(Number.isNaN(dt.getTime()))return '';
+  return dt.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:BIZ_TZ});
+}
+async function loadJobMessages(jobId){
+  const box=document.getElementById('job-thread');
+  if(!box||jobMessageWatchId!==jobId)return;
+  const{data,error}=await db.from('job_messages').select('id, job_id, author_id, body, photo_path, created_at').eq('job_id',jobId).order('created_at',{ascending:true}).limit(200);
+  if(error){box.innerHTML=`<div class="job-thread-empty">${esc(error.message)}</div>`;return;}
+  const rows=data||[];
+  if(!rows.length){box.innerHTML='<div class="job-thread-empty">No messages yet.</div>';return;}
+  const html=await Promise.all(rows.map(async m=>{
+    const mine=m.author_id===currentUser?.id;
+    const who=mine?'You':(currentProfile?.role==='admin'?'Sub':'Office');
+    let photo='';
+    if(m.photo_path){
+      const url=await signedJobPhotoUrl(m.photo_path);
+      if(url)photo=`<a href="${escapeAttr(url)}" target="_blank" rel="noopener"><img src="${escapeAttr(url)}" alt="Photo on this message"></a>`;
+    }
+    return `<div class="job-msg${mine?' mine':''}"><div class="job-msg-who">${who}</div>${m.body?`<div class="job-msg-body">${esc(m.body)}</div>`:''}${photo}<div class="job-msg-time">${jobMessageWhen(m.created_at)}</div></div>`;
+  }));
+  if(jobMessageWatchId!==jobId)return;
+  box.innerHTML=html.join('');
+  box.scrollTop=box.scrollHeight;
+}
+function watchJobMessages(jobId){
+  stopJobMessages();
+  jobMessageWatchId=jobId;
+  loadJobMessages(jobId);
+  try{
+    jobMessageChannel=db.channel('job-messages-'+jobId).on('postgres_changes',{event:'INSERT',schema:'public',table:'job_messages',filter:'job_id=eq.'+jobId},()=>{
+      if(jobMessageWatchId===jobId)loadJobMessages(jobId);
+    }).subscribe();
+  }catch(e){console.error('job message channel',e);}
+  jobMessagePoll=setInterval(()=>{if(jobMessageWatchId===jobId)loadJobMessages(jobId);},12000);
+}
+function pickJobMessagePhoto(jobId){
+  const input=document.getElementById('job-message-file');
+  if(!input)return;
+  input.onchange=async(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    input.value='';
+    if(!file)return;
+    const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-zA-Z0-9]/g,'').slice(0,8)||'jpg';
+    const path=`${jobId}/msg-${Date.now()}.${ext}`;
+    toast('Uploading photo…');
+    const{error}=await db.storage.from('job-photos').upload(path,file,{contentType:file.type||'image/jpeg'});
+    if(error){toast('Upload error: '+error.message);return;}
+    jobMessagePhotoPath=path;
+    const el=document.getElementById('job-thread-photo');
+    if(el)el.textContent='Photo attached. It sends with your next message.';
+    toast('Photo ready ✓');
+  };
+  input.click();
+}
+async function postJobMessage(jobId){
+  const body=(document.getElementById('job-thread-body')?.value||'').trim();
+  const photo=jobMessagePhotoPath;
+  if(!body&&!photo){toast('Write a message or add a photo');return;}
+  const{data,error}=await db.from('job_messages').insert({job_id:jobId,author_id:currentUser.id,body:body||null,photo_path:photo||null}).select('id').single();
+  if(error){toast('Could not send: '+error.message);return;}
+  jobMessagePhotoPath=null;
+  const photoEl=document.getElementById('job-thread-photo');
+  if(photoEl)photoEl.textContent='';
+  const input=document.getElementById('job-thread-body');
+  if(input)input.value='';
+  logActivity('Job message',(body||'Photo').slice(0,140),'job',jobId);
+  await loadJobMessages(jobId);
+  try{
+    const result=await invokeJobComms({action:'message',message_id:data.id});
+    if(result&&result.notified===false)toast(result.error||'Message saved. Nobody was notified.');
+    else toast('Message sent ✓');
+  }catch(e){
+    toast('Message saved, but the other side was not notified: '+e.message);
+  }
 }
 function editJob(id){
   const j=jobs.find(x=>x.id===id);if(!j)return;
@@ -6724,6 +6935,7 @@ function editJob(id){
     document.getElementById('job-pay').value=j.sub_pay||'';
     document.getElementById('job-paystatus').value=j.payment_status||'Unpaid';
     document.getElementById('job-notes').value=j.notes||'';
+    const skip=document.getElementById('job-skip-notify');if(skip)skip.checked=false;
     updateJobMarginPreview();
   },60);
 }
@@ -6918,6 +7130,7 @@ function openModal(type){
     document.getElementById('job-margin-preview').style.display='none';
     document.getElementById('job-status').value='Pending';document.getElementById('job-paystatus').value='Unpaid';
     document.getElementById('job-customer').value='';document.getElementById('job-sub').value='';
+    const skipNotify=document.getElementById('job-skip-notify');if(skipNotify)skipNotify.checked=false;
     document.getElementById('job-prop-select').innerHTML='<option value="">Select saved address...</option>';
   }else if(type==='customer'){
     document.getElementById('cust-modal-title').textContent='New Client';document.getElementById('cust-edit-id').value='';
@@ -6962,6 +7175,7 @@ function overlayClose(e,type){if(e.target===document.getElementById(`modal-${typ
 function closeDetail(type){
   const map={job:'job-detail',cust:'cust-detail',est:'est-detail',inv:'inv-detail'};
   const el=document.getElementById(map[type]);if(el)el.classList.remove('open');
+  if(type==='job')stopJobMessages();
 }
 const NAV_ORDER=['dashboard','jobs','calendar','customers','estimates','invoices'];
 // ── REAL URLS ──
