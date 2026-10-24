@@ -11,6 +11,8 @@
 //     Already used by the send-email function. This function tries
 //     send-email first, then Resend directly with the same key.
 //     From address: Sumak Lawncare <office@sumaklawncare.com>
+//     send-email stores the Resend id on email_events. The direct
+//     fallback stores it too. A Resend rejection is not retried.
 //
 //   VAPID_PUBLIC_KEY
 //     Must be the same value as VAPID_PUBLIC_KEY in index.html.
@@ -161,10 +163,33 @@ async function loadSub(admin, subId) {
   return data;
 }
 
-async function sendOfficeEmail({ to, subject, html }) {
+async function rememberEmail(admin, { resendId, to, subject, kind, jobId }) {
+  const { error } = await admin.rpc('record_outgoing_email', {
+    p_resend_id: resendId,
+    p_kind: kind || 'job',
+    p_invoice_id: null,
+    p_estimate_id: null,
+    p_job_id: jobId || null,
+    p_to: [to],
+    p_cc: [],
+    p_subject: subject,
+    p_sent_at: new Date().toISOString(),
+  });
+  if (error) console.error('email event was not saved', error.message);
+}
+
+async function sendOfficeEmail(admin, { to, subject, html, kind, jobId }) {
   const url = Deno.env.get('SUPABASE_URL') || '';
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const payload = {
+    to: [to],
+    subject,
+    html,
+    kind: kind || 'job',
+  };
+  if (jobId) payload.job_id = jobId;
   if (url && key) {
+    let reached = false;
     try {
       const res = await fetch(`${url}/functions/v1/send-email`, {
         method: 'POST',
@@ -173,14 +198,23 @@ async function sendOfficeEmail({ to, subject, html }) {
           apikey: key,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ to: [to], subject, html }),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (!data?.error) return { via: 'send-email' };
+      reached = true;
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_err) {
+        data = {};
       }
-    } catch (_err) {
-      // Fall through to Resend.
+      if (res.ok && !data.error) return { via: 'send-email', id: data.id || null };
+      if (res.status !== 404) {
+        const detail = data.detail || data.error || text || 'Email was not sent.';
+        throw new Error(String(detail).slice(0, 240));
+      }
+    } catch (err) {
+      if (reached) throw err;
     }
   }
   const resendKey = Deno.env.get('RESEND_API_KEY') || '';
@@ -198,11 +232,19 @@ async function sendOfficeEmail({ to, subject, html }) {
       html,
     }),
   });
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(`Resend rejected the email (${res.status}): ${detail.slice(0, 240)}`);
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (_err) {
+    data = {};
   }
-  return { via: 'resend' };
+  if (!res.ok || data.error || !data.id) {
+    const detail = data.message || data.error || text || res.status;
+    throw new Error(`Resend rejected the email (${res.status}): ${String(detail).slice(0, 240)}`);
+  }
+  await rememberEmail(admin, { resendId: data.id, to, subject, kind, jobId });
+  return { via: 'resend', id: data.id };
 }
 
 function vapidReady() {
@@ -276,7 +318,7 @@ async function handleJobEmail(admin, profile, body) {
   const sub = await loadSub(admin, job.subcontractor_id);
   if (!sub?.email) return json(400, { error: 'This sub has no email on file.' });
   const mail = composeJobEmail({ job, subName: sub.name, reason });
-  await sendOfficeEmail({ to: sub.email, subject: mail.subject, html: mail.html });
+  await sendOfficeEmail(admin, { to: sub.email, subject: mail.subject, html: mail.html, kind: 'job', jobId: job.id });
   const note = mail.subject;
   await notifyInApp(admin, {
     recipient_role: 'sub',
@@ -460,7 +502,13 @@ async function handleReminder(admin, dryRun) {
       const mail = composeReminderEmail({ subName: group.sub.name, jobs: group.jobs });
       if (group.sub.email) {
         try {
-          await sendOfficeEmail({ to: group.sub.email, subject: mail.subject, html: mail.html });
+          await sendOfficeEmail(admin, {
+            to: group.sub.email,
+            subject: mail.subject,
+            html: mail.html,
+            kind: 'reminder',
+            jobId: group.jobs[0]?.id || null,
+          });
           emails++;
         } catch (err) {
           emailErrors++;
@@ -493,7 +541,12 @@ async function handleReminder(admin, dryRun) {
       throw new Error('Reminder emails failed.');
     }
     if (unaccepted.length) {
-      await sendOfficeEmail({ to: OFFICE_EMAIL, subject: officeMail.subject, html: officeMail.html });
+      await sendOfficeEmail(admin, {
+        to: OFFICE_EMAIL,
+        subject: officeMail.subject,
+        html: officeMail.html,
+        kind: 'reminder',
+      });
     }
     for (const job of unaccepted) {
       const sub = bySub.get(job.subcontractor_id);
@@ -599,7 +652,7 @@ async function handleRecap(admin, dryRun) {
   const claimed = await claimDispatch(admin, 'recap', today);
   if (!claimed) return json(200, { ok: true, skipped: 'already sent' });
   try {
-    await sendOfficeEmail({ to: OFFICE_EMAIL, subject: mail.subject, html: mail.html });
+    await sendOfficeEmail(admin, { to: OFFICE_EMAIL, subject: mail.subject, html: mail.html, kind: 'recap' });
   } catch (err) {
     await releaseDispatch(admin, 'recap', today);
     throw err;

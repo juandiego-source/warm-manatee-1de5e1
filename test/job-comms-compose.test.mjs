@@ -80,6 +80,9 @@ test('the function source does not select office price columns', () => {
   const src = [
     readFileSync(new URL('../supabase/functions/job-comms/index.ts', import.meta.url), 'utf8'),
     readFileSync(new URL('../supabase/functions/job-comms/compose.js', import.meta.url), 'utf8'),
+    readFileSync(new URL('../supabase/functions/send-email/index.ts', import.meta.url), 'utf8'),
+    readFileSync(new URL('../supabase/functions/resend-webhook/index.ts', import.meta.url), 'utf8'),
+    readFileSync(new URL('../supabase/functions/resend-webhook/verify.js', import.meta.url), 'utf8'),
   ].join('\n');
   for (const name of ['client_price', 'office_price', 'margin_pct']) {
     assert.equal(src.includes(name), false, name);
