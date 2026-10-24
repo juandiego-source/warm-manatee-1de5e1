@@ -3,3 +3,7 @@
 # CRON_SECRET. See the header of supabase/functions/job-comms/index.ts.
 [functions.job-comms]
 verify_jwt = false
+
+# Resend calls this with a Svix signature, not a Supabase JWT.
+[functions.resend-webhook]
+verify_jwt = false

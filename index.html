@@ -1253,7 +1253,7 @@ const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 let db=null;
 try{db=supabase.createClient(SB_URL,SB_KEY);}catch(err){db=null;}
 
-let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices=[],estItems={},invItems={},recurring=[];
+let jobs=[],customers=[],subs=[],profiles=[],properties=[],estimates=[],invoices=[],estItems={},invItems={},recurring=[],emailEvents=[];
 let invoicedJobIds=new Set(),jobInvoiceMap={},jobInvoiceIds={},invoiceItemJobLinks=[],services=[],costRequests=[];
 let subPayments=[],subPaymentJobs=[],subPayLedgerReady=false,payoutSaving=false;
 const inviteSubId=new URLSearchParams(window.location.search).get('invite');
@@ -1466,6 +1466,12 @@ function routeToLink(linkType,linkId){
   }else if(linkType==='costreq'){
     if(currentProfile?.role==='admin'){showView('estimates',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('estimates')]);renderCostRequestsSection();}
     else{showView('sub-portal',document.querySelector('.nav-item'));switchSubMode('quotes');}
+  }else if(linkType==='invoice'&&linkId&&currentProfile?.role==='admin'){
+    showView('invoices',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('invoices')]);
+    openInvDetail(linkId);
+  }else if(linkType==='estimate'&&linkId&&currentProfile?.role==='admin'){
+    showView('estimates',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('estimates')]);
+    openEstDetail(linkId);
   }else if(linkType==='dashboard'){
     if(currentProfile?.role==='admin'){showView('dashboard',document.querySelector('.nav-item'));renderDashboard();}
   }
@@ -1574,7 +1580,7 @@ async function doSetNewPassword(){
   const{data:{session}}=await db.auth.getSession();
   if(session)await afterLogin(session.user);
 }
-async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}recoveryMode=false;await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];recurring=[];services=[];costRequests=[];invoiceItemJobLinks=[];notifications=[];subPayments=[];subPaymentJobs=[];subPayLedgerReady=false;currentUser=null;currentProfile=null;currentSubId=null;}
+async function doSignOut(){if(notifChannel){db.removeChannel(notifChannel);notifChannel=null;}recoveryMode=false;await db.auth.signOut();jobs=[];customers=[];subs=[];profiles=[];properties=[];estimates=[];invoices=[];emailEvents=[];recurring=[];services=[];costRequests=[];invoiceItemJobLinks=[];notifications=[];subPayments=[];subPaymentJobs=[];subPayLedgerReady=false;currentUser=null;currentProfile=null;currentSubId=null;}
 function switchAuthTab(tab,el){
   document.querySelectorAll('.auth-tab').forEach(t=>{t.classList.remove('active');t.style.display='';});
   if(el)el.classList.add('active');
@@ -1587,10 +1593,10 @@ function switchAuthTab(tab,el){
 // ── DATA ──────────────────────────────────────────────────────────────────
 async function loadAll(){
   if(currentProfile?.role==='admin'){
-    await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchInvoicedJobIds(),fetchSubPayments(),fetchServices(),fetchCostRequests()]);
+    await Promise.allSettled([fetchJobs(),fetchCustomers(),fetchSubs(),fetchProfiles(),fetchProperties(),fetchEstimates(),fetchInvoices(),fetchEmailEvents(),fetchRecurring(),fetchInvoicedJobIds(),fetchSubPayments(),fetchServices(),fetchCostRequests()]);
     return;
   }
-  customers=[];profiles=[];properties=[];estimates=[];invoices=[];recurring=[];services=[];subPayments=[];subPaymentJobs=[];invoiceItemJobLinks=[];
+  customers=[];profiles=[];properties=[];estimates=[];invoices=[];emailEvents=[];recurring=[];services=[];subPayments=[];subPaymentJobs=[];invoiceItemJobLinks=[];
   await Promise.allSettled([fetchJobs(),fetchOwnSub(),fetchCostRequests()]);
 }
 async function fetchOwnSub(){
@@ -1748,6 +1754,23 @@ async function fetchInvoices(){
   }
   invoices=sortInvoices(data||[]);
   indexInvoicedJobs();
+}
+async function fetchEmailEvents(){
+  if(currentProfile?.role!=='admin'){emailEvents=[];return;}
+  const{data,error}=await fetchAllRows(()=>db.from('email_events').select('*').order('created_at',{ascending:false}));
+  if(error){console.error('fetchEmailEvents',error);emailEvents=[];return;}
+  emailEvents=data||[];
+}
+function latestEmailEvent(kind,id){
+  if(!id||currentProfile?.role==='sub')return null;
+  const rows=(emailEvents||[]).filter(ev=>kind==='invoice'?ev.invoice_id===id:kind==='estimate'?ev.estimate_id===id:false);
+  rows.sort((a,b)=>String(b.sent_at||b.created_at||'').localeCompare(String(a.sent_at||a.created_at||'')));
+  return rows[0]||null;
+}
+function emailProblemEvents(){
+  return (emailEvents||[]).filter(ev=>ev.bounced_at||ev.complained_at||ev.status==='bounced'||ev.status==='complained')
+    .slice()
+    .sort((a,b)=>String(b.status_at||b.bounced_at||b.complained_at||'').localeCompare(String(a.status_at||a.bounced_at||a.complained_at||'')));
 }
 function invoiceSortKey(inv){
   const m=String(inv.invoice_number||'').match(/(\d+)\s*$/);
@@ -2122,6 +2145,21 @@ function focusAttention(kind){
     jobFilter='all';showView('jobs',document.querySelectorAll('.nav-item')[1]);attnFocus='unassigned';renderJobs();
   }
 }
+function openEmailProblem(eventId){
+  const ev=(emailEvents||[]).find(e=>e.id===eventId)||emailProblemEvents()[0];
+  if(!ev)return;
+  closeDetail('job');closeDetail('inv');closeDetail('est');
+  if(ev.invoice_id){
+    showView('invoices',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('invoices')]);
+    openInvDetail(ev.invoice_id);
+  }else if(ev.estimate_id){
+    showView('estimates',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('estimates')]);
+    openEstDetail(ev.estimate_id);
+  }else if(ev.job_id){
+    showView('jobs',document.querySelectorAll('.nav-item')[NAV_ORDER.indexOf('jobs')]);
+    openJobDetail(ev.job_id);
+  }
+}
 function clearAttnFocus(){if(attnFocus){attnFocus=null;}}
 function renderAttentionList(){
   const el=document.getElementById('attention-list');
@@ -2133,6 +2171,15 @@ function renderAttentionList(){
   const todayStr=bizYMD();
   const today=new Date(todayStr+'T12:00:00');
   const items=[];
+
+  const mailProblems=emailProblemEvents();
+  if(mailProblems.length){
+    const newest=mailProblems[0];
+    const who=(newest.to_addresses||[]).filter(Boolean).join(', ');
+    const label=newest.subject||who||'An outgoing email';
+    const eventId=String(newest.id||'').replace(/[^0-9a-f-]/gi,'');
+    items.push({cls:'rose',icon:'📭',bg:'rgba(224,87,74,0.14)',title:`${plural(mailProblems.length,'email')} bounced or marked as spam`,sub:esc(label)+(who&&newest.subject?' · '+esc(who):''),count:mailProblems.length,action:eventId?`openEmailProblem('${eventId}')`:'renderDashboard()'});
+  }
 
   // 1. Jobs completed but NOT invoiced — same set as Ready to Invoice and Reports
   const needInvoice=jobsNeedingInvoice();
@@ -2720,7 +2767,7 @@ async function confirmMergeClients(){
   logActivity('Clients merged',`${drop.name} → ${keep.name} · ${n.jobs} jobs, ${n.properties} properties, ${n.estimates} estimates, ${n.invoices} invoices, ${n.plans} plans`,'customer',keepId);
   closeModal('merge');
   closeDetail('cust');
-  await Promise.all([fetchCustomers(),fetchProperties(),fetchJobs(),fetchEstimates(),fetchInvoices(),fetchRecurring(),fetchCostRequests()]);
+  await Promise.all([fetchCustomers(),fetchProperties(),fetchJobs(),fetchEstimates(),fetchInvoices(),fetchEmailEvents(),fetchRecurring(),fetchCostRequests()]);
   renderAll();
   toast(drop.name+' archived · records are on '+keep.name);
 }
@@ -4698,8 +4745,9 @@ async function openEstDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${sentHeaderHTML(e)}${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(e.estimate_number||'')}</div><div>Status: ${esc(e.status||'')}</div>${e.valid_until?`<div>Valid until: ${fmtDate(e.valid_until)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(e)||'—')}</div>${e.address?`<div style="font-size:11px;color:var(--ink2)">${esc(e.address)}</div>`:''}</div>
       </div>
+      ${emailDeliveryHTML(e,'estimate')}
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
         <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);const opt=lineIsOptional(i);const skipped=opt&&acceptedIds&&!lineCountsTowardApproved(i,acceptedIds);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}${opt?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:#8a6d3b">OPTIONAL</span>':''}${skipped?' <span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--ink3)">NOT CHOSEN</span>':''}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
@@ -5152,13 +5200,38 @@ function sentTimelineLabel(raw){
   if(!rec.to.length&&!rec.cc.length)return 'Sent — '+esc(phrase);
   return 'Sent to '+esc(phrase);
 }
-function sentHeaderHTML(row){
-  if(!row||!row.sent_at)return '';
-  const rec=parseSentTo(row.sent_to);
-  const phrase=sentRecipientsPhrase(row.sent_to);
-  const when=`✓ Sent ${fmtDateTime(row.sent_at)}${phrase?' · '+esc(phrase):''}`;
-  const ccLine=rec.cc.length?`<div>CC: ${rec.cc.map(esc).join(', ')}</div>`:'';
-  return `<div style="color:var(--green);font-weight:600">${when}</div>${ccLine}`;
+function emailAddressPhrase(ev){
+  if(!ev)return '';
+  const to=(ev.to_addresses||[]).filter(Boolean);
+  const cc=(ev.cc_addresses||[]).filter(Boolean);
+  const bits=[];
+  if(to.length)bits.push(to.join(', '));
+  if(cc.length)bits.push('(cc '+cc.join(', ')+')');
+  return bits.join(' ');
+}
+function emailDeliveryHTML(row,kind){
+  if(!row)return '';
+  const ev=kind?latestEmailEvent(kind,row.id):null;
+  const phrase=sentRecipientsPhrase(row.sent_to)||emailAddressPhrase(ev);
+  const when=row.sent_at||(ev&&ev.sent_at);
+  if(!when&&!ev)return '';
+  const bits=[];
+  if(ev&&ev.delivered_at)bits.push('Delivered '+fmtDateTime(ev.delivered_at));
+  if(ev&&ev.opened_at)bits.push('Opened '+fmtDateTime(ev.opened_at));
+  if(ev&&ev.delayed_at)bits.push('Delayed '+fmtDateTime(ev.delayed_at));
+  if(ev&&ev.bounced_at)bits.push('Bounced '+fmtDateTime(ev.bounced_at)+(ev.bounce_reason?' — '+ev.bounce_reason:''));
+  if(ev&&ev.complained_at)bits.push('Complained '+fmtDateTime(ev.complained_at));
+  const problem=!!(ev&&(ev.bounced_at||ev.complained_at||ev.status==='bounced'||ev.status==='complained'));
+  const color=problem?'var(--rose)':(ev&&(ev.opened_at||ev.delivered_at)?'var(--green)':'var(--ink2)');
+  const sentLine=when?`<div style="color:${problem?'var(--rose)':'var(--green)'};font-weight:600">✓ Sent ${fmtDateTime(when)}${phrase?' · '+esc(phrase):''}</div>`:'';
+  const missing=when&&!phrase?`<div style="font-size:11px;color:var(--rose);margin-top:2px">The recipient for this send was not recorded.</div>`:'';
+  const statusLine=bits.length?`<div style="color:${color};font-weight:600;font-size:12.5px;margin-top:2px">${bits.map(esc).join(' · ')}</div>`:'';
+  const approx=ev&&ev.opened_at?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">Opened is approximate. A preview in the mail app can count as an open.</div>`:'';
+  const safeId=/^[0-9a-f-]{36}$/i.test(String(row.id||''))?row.id:'';
+  const fn=safeId?(kind==='invoice'?`emailInvoice('${safeId}')`:`emailEstimate('${safeId}')`):'';
+  const resend=problem&&fn?`<button type="button" class="action-btn ab-red" style="margin-top:8px;width:auto;padding:10px 14px" onclick="${fn}">${ICONS.send} Resend</button>`:'';
+  const border=problem?'1px solid rgba(224,87,74,0.45)':'1px solid var(--line)';
+  return `<div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;border:${border};text-align:left">${sentLine}${missing}${statusLine}${approx}${resend}</div>`;
 }
 function parseContacts(raw){
   let extra=raw;
@@ -5267,36 +5340,30 @@ async function emailEstimate(id){
     <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(quoteUrl)}</p>`:`<p>Just reply to this email or give us a call to move forward — we'd be glad to help!</p>`}
     <p style="margin-top:24px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
+  if(!sentRecord){toast('Add a To address before sending.');return;}
   try{
-    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc);
-    await stampSent('estimates',id,Object.assign(sentRecord?{sent_to:sentRecord}:{},est.status==='Draft'?{status:'Sent'}:{}));
-    logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${who}`,'estimate',id);
-    await fetchEstimates();renderEstimates();renderDashboard();
+    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'estimate',estimate_id:id});
+    const err=await stampSent('estimates',id,Object.assign({sent_to:sentRecord},est.status==='Draft'?{status:'Sent'}:{}));
+    await fetchEstimates();
+    await fetchEmailEvents();
+    renderEstimates();
+    renderDashboard();
+    const fresh=estimates.find(x=>x.id===id);
+    if(err&&!(fresh&&fresh.sent_to)){
+      toast('The email went out, but the recipient was not saved: '+(err.message||'update failed'));
+    }else{
+      logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${who}`,'estimate',id);
+      toast(`✓ Estimate emailed to ${who}`);
+    }
     if(document.getElementById('est-detail').classList.contains('open'))openEstDetail(id);
-    toast(`✓ Estimate emailed to ${who}`);
   }catch(e){
     console.error('resend',e);
-    toast('Direct send failed — opening share instead');
-    const file=new File([result.blob],result.filename,{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:subject});}catch(err){if(err.name==='AbortError')return;}
-    }else{
-      const url=URL.createObjectURL(result.blob);const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-    }
-    await stampSent('estimates',id,Object.assign(sentRecord?{sent_to:sentRecord}:{},est.status==='Draft'?{status:'Sent'}:{}));
-    await fetchEstimates();renderEstimates();
+    toast('Email was not sent: '+(e.message||'the mailer rejected it'));
   }
 }
 async function stampSent(table,id,extra){
   const full=Object.assign({sent_at:new Date().toISOString()},extra||{});
-  let res=await db.from(table).update(full).eq('id',id);
-  if(res.error&&Object.prototype.hasOwnProperty.call(full,'sent_to')){
-    const slim=Object.assign({},full);delete slim.sent_to;
-    res=await db.from(table).update(slim).eq('id',id);
-  }
-  if(res.error&&full.status){
-    res=await db.from(table).update({status:full.status}).eq('id',id);
-  }
+  const res=await db.from(table).update(full).eq('id',id);
   if(res.error)console.error('stampSent',table,res.error);
   return res.error;
 }
@@ -5342,15 +5409,7 @@ async function undoMarkEstimateSent(id){
   if(!confirm(`Mark ${est.estimate_number||'this estimate'} as not sent?`))return;
   const payload={sent_at:null,sent_to:null};
   if(est.status==='Sent')payload.status='Draft';
-  let {error}=await db.from('estimates').update(payload).eq('id',id);
-  if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
-    const slim={sent_at:null};
-    if(payload.status)slim.status=payload.status;
-    ({error}=await db.from('estimates').update(slim).eq('id',id));
-  }
-  if(error&&payload.status){
-    ({error}=await db.from('estimates').update({sent_at:null,status:'Draft'}).eq('id',id));
-  }
+  const {error}=await db.from('estimates').update(payload).eq('id',id);
   if(error){toast('Could not update: '+error.message);return;}
   logActivity('Estimate marked not sent',est.estimate_number||'','estimate',id);
   await fetchEstimates();renderEstimates();renderDashboard();
@@ -5446,7 +5505,19 @@ function invIsOverdue(i){
   const days=(new Date()-new Date(i.sent_at))/(1000*60*60*24);
   return days>30;
 }
+function emailDeliveryCue(kind,id){
+  const ev=latestEmailEvent(kind,id);
+  if(!ev)return '';
+  if(ev.bounced_at||ev.status==='bounced')return `<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} Bounced</span>`;
+  if(ev.complained_at||ev.status==='complained')return `<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} Complaint</span>`;
+  if(ev.opened_at)return `<span class="card-meta-item" style="color:var(--green)">Opened · approximate</span>`;
+  if(ev.delivered_at)return `<span class="card-meta-item" style="color:var(--green)">Delivered</span>`;
+  return '';
+}
 function invSentLabel(i){
+  const ev=latestEmailEvent('invoice',i.id);
+  if(ev&&(ev.bounced_at||ev.status==='bounced'))return ' · <span style="color:var(--rose)">Bounced</span>';
+  if(ev&&(ev.complained_at||ev.status==='complained'))return ' · <span style="color:var(--rose)">Complaint</span>';
   if(i.sent_at)return ' · <span style="color:var(--green)">✓ Sent</span>';
   if(i.status==='Paid'||i.status==='Cancelled')return '';
   return ' · <span style="color:var(--ink3)">Not sent</span>';
@@ -5470,8 +5541,8 @@ function invoiceDueCue(i){
 }
 function estimateListCard(e,onclick){
   return `<div class="card" data-type="estimate" data-id="${esc(e.id)}" data-number="${esc(e.estimate_number||'')}" onclick="${onclick}">
-    <div class="card-top"><div><div class="card-id">${esc(e.estimate_number||'')}${e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':''}</div><div class="card-title">${esc(customerNameOf(e)||e.address||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
-    <div class="card-meta">${estimateDateLabel(e)?`<span class="card-meta-item">${ICONS.calendar} ${esc(estimateDateLabel(e))}</span>`:''}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}</div>
+    <div class="card-top"><div>    <div class="card-id">${esc(e.estimate_number||'')}${(()=>{const ev=latestEmailEvent('estimate',e.id);if(ev&&(ev.bounced_at||ev.status==='bounced'))return ' · <span style="color:var(--rose)">Bounced</span>';if(ev&&(ev.complained_at||ev.status==='complained'))return ' · <span style="color:var(--rose)">Complaint</span>';return e.sent_at?' · <span style="color:var(--green)">✓ Sent</span>':'';})()}</div><div class="card-title">${esc(customerNameOf(e)||e.address||'—')}</div></div><span class="${pClass(e.status)}">${esc(e.status||'')}</span></div>
+    <div class="card-meta">${estimateDateLabel(e)?`<span class="card-meta-item">${ICONS.calendar} ${esc(estimateDateLabel(e))}</span>`:''}${e.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(e.address)}</span>`:''}${e.valid_until?`<span class="card-meta-item">${ICONS.calendar} Valid until ${fmtDate(e.valid_until)}</span>`:''}${emailDeliveryCue('estimate',e.id)}</div>
     <div class="card-footer"><div class="card-amount">${fmt(estimateDisplayMoney(e).total)}</div></div>
   </div>`;
 }
@@ -5480,7 +5551,7 @@ function invoiceListCard(i,onclick){
   const displayStatus=overdue&&i.status!=='Paid'&&i.status!=='Cancelled'?'Overdue':i.status;
   return `<div class="card" data-type="invoice" data-id="${esc(i.id)}" data-number="${esc(i.invoice_number||'')}" onclick="${onclick}">
     <div class="card-top"><div><div class="card-id">${esc(i.invoice_number||'')}${invSentLabel(i)}</div><div class="card-title">${esc(customerNameOf(i)||'—')}</div></div><span class="${pClass(displayStatus)}">${esc(displayStatus||'')}</span></div>
-    <div class="card-meta">${cardWhenHTML(i)}${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${invoiceDueCue(i)}${invoicePaidCardHTML(i)}</div>
+    <div class="card-meta">${cardWhenHTML(i)}${i.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(i.address)}</span>`:''}${invoiceDueCue(i)}${emailDeliveryCue('invoice',i.id)}${invoicePaidCardHTML(i)}</div>
     <div class="card-footer"><div class="card-amount">${fmt(i.total)}</div></div>
   </div>`;
 }
@@ -5721,8 +5792,9 @@ async function openInvDetail(id){
     <div class="invoice-preview">
       <div class="inv-header">
         <div><div class="inv-brand">Sumak Lawncare</div><div style="font-size:11px;color:var(--ink2);margin-top:4px">Treasure Valley, Idaho<br>office@sumaklawncare.com</div></div>
-        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${invoicePaymentDetailHTML(inv)}${inv.sent_at?sentHeaderHTML(inv):(inv.status==='Paid'?'':`<div style="color:var(--ink3)">Not sent yet</div>`)}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
+        <div class="inv-meta"><div style="font-weight:700;font-size:14px">${esc(inv.invoice_number||'')}</div><div>Status: ${esc(inv.status||'')}</div>${invoicePaymentDetailHTML(inv)}${!inv.sent_at&&!latestEmailEvent('invoice',inv.id)&&inv.status!=='Paid'?`<div style="color:var(--ink3)">Not sent yet</div>`:''}${inv.due_date?`<div>Due: ${fmtDate(inv.due_date)}</div>`:''}<div style="margin-top:4px;font-weight:600">${esc(customerNameOf(inv)||'—')}</div>${inv.address?`<div style="font-size:11px;color:var(--ink2)">${esc(inv.address)}</div>`:''}</div>
       </div>
+      ${emailDeliveryHTML(inv,'invoice')}
       <table class="inv-table">
         <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
         <tbody>${(items||[]).map(i=>{const a=lineAmounts(i.quantity,i.unit_price,i.total);return `<tr><td><div style="font-weight:600">${esc(i.title||i.description||'')}</div>${i.title&&i.description?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(i.description)}</div>`:''}</td><td>${fmtQty(i.quantity)}</td><td>${fmt(a.unit)}</td><td>${fmt(a.total)}</td></tr>`;}).join('')}</tbody>
@@ -5931,15 +6003,40 @@ async function blobToBase64(blob){
     r.readAsDataURL(blob);
   });
 }
-async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc){
+async function resendErrorMessage(error,data){
+  if(data&&data.error){
+    const detail=data.detail||data.error;
+    return typeof detail==='string'?detail:JSON.stringify(detail);
+  }
+  let msg=error&&error.message||'Email was not sent';
+  try{
+    const ctx=error&&error.context;
+    if(ctx&&typeof ctx.json==='function'){
+      const payload=await ctx.json();
+      const detail=payload&&(payload.detail||payload.error);
+      if(detail)msg=typeof detail==='string'?detail:JSON.stringify(detail);
+    }else if(ctx&&typeof ctx.text==='function'){
+      const text=await ctx.text();
+      if(text){
+        try{const payload=JSON.parse(text);if(payload.detail||payload.error)msg=payload.detail||payload.error;}catch(e){msg=String(text).slice(0,240);}
+      }
+    }
+  }catch(e){}
+  if(msg==='Edge Function returned a non-2xx status code')msg='Email was not sent';
+  return msg;
+}
+async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc,meta){
   const pdfBase64=pdfBlob?await blobToBase64(pdfBlob):null;
   const toList=dedupeEmails(Array.isArray(to)?to:parseAddressList(to));
   const ccList=dedupeEmails(Array.isArray(cc)?cc:parseAddressList(cc)).filter(e=>!toList.some(t=>t.toLowerCase()===e.toLowerCase()));
   const body={to:toList,subject,html:htmlBody,pdfBase64,pdfFilename};
   if(ccList.length)body.cc=ccList;
+  if(meta&&meta.kind)body.kind=meta.kind;
+  if(meta&&meta.invoice_id)body.invoice_id=meta.invoice_id;
+  if(meta&&meta.estimate_id)body.estimate_id=meta.estimate_id;
+  if(meta&&meta.job_id)body.job_id=meta.job_id;
   const{data,error}=await db.functions.invoke('send-email',{body});
-  if(error)throw new Error(error.message||'send failed');
-  if(data&&data.error)throw new Error(JSON.stringify(data.detail||data.error));
+  if(error||(data&&data.error))throw new Error(await resendErrorMessage(error,data));
   return data;
 }
 async function emailInvoice(id){
@@ -5948,6 +6045,7 @@ async function emailInvoice(id){
   const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number);
   if(!choice||!choice.to||!choice.to.length)return;
   const sentRecord=encodeSentTo(choice);
+  if(!sentRecord){toast('Add a To address before sending.');return;}
   const who=sentRecipientsPhrase(sentRecord);
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
@@ -5960,39 +6058,41 @@ async function emailInvoice(id){
     <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
   try{
-    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc);
-    await markInvoiceSent(id,sentRecord);
-    toast(`✓ Invoice emailed to ${who}`);
+    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'invoice',invoice_id:id});
+    const saved=await markInvoiceSent(id,sentRecord);
+    if(saved)toast(`✓ Invoice emailed to ${who}`);
     openInvDetail(id);
   }catch(e){
-    // Fall back to the share/download path if direct send fails
     console.error('resend',e);
-    toast('Direct send failed — opening share instead');
-    const file=new File([result.blob],result.filename,{type:'application/pdf'});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      try{await navigator.share({files:[file],title:subject});await markInvoiceSent(id,sentRecord);toast('Shared ✓');return;}catch(err){if(err.name==='AbortError')return;}
-    }
-    const url=URL.createObjectURL(result.blob);
-    const a=document.createElement('a');a.href=url;a.download=result.filename;document.body.appendChild(a);a.click();document.body.removeChild(a);
-    await markInvoiceSent(id,sentRecord);
+    toast('Email was not sent: '+(e.message||'the mailer rejected it'));
   }
 }
 async function markInvoiceSent(id,sentTo){
   const inv=invoices.find(x=>x.id===id);
   const phrase=sentTo?sentRecipientsPhrase(sentTo):'';
-  await stampSent('invoices',id,sentTo?{sent_to:sentTo}:{});
+  if(!sentTo){
+    toast('The email went out, but the recipient was not saved.');
+    return false;
+  }
+  const err=await stampSent('invoices',id,{sent_to:sentTo});
+  await fetchInvoices();
+  await fetchEmailEvents();
+  renderInvoices();
+  renderDashboard();
+  const fresh=invoices.find(x=>x.id===id);
+  if(err&&!(fresh&&fresh.sent_to)){
+    toast('The email went out, but the recipient was not saved: '+(err.message||'update failed'));
+    return false;
+  }
   logActivity('Invoice sent',inv?`${inv.invoice_number} — ${inv.customers?.name||''}${phrase?' · '+phrase:''}`.trim():null,'invoice',id);
-  await fetchInvoices();renderInvoices();
+  return true;
 }
 async function toggleInvoiceSent(id){
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
   if(!inv.sent_at){openMarkInvoiceSent(id);return;}
   if(!confirm(`Mark ${inv.invoice_number} as not sent?`))return;
   const payload={sent_at:null,sent_to:null};
-  let {error}=await db.from('invoices').update(payload).eq('id',id);
-  if(error&&Object.prototype.hasOwnProperty.call(payload,'sent_to')){
-    ({error}=await db.from('invoices').update({sent_at:null}).eq('id',id));
-  }
+  const {error}=await db.from('invoices').update(payload).eq('id',id);
   if(error){toast('Could not update: '+error.message);return;}
   logActivity('Invoice marked not sent',inv.invoice_number||'','invoice',id);
   await fetchInvoices();renderInvoices();openInvDetail(id);
