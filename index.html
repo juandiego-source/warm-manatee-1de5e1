@@ -42,6 +42,9 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 @media (max-width:899px){
   html.ios-standalone,html.ios-standalone body{height:100vh;height:100lvh;}
   html.ios-standalone #app{height:100vh;height:100lvh;max-height:100lvh;}
+  /* Status bar and home indicator stay solid cream. Glass blur was smearing the page gradient into both insets. */
+  html.ios-standalone #topbar,html.ios-standalone .detail-topbar{background:var(--cream);backdrop-filter:none;-webkit-backdrop-filter:none;}
+  html.ios-standalone #navbar{background:var(--cream);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;}
 }
 
 /* AUTH */
