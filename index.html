@@ -45,6 +45,21 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
   /* Status bar and home indicator stay solid cream. Glass blur was smearing the page gradient into both insets. */
   html.ios-standalone #topbar,html.ios-standalone .detail-topbar{background:var(--cream);backdrop-filter:none;-webkit-backdrop-filter:none;}
   html.ios-standalone #navbar{background:var(--cream);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;}
+  /* Sheet sits above the fixed tab bar and stays inside the safe area. */
+  .modal-overlay{position:fixed;z-index:450;}
+  .modal{max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 12px);overscroll-behavior:contain;padding-bottom:calc(20px + env(safe-area-inset-bottom, 0px));}
+  .modal-actions{bottom:calc(-20px - env(safe-area-inset-bottom, 0px));margin-bottom:calc(-20px - env(safe-area-inset-bottom, 0px));padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));}
+  body.modal-open #navbar{display:none;}
+  .modal-close,.back-btn,.cal-nav-btn,#more-menu-btn,#notif-bell{width:44px;height:44px;min-width:44px;min-height:44px;}
+  #signout-btn{min-height:44px;display:inline-flex;align-items:center;padding:0 12px;}
+  .fchip{min-height:44px;display:inline-flex;align-items:center;}
+  .btn,.action-btn,.photo-upload-btn{min-height:44px;}
+  .nav-item{min-height:48px;}
+  input,select,textarea{font-size:16px !important;}
+  .detail-scroll{padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px));}
+  #content{padding-bottom:calc(92px + env(safe-area-inset-bottom, 0px));}
+  #trash-overlay>div,#activity-overlay>div{max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 12px) !important;padding-bottom:calc(20px + env(safe-area-inset-bottom, 0px)) !important;overscroll-behavior:contain;}
+  #trash-overlay span[onclick],#activity-overlay span[onclick]{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
 }
 
 /* AUTH */
@@ -296,10 +311,14 @@ body{background:var(--cream);background-image:radial-gradient(ellipse 80% 60% at
 .modal-overlay.open .modal{transform:translateY(0);opacity:1;}
 .modal{background:var(--glass-s);border-radius:28px 28px 0 0;padding:8px 20px 44px;width:100%;max-height:92vh;overflow-y:auto;backdrop-filter:var(--blur);border:1px solid var(--glass-b);border-bottom:none;box-shadow:var(--gshadow-lg);}
 .modal-handle{width:40px;height:4px;background:rgba(255,255,255,0.16);border-radius:2px;margin:14px auto 20px;}
-.modal-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:20px;}
+.modal-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;}
+.modal-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:0;flex:1;min-width:0;}
+.modal-close{width:36px;height:36px;margin-top:2px;border-radius:50%;border:1px solid var(--glass-b);background:rgba(255,255,255,0.06);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:inherit;}
+.modal-actions{position:sticky;bottom:0;z-index:3;margin:16px -20px -44px;padding:12px 20px 16px;background:#1C1613;border-top:1px solid var(--line);}
+body.modal-open #content,body.detail-open #content{overflow:hidden;}
 .form-group{margin-bottom:14px;}
 .form-label{font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:6px;display:block;}
-.form-input{width:100%;border:1.5px solid rgba(255,255,255,0.14);border-radius:var(--rxs);padding:12px 13px;font-size:14px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);background:rgba(255,255,255,0.05);backdrop-filter:var(--blur-sm);transition:all 0.15s;appearance:none;}
+.form-input{width:100%;border:1.5px solid rgba(255,255,255,0.14);border-radius:var(--rxs);padding:12px 13px;font-size:16px;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);background:rgba(255,255,255,0.05);backdrop-filter:var(--blur-sm);transition:all 0.15s;appearance:none;}
 .form-input:focus{outline:none;border-color:var(--red);background:rgba(255,255,255,0.07);box-shadow:0 0 0 3px var(--red-l);}
 select.form-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237C7268' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:36px;}
 textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
@@ -342,6 +361,15 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 .detail-topbar{background:var(--glass);backdrop-filter:var(--blur);border-bottom:1px solid var(--glass-b);padding:14px 18px;padding-top:calc(14px + env(safe-area-inset-top, 0px));display:flex;align-items:center;gap:14px;flex-shrink:0;}
 .back-btn{color:var(--red);font-size:20px;cursor:pointer;background:var(--red-l);border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;}
 .back-btn:active{background:var(--red);color:white;}
+@media (max-width:899px){
+  /* Later base rules would otherwise win over the phone sheet. Keep the sheet above the tab bar and clear of the home indicator. */
+  .modal-overlay{position:fixed;z-index:450;}
+  .modal{max-height:calc(100dvh - env(safe-area-inset-top, 0px) - 12px);overscroll-behavior:contain;padding-bottom:calc(20px + env(safe-area-inset-bottom, 0px));}
+  .modal-actions{bottom:calc(-20px - env(safe-area-inset-bottom, 0px));margin-bottom:calc(-20px - env(safe-area-inset-bottom, 0px));padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));}
+  body.modal-open #navbar{display:none !important;}
+  #content{padding-bottom:calc(92px + env(safe-area-inset-bottom, 0px));}
+  .detail-scroll{padding-bottom:calc(96px + env(safe-area-inset-bottom, 0px));}
+}
 .detail-topbar-title{font-family:'Cormorant Garamond',serif;color:var(--ink);font-size:19px;font-weight:600;flex:1;}
 .detail-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px 14px calc(88px + env(safe-area-inset-bottom, 0px));}
 .detail-card{background:var(--glass);border:1px solid var(--glass-b);border-radius:var(--r);padding:16px;margin-bottom:12px;backdrop-filter:var(--blur);box-shadow:var(--gshadow);}
@@ -365,7 +393,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 .photo-del{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:white;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;}
 .photo-upload-btn{width:100%;padding:14px;background:var(--glass);border:2px dashed rgba(255,255,255,0.16);border-radius:var(--rsm);font-size:14px;font-weight:600;color:var(--ink2);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;text-align:center;margin-top:8px;backdrop-filter:var(--blur-sm);}
 .photo-upload-btn:active{border-color:var(--red);color:var(--red);}
-#photo-lightbox{position:fixed;inset:0;z-index:1000;background:rgba(10,8,7,0.94);display:none;align-items:center;justify-content:center;padding:24px;}
+#photo-lightbox{position:fixed;inset:0;z-index:1000;background:rgba(10,8,7,0.94);display:none;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));}
 #photo-lightbox.open{display:flex;}
 #photo-lightbox img{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
 #photo-lightbox-close{position:absolute;top:20px;right:20px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:white;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
@@ -802,7 +830,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 <div class="modal-overlay" id="modal-job" onclick="overlayClose(event,'job')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="job-modal-title">New Job</div>
+    <div class="modal-title-row"><div class="modal-title" id="job-modal-title">New Job</div><button type="button" class="modal-close" onclick="requestCloseModal('job')" aria-label="Close">✕</button></div>
     <input type="hidden" id="job-edit-id">
     <div class="form-group"><label class="form-label">Job Title *</label><input class="form-input" id="job-title" placeholder="e.g. Lawn mowing & edging"></div>
     <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="job-customer" required onchange="loadCustomerProps()"><option value="">Select customer...</option></select></div>
@@ -831,8 +859,10 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
     <div id="job-margin-preview" style="display:none;padding:10px 12px;border-radius:var(--rxs);background:var(--red-l);margin-bottom:14px;font-size:12px;color:var(--ink2);justify-content:space-between"></div>
     <div class="form-group"><label class="form-label">Payment to Sub</label><select class="form-input" id="job-paystatus"><option>Unpaid</option><option>Paid</option></select></div>
     <div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="job-notes" placeholder="Gate code, special instructions..."></div>
-    <button class="btn btn-red btn-full" onclick="saveJob()">Save Job</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('job')">Cancel</button>
+    <div class="modal-actions">
+      <button class="btn btn-red btn-full" onclick="saveJob()">Save Job</button>
+      <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('job')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -840,7 +870,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
 <div class="modal-overlay" id="modal-import" onclick="overlayClose(event,'import')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Import Clients</div>
+    <div class="modal-title-row"><div class="modal-title">Import Clients</div><button type="button" class="modal-close" onclick="requestCloseModal('import')" aria-label="Close">✕</button></div>
     <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">Paste your list below — one client per line, separated by commas: <strong style="color:var(--ink2)">Name, Phone, Email, City</strong>. Phone/Email/City are optional.</div>
     <div class="form-group">
       <textarea class="form-input" id="import-text" rows="7" placeholder="Village Bungalows HOA, 208-555-1234, nina@example.com, Meridian
@@ -851,7 +881,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <button class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-bottom:12px" onclick="previewImport()">Preview</button>
     <div id="import-preview"></div>
     <button class="btn btn-red btn-full" id="import-confirm-btn" style="display:none" onclick="confirmImport()">Import All</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('import')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('import')">Cancel</button>
   </div>
 </div>
 
@@ -859,7 +889,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-customer" onclick="overlayClose(event,'customer')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="cust-modal-title">New Client</div>
+    <div class="modal-title-row"><div class="modal-title" id="cust-modal-title">New Client</div><button type="button" class="modal-close" onclick="requestCloseModal('customer')" aria-label="Close">✕</button></div>
     <input type="hidden" id="cust-edit-id">
     <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="cust-name" placeholder="e.g. Apex Idaho PM"></div>
     <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="cust-phone" type="tel" placeholder="(208) 555-0100"></div>
@@ -877,7 +907,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
       <button type="button" class="btn btn-glass btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="addCustContactRow()">+ Add contact</button>
     </div>
     <button class="btn btn-red btn-full" onclick="saveCustomer()">Save Client</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('customer')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('customer')">Cancel</button>
   </div>
 </div>
 
@@ -885,7 +915,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-sub" onclick="overlayClose(event,'sub')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="sub-modal-title">New Subcontractor</div>
+    <div class="modal-title-row"><div class="modal-title" id="sub-modal-title">New Subcontractor</div><button type="button" class="modal-close" onclick="requestCloseModal('sub')" aria-label="Close">✕</button></div>
     <input type="hidden" id="sub-edit-id">
     <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="sub-name" placeholder="e.g. Carlos M."></div>
     <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="sub-phone" type="tel" placeholder="(208) 555-0100"></div>
@@ -893,7 +923,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="form-group"><label class="form-label">Specialty</label><input class="form-input" id="sub-specialty" placeholder="e.g. Lawn & Irrigation"></div>
     <div class="form-group"><label class="form-label">Status</label><select class="form-input" id="sub-active"><option value="true">Active</option><option value="false">Inactive</option></select></div>
     <button class="btn btn-red btn-full" onclick="saveSub()">Save Subcontractor</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('sub')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('sub')">Cancel</button>
   </div>
 </div>
 
@@ -901,7 +931,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-estimate" onclick="overlayClose(event,'estimate')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="est-modal-title">New Estimate</div>
+    <div class="modal-title-row"><div class="modal-title" id="est-modal-title">New Estimate</div><button type="button" class="modal-close" onclick="requestCloseModal('estimate')" aria-label="Close">✕</button></div>
     <input type="hidden" id="est-edit-id">
     <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="est-customer" onchange="loadEstCustomerProps()"><option value="">Select customer...</option></select></div>
     <div class="form-group"><label class="form-label">Property Address</label>
@@ -943,9 +973,11 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
       </div>
     </div>
     <div class="form-group" style="margin-top:14px"><label class="form-label">Notes</label><textarea class="form-input" id="est-notes" placeholder="Terms, conditions, scope notes..."></textarea></div>
-    <button class="btn btn-red btn-full" onclick="saveEstimate(true)">Save & Send to Client</button>
-    <button class="btn btn-full btn-glass" style="margin-top:8px" onclick="saveEstimate(false)">Save as Draft</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('estimate')">Cancel</button>
+    <div class="modal-actions">
+      <button class="btn btn-red btn-full" onclick="saveEstimate(true)">Save & Send to Client</button>
+      <button class="btn btn-full btn-glass" style="margin-top:8px" onclick="saveEstimate(false)">Save as Draft</button>
+      <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('estimate')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -953,10 +985,10 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-invoice" onclick="overlayClose(event,'invoice')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="inv-modal-title">New Invoice</div>
+    <div class="modal-title-row"><div class="modal-title" id="inv-modal-title">New Invoice</div><button type="button" class="modal-close" onclick="requestCloseModal('invoice')" aria-label="Close">✕</button></div>
     <input type="hidden" id="inv-edit-id">
     <div class="form-group"><label class="form-label">Customer *</label><select class="form-input" id="inv-customer" onchange="loadInvCustomerProps()"><option value="">Select customer...</option></select></div>
-    <div class="form-group"><label class="form-label">Linked Job</label><select class="form-input" id="inv-job" onchange="refreshInvoiceDupWarning()"><option value="">Select job (optional)...</option></select></div>
+    <div class="form-group"><label class="form-label">Linked Job</label><select class="form-input" id="inv-job" onchange="onInvJobChange()"><option value="">Select job (optional)...</option></select></div>
     <div id="inv-dup-warn"></div>
     <div class="form-group"><label class="form-label">Service Address</label>
       <select class="form-input" id="inv-prop-select" onchange="onInvPropSelect()" style="margin-bottom:6px"><option value="">Select saved address...</option></select>
@@ -977,9 +1009,12 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     </div>
     <div class="estimate-total-row"><span class="estimate-total-lbl">Total</span><span class="estimate-total-val" id="inv-total-display">$0</span></div>
     <div class="form-group" style="margin-top:14px"><label class="form-label">Notes</label><textarea class="form-input" id="inv-notes" placeholder="Payment terms, notes..."></textarea></div>
-    <button class="btn btn-red btn-full" onclick="saveInvoice(true)">Save & Send to Client</button>
-    <button class="btn btn-full btn-glass" style="margin-top:8px" onclick="saveInvoice(false)">Save Only</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('invoice')">Cancel</button>
+    <label style="display:flex;gap:10px;align-items:flex-start;min-height:44px;margin:4px 0 8px;font-size:13px;color:var(--ink2);cursor:pointer"><input type="checkbox" id="inv-include-photos" checked style="width:22px;height:22px;margin-top:1px;flex-shrink:0"> <span>Include job photos <span style="color:var(--ink3)">on the invoice and in the client email</span></span></label>
+    <div class="modal-actions">
+      <button class="btn btn-red btn-full" onclick="saveInvoice(true)">Save & Send to Client</button>
+      <button class="btn btn-full btn-glass" style="margin-top:8px" onclick="saveInvoice(false)">Save Only</button>
+      <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('invoice')">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -987,10 +1022,10 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-assign" onclick="overlayClose(event,'assign')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Link Sub Account</div>
+    <div class="modal-title-row"><div class="modal-title">Link Sub Account</div><button type="button" class="modal-close" onclick="requestCloseModal('assign')" aria-label="Close">✕</button></div>
     <p style="font-size:13px;color:var(--ink2);margin-bottom:18px;line-height:1.6">Link a registered account to a subcontractor profile so they see their jobs.</p>
     <div id="assign-list"></div>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('assign')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('assign')">Cancel</button>
   </div>
 </div>
 
@@ -998,7 +1033,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-costreq" onclick="overlayClose(event,'costreq')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="cr-modal-title">Request a Quote from a Sub</div>
+    <div class="modal-title-row"><div class="modal-title" id="cr-modal-title">Request a Quote from a Sub</div><button type="button" class="modal-close" onclick="requestCloseModal('costreq')" aria-label="Close">✕</button></div>
     <input type="hidden" id="cr-edit-id">
     <div style="font-size:12px;color:var(--ink3);margin-bottom:14px">Send a sub to look at a job and tell you what it'll cost. Once they submit it, you'll turn that into a client estimate with your markup.</div>
     <div class="form-group"><label class="form-label">Client *</label><select class="form-input" id="cr-customer" required onchange="loadCrCustomerProps()"><option value="">Select client...</option></select></div>
@@ -1012,7 +1047,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="form-group"><label class="form-label">What to Assess</label><textarea class="form-input" id="cr-description" placeholder="Details for the sub — scope, what you want priced..."></textarea></div>
     <div class="form-group"><label class="form-label">Send to Sub *</label><select class="form-input" id="cr-sub" required><option value="">Select subcontractor...</option></select></div>
     <button class="btn btn-red btn-full" onclick="saveCostRequest()">Send Request</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('costreq')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('costreq')">Cancel</button>
   </div>
 </div>
 
@@ -1020,7 +1055,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-rec" onclick="overlayClose(event,'rec')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="rec-modal-title">New Recurring Service</div>
+    <div class="modal-title-row"><div class="modal-title" id="rec-modal-title">New Recurring Service</div><button type="button" class="modal-close" onclick="requestCloseModal('rec')" aria-label="Close">✕</button></div>
     <input type="hidden" id="rec-id">
     <div class="form-group" id="rec-customer-group"><label class="form-label">Client</label><select class="form-input" id="rec-customer" onchange="loadRecCustomerProps()"><option value="">Select client...</option></select></div>
     <div class="form-group" id="rec-address-single" style="display:none">
@@ -1055,7 +1090,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     </div>
     <div class="form-group"><label class="form-label">Season Ends (last visit on or before)</label><input class="form-input" id="rec-end" type="date"></div>
     <button class="btn btn-red btn-full" onclick="saveRecService()">Save Recurring Service</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('rec')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('rec')">Cancel</button>
   </div>
 </div>
 
@@ -1063,11 +1098,11 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-dupinv" onclick="overlayClose(event,'dupinv')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">This job already has an invoice</div>
+    <div class="modal-title-row"><div class="modal-title">This job already has an invoice</div><button type="button" class="modal-close" onclick="requestCloseModal('dupinv')" aria-label="Close">✕</button></div>
     <div id="dupinv-body"></div>
     <p style="font-size:12.5px;color:var(--ink2);margin:12px 0 16px;line-height:1.5">Open the invoice above. A second invoice bills the same job again. Choose that only when you really mean to.</p>
     <button class="btn btn-red btn-full" onclick="confirmDupInvoiceOverride()">Create a second invoice anyway</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('dupinv')">Don't create another</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('dupinv')">Don't create another</button>
   </div>
 </div>
 
@@ -1075,14 +1110,14 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-merge" onclick="overlayClose(event,'merge')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Merge clients</div>
+    <div class="modal-title-row"><div class="modal-title">Merge clients</div><button type="button" class="modal-close" onclick="requestCloseModal('merge')" aria-label="Close">✕</button></div>
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5">Pick the duplicate to archive and the record to keep. Jobs, properties, estimates, invoices, and maintenance plans move onto the one you keep. Nothing is deleted until you confirm.</p>
     <div id="merge-suggestions"></div>
     <div class="form-group"><label class="form-label">Duplicate to archive</label><select class="form-input" id="merge-drop" onchange="renderMergePreview()"></select></div>
     <div class="form-group"><label class="form-label">Record to keep</label><select class="form-input" id="merge-keep" onchange="renderMergePreview()"></select></div>
     <div id="merge-preview"></div>
     <button class="btn btn-red btn-full" onclick="confirmMergeClients()">Move records and archive duplicate</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('merge')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('merge')">Cancel</button>
   </div>
 </div>
 
@@ -1090,7 +1125,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-subpay" onclick="overlayClose(event,'subpay')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="sp-title">Record a payout</div>
+    <div class="modal-title-row"><div class="modal-title" id="sp-title">Record a payout</div><button type="button" class="modal-close" onclick="requestCloseModal('subpay')" aria-label="Close">✕</button></div>
     <input type="hidden" id="sp-id" value="">
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5">Money you paid a sub. Mark as Paid on a job still works by itself. A job is marked paid here only when the amount tied to it covers the rest of its sub pay.</p>
     <div class="form-group"><label class="form-label">Sub</label><select class="form-input" id="sp-sub" onchange="renderPayoutJobPicks()"></select></div>
@@ -1112,7 +1147,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div id="sp-jobs" style="margin-bottom:8px"></div>
     <div id="sp-hint" style="font-size:12px;color:var(--ink2);margin-bottom:8px"></div>
     <button class="btn btn-red btn-full" id="sp-save" onclick="saveRecordPayout()">Save payout</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('subpay')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('subpay')">Cancel</button>
   </div>
 </div>
 
@@ -1120,7 +1155,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-markpaid" onclick="overlayClose(event,'markpaid')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="mp-title">Mark as Paid</div>
+    <div class="modal-title-row"><div class="modal-title" id="mp-title">Mark as Paid</div><button type="button" class="modal-close" onclick="requestCloseModal('markpaid')" aria-label="Close">✕</button></div>
     <input type="hidden" id="mp-job-id">
     <div class="form-group"><label class="form-label">Paid Via</label>
       <select class="form-input" id="mp-method">
@@ -1129,7 +1164,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     </div>
     <div class="form-group"><label class="form-label">Date Paid</label><input class="form-input" id="mp-date" type="date"></div>
     <button class="btn btn-red btn-full" onclick="confirmMarkPaid()">Confirm Payment</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('markpaid')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('markpaid')">Cancel</button>
   </div>
 </div>
 
@@ -1137,7 +1172,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-sendto" onclick="overlayClose(event,'sendto')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="sendto-title">Send to</div>
+    <div class="modal-title-row"><div class="modal-title" id="sendto-title">Send to</div><button type="button" class="modal-close" onclick="requestCloseModal('sendto')" aria-label="Close">✕</button></div>
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Check every To address that should get this email. Type extra addresses separated by commas. CC is separate. A typed address is used for this send only and is not saved on the client.</p>
     <div class="form-label">To</div>
     <div id="sendto-choices"></div>
@@ -1146,7 +1181,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div id="sendto-cc-choices"></div>
     <div class="form-group" style="margin-top:12px"><label class="form-label">CC addresses</label><input class="form-input" id="sendto-cc" type="text" placeholder="cc@example.com, other@example.com" autocomplete="off"></div>
     <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
-    <button class="btn btn-full btn-full-ghost" onclick="cancelSendTo()">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('sendto')">Cancel</button>
   </div>
 </div>
 
@@ -1154,7 +1189,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-invpaid" onclick="overlayClose(event,'invpaid')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="invpaid-title">Mark as Paid</div>
+    <div class="modal-title-row"><div class="modal-title" id="invpaid-title">Mark as Paid</div><button type="button" class="modal-close" onclick="requestCloseModal('invpaid')" aria-label="Close">✕</button></div>
     <p id="invpaid-sub" style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5"></p>
     <div class="form-group"><label class="form-label">Payment method *</label>
       <select class="form-input" id="invpaid-method">
@@ -1172,7 +1207,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="form-group"><label class="form-label">Date paid *</label><input class="form-input" id="invpaid-date" type="date"></div>
     <div id="invpaid-error" style="display:none;font-size:12.5px;color:var(--rose);font-weight:600;margin:-2px 0 12px;line-height:1.4"></div>
     <button class="btn btn-red btn-full" id="invpaid-save" onclick="confirmInvoicePaid()">Confirm Payment</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('invpaid')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('invpaid')">Cancel</button>
   </div>
 </div>
 
@@ -1180,13 +1215,13 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-markinv" onclick="overlayClose(event,'markinv')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="markinv-title">Mark as sent</div>
+    <div class="modal-title-row"><div class="modal-title" id="markinv-title">Mark as sent</div><button type="button" class="modal-close" onclick="requestCloseModal('markinv')" aria-label="Close">✕</button></div>
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Record who received this invoice, including anyone on CC. Both address fields are optional. This does not send another email.</p>
     <div class="form-group"><label class="form-label">Sent to</label><input class="form-input" id="markinv-to" type="text" placeholder="billing@example.com" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">CC</label><input class="form-input" id="markinv-cc" type="text" placeholder="judy@example.com" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">Note</label><input class="form-input" id="markinv-note" type="text" placeholder="sent via the portal" autocomplete="off"></div>
     <button class="btn btn-red btn-full" id="markinv-save" onclick="confirmMarkInvoiceSent()">Mark as Sent</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('markinv')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('markinv')">Cancel</button>
   </div>
 </div>
 
@@ -1194,12 +1229,12 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
 <div class="modal-overlay" id="modal-marksent" onclick="overlayClose(event,'marksent')">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="marksent-title">Mark as sent</div>
+    <div class="modal-title-row"><div class="modal-title" id="marksent-title">Mark as sent</div><button type="button" class="modal-close" onclick="requestCloseModal('marksent')" aria-label="Close">✕</button></div>
     <p style="font-size:12.5px;color:var(--ink3);margin:-6px 0 12px;line-height:1.5">Use this when the estimate went out another way (Gmail, text, a vendor portal). Both fields are optional.</p>
     <div class="form-group"><label class="form-label">Sent to</label><input class="form-input" id="marksent-to" type="text" placeholder="judy@example.com, francine@example.com" autocomplete="off"></div>
     <div class="form-group"><label class="form-label">Note</label><input class="form-input" id="marksent-note" type="text" placeholder="sent via Gmail" autocomplete="off"></div>
     <button class="btn btn-red btn-full" onclick="confirmMarkEstimateSent()">Mark as Sent</button>
-    <button class="btn btn-full btn-full-ghost" onclick="closeModal('marksent')">Cancel</button>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('marksent')">Cancel</button>
   </div>
 </div>
 
@@ -1432,7 +1467,12 @@ async function fetchNotifications(){
 }
 function toggleNotifPanel(){
   const p=document.getElementById('notif-panel');
+  const opening=!p.classList.contains('open');
   p.classList.toggle('open');
+  if(opening)pushHistoryState('sheet');
+  else if(history.state&&history.state.kind==='sheet'&&!modalClosePending){
+    try{history.replaceState({sumak:true,path:currentUrl()},'',currentUrl());}catch(e){}
+  }
 }
 function renderNotifPanel(){
   const unread=notifications.filter(n=>!n.read).length;
@@ -2548,7 +2588,7 @@ function openCustDetail(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   if(!beginRecordOpen(c.id))return;
   document.getElementById('detail-cust-name').textContent=c.name||'Client';
-  document.getElementById('cust-detail').classList.add('open');
+  document.getElementById('cust-detail').classList.add('open');syncDetailOpenClass();
   syncRecordUrl('cust',c);
   const cj=jobs.filter(j=>j.customer_id===id);
   const cProps=properties.filter(p=>p.customer_id===id);
@@ -3206,11 +3246,11 @@ function openRecDetail(id){
   const done=visits.filter(j=>j.status==='Completed').length;
   const lastDate=visits.length?visits[visits.length-1].scheduled_date:null;
   let overlay=document.getElementById('trash-overlay');
-  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
+  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};document.body.appendChild(overlay);}
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
       <div><div style="font-size:11px;color:var(--ink3)">${freqLabel(r.frequency)} maintenance${r.active?'':' · PAUSED'}</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${r.title}</div></div>
-      <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span>
+      <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span>
     </div>
     <div style="background:var(--card2);border-radius:var(--rsm);padding:14px;margin:12px 0">
       <div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${r.customers?.name||'—'}</span></div>
@@ -3240,7 +3280,7 @@ function openRecDetail(id){
       <button class="btn btn-danger" style="flex:1" onclick="closeTrash();deleteRecService('${r.id}','${r.customer_id}')">Delete</button>
     </div>
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 async function extendRecService(id){
   const r=recurring.find(x=>x.id===id);if(!r)return;
@@ -3385,19 +3425,19 @@ async function regenerateFlaggedPlans(){
 function openVisitFixList(){
   const list=plansNeedingVisits();
   let overlay=document.getElementById('trash-overlay');
-  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};document.body.appendChild(overlay);}
+  if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};document.body.appendChild(overlay);}
   const rows=list.length?list.map(r=>{
     const issue=planVisitIssue(r);
     const why=issue.kind==='empty'?'No upcoming visits':issue.kind==='title'?'Title still says Weekly':`Upcoming dates are not ${normalizeFrequency(r.frequency)==='biweekly'?'14 days apart':freqLabel(r.frequency).toLowerCase()}`;
     return `<div class="detail-row" style="align-items:flex-start"><div style="flex:1"><div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.customers?.name||'Client')}</div><div style="font-size:12px;color:var(--ink2)">${esc(r.title)} · ${esc(freqLabel(r.frequency))}</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">${why}</div></div><button class="btn btn-sm btn-red" onclick="regeneratePlanVisits('${r.id}').then(()=>openVisitFixList())">Regenerate</button></div>`;
   }).join(''):`<div style="padding:12px 0;color:var(--ink3);font-size:13px">Every active plan already has visits on its schedule.</div>`;
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Fix visit dates</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Fix visit dates</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div style="font-size:12px;color:var(--ink3);margin-bottom:12px;line-height:1.5">Every 2 weeks means a visit every 14 days, counted from the plan start. Plans with no upcoming visits get new dates from that same schedule through the season end. Completed visits are left alone. Nothing is written until you confirm a plan.</div>
     ${rows}
     ${list.length?`<button class="btn btn-red btn-full" style="margin-top:8px" onclick="regenerateFlaggedPlans()">Regenerate all ${list.length}</button>`:''}
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 function newJobForCustomer(custId){closeDetail('cust');openModal('job');setTimeout(()=>{document.getElementById('job-customer').value=custId;loadCustomerProps();},80);}
 
@@ -3411,7 +3451,7 @@ async function logActivity(action,detail,entityType,entityId){
     });
   }catch(e){/* logging must never block the real action */}
 }
-function closeActivity(){const o=document.getElementById('activity-overlay');if(o)o.style.display='none';}
+function closeActivity(){userDismissSheet('activity-overlay',false);}
 function activityRecord(a){
   const id=a?.entity_id;if(!id)return null;
   const t=a.entity_type;
@@ -3434,16 +3474,16 @@ async function openActivityLog(){
     overlay=document.createElement('div');
     overlay.id='activity-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeActivity();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseActivity();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:80vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeActivity()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Activity Log</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseActivity()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">A record of everything that's happened — for looking back if a question ever comes up.</div>
     <input class="form-input" id="activity-search" placeholder="Search by client, job, sub, or number..." oninput="renderActivityLog()" style="margin-bottom:12px">
     <div id="activity-log-list" style="font-size:12.5px;color:var(--ink3)">Loading…</div>
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
   const{data}=await db.from('activity_log').select('*').order('created_at',{ascending:false}).limit(300);
   window._activityLog=data||[];
   renderActivityLog();
@@ -3478,11 +3518,11 @@ function openNotifDiagnostics(){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:75vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Notification Status</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Notification Status</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div class="detail-row"><span class="detail-label">This device supports it</span><span class="detail-value" style="color:${supported?'var(--green)':'var(--rose)'}">${supported?'Yes':'No'}</span></div>
     <div class="detail-row"><span class="detail-label">Permission</span><span class="detail-value" style="color:${permission==='granted'?'var(--green)':permission==='denied'?'var(--rose)':'var(--amber)'}">${permissionLabel}</span></div>
     ${dismissed?'<div style="font-size:11.5px;color:var(--ink3);margin-top:8px">You (or someone) tapped "Not now" on this device before, so it stopped asking automatically.</div>':''}
@@ -3492,7 +3532,7 @@ function openNotifDiagnostics(){
     <button class="btn btn-glass btn-full" style="margin-top:8px" onclick="testServerPush()">Test #2 — Send a real push from the server</button>
     <div style="font-size:11px;color:var(--ink3);margin-top:10px;line-height:1.5">Test #1 checks your phone can display a notification at all (no server involved). Test #2 checks the full path — server to your phone — same as a real alert. Try #1 first; if it works but #2 doesn't, the problem is on the server side.</div>
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 async function testLocalNotification(){
   try{
@@ -3514,7 +3554,7 @@ function openMoreMenu(){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   const items=[
@@ -3526,7 +3566,7 @@ function openMoreMenu(){
     {icon:ICONS.trash,label:'Recently Deleted',sub:'Restore jobs or clients',fn:"closeTrash();openTrash();"}
   ];
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:70vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">More</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">More</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div style="margin-top:8px">
       ${items.map(i=>`<div class="detail-row" style="cursor:pointer" onclick="${i.fn}">
         <div style="display:flex;align-items:center;gap:12px">
@@ -3537,7 +3577,7 @@ function openMoreMenu(){
       </div>`).join('')}
     </div>
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 function openInvitePicker(){
   const linkedIds=new Set(profiles.filter(p=>p.subcontractor_id).map(p=>p.subcontractor_id));
@@ -3547,7 +3587,7 @@ function openInvitePicker(){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   const list=unlinkedSubs.length?unlinkedSubs.map(s=>{
@@ -3560,11 +3600,11 @@ function openInvitePicker(){
   }).join('')
     :`<div style="padding:20px 0;text-align:center;color:var(--ink3);font-size:13px">${subs.length?'Every subcontractor already has an account linked.':'No subcontractors yet — add one first with "+ New", then come back here to invite them.'}</div>`;
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:75vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Invite a Subcontractor</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Invite a Subcontractor</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">Text or email this link. When they open it and register, the login links to that subcontractor if nobody else is already linked. Registering without the link leaves the account pending until you use Link Accounts. After you link them, they refresh or sign out and back in.</div>
     ${list}
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 function copyInviteLink(url,btnEl){
   const done=()=>{toast('Link copied ✓ — text it to them');if(btnEl){btnEl.textContent='Copied ✓';setTimeout(()=>{btnEl.innerHTML=`${ICONS.send} Copy Link`;},1800);}};
@@ -4107,7 +4147,7 @@ function openSubReconcile(subKey, ym){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   const monthLbl=monthLabelFromYm(ym);
@@ -4122,7 +4162,7 @@ function openSubReconcile(subKey, ym){
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
       <div><div style="font-size:11px;color:var(--ink3)">${esc(monthLbl)} · reconciliation</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${esc(subName)}</div></div>
-      <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span>
+      <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span>
     </div>
     <div style="font-size:12px;color:var(--ink2);margin-bottom:8px">${esc(sinceLabel)}: earned ${fmt(bal.earned)} · paid ${fmt(bal.paid)} · balance ${fmt(bal.owed)}</div>
     <div style="display:flex;gap:8px;margin:12px 0">
@@ -4145,7 +4185,7 @@ function openSubReconcile(subKey, ym){
     ${subKey!=='unassigned'?`<button class="btn btn-red btn-full" style="margin-top:8px" onclick="printSubPayout('${subKey}')">Generate Payout Statement (PDF)</button>`:''}
     ${subKey!=='unassigned'?`<button class="btn btn-glass btn-full" style="margin-top:8px" onclick="shareSubPayout('${subKey}')">Share / Text Payout</button>`:''}
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 function raiseSheetModal(type){
   const overlay=document.getElementById('modal-'+type);
@@ -4729,7 +4769,7 @@ async function openEstDetail(id){
   const pill=document.getElementById('detail-est-pill');
   if(numEl)numEl.textContent=e.estimate_number||'Estimate';
   if(pill){pill.className=pClass(e.status);pill.textContent=e.status||'';}
-  document.getElementById('est-detail').classList.add('open');
+  document.getElementById('est-detail').classList.add('open');syncDetailOpenClass();
   syncRecordUrl('est',e);
   let items=[];
   try{
@@ -4951,18 +4991,44 @@ async function openTrash(){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:70vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Recently Deleted</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Recently Deleted</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:14px">Items are permanently removed after 30 days.</div>
     ${html}
   </div>`;
   overlay.dataset.sheet='trash';
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
-function closeTrash(){const o=document.getElementById('trash-overlay');if(o)o.style.display='none';}
+function showSheet(overlay){
+  if(!overlay)return;
+  const already=overlay.dataset.sheetOpen==='1';
+  overlay.style.display='flex';
+  overlay.dataset.sheetOpen='1';
+  syncModalOpenClass();
+  if(!already)pushHistoryState('sheet');
+}
+function hideSheetEl(el){
+  if(el){el.style.display='none';el.dataset.sheetOpen='';}
+  syncModalOpenClass();
+}
+function userDismissSheet(id,viaHistory){
+  const el=document.getElementById(id);
+  if(!el||el.style.display!=='flex')return;
+  if(viaHistory&&!modalClosePending&&history.state&&history.state.kind==='sheet'){
+    modalClosePending=true;
+    try{history.back();return;}catch(e){modalClosePending=false;}
+  }
+  if(!modalClosePending&&history.state&&history.state.kind==='sheet'){
+    try{history.replaceState({sumak:true,path:currentUrl()},'',currentUrl());}catch(e){}
+  }
+  hideSheetEl(el);
+}
+function userCloseTrash(){userDismissSheet('trash-overlay',true);}
+function userCloseActivity(){userDismissSheet('activity-overlay',true);}
+function closeTrash(){userDismissSheet('trash-overlay',false);}
 async function generateAIEstimate(){
   const desc=document.getElementById('est-ai-desc').value.trim();
   if(!desc){toast(`${ICONS.alert} Describe the job first`);return;}
@@ -4996,11 +5062,11 @@ function openServicePicker(target){
     overlay=document.createElement('div');
     overlay.id='trash-overlay';
     overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';
-    overlay.onclick=(e)=>{if(e.target===overlay)closeTrash();};
+    overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};
     document.body.appendChild(overlay);
   }
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:80vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Service Catalog</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="closeTrash()">×</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div style="font-weight:700;font-size:15px;color:var(--ink)">Service Catalog</div><span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span></div>
     <div style="font-size:11px;color:var(--ink3);margin-bottom:12px">Tap a service to add it as a line item.</div>
     <div id="service-picker-list">${renderServicePickerList(target)}</div>
     <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px">
@@ -5010,7 +5076,7 @@ function openServicePicker(target){
       <button class="btn btn-red btn-sm" style="width:100%;justify-content:center" onclick="addService('${target}')">+ Save to Catalog</button>
     </div>
   </div>`;
-  overlay.style.display='flex';
+  showSheet(overlay);
 }
 async function addService(target){
   const name=document.getElementById('new-svc-name').value.trim();
@@ -5778,6 +5844,7 @@ async function openInvDetail(id){
   if(numEl)numEl.textContent=inv.invoice_number||'Invoice';
   if(pill){pill.className=pClass(inv.status);pill.textContent=inv.status||'';}
   if(panel)panel.classList.add('open');
+  syncDetailOpenClass();
   syncRecordUrl('inv',inv);
   let items=[];
   try{
@@ -5806,6 +5873,7 @@ async function openInvDetail(id){
       </div>
       ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${esc(inv.notes)}</div>`:''}
     </div>
+    ${currentProfile?.role==='admin'?`<div class="detail-card" id="inv-photo-block"><div class="detail-section-lbl">Job photos</div><div id="inv-photo-grid" style="font-size:12.5px;color:var(--ink3)">Loading photos…</div><label style="display:flex;gap:10px;align-items:center;min-height:44px;margin-top:10px;font-size:13px;color:var(--ink2);cursor:pointer"><input type="checkbox" id="inv-include-photos-detail" ${invoiceIncludePhotos(inv)?'checked':''} style="width:22px;height:22px;flex-shrink:0" onchange="setInvoiceIncludePhotos('${inv.id}',this.checked)"> Include job photos</label><div style="font-size:11.5px;color:var(--ink3);line-height:1.4">Checked invoices email these completion photos to the client. Nothing else from the job is included.</div></div>`:''}
     ${invoiceTimelineHTML(inv)}
     <div class="action-row">
       ${inv.status!=='Paid'&&inv.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="openInvoicePaid('${inv.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
@@ -5819,6 +5887,7 @@ async function openInvDetail(id){
       <button class="action-btn ab-glass" onclick="editInv('${inv.id}')">${ICONS.pencil} Edit Invoice</button>
       <button class="action-btn ab-danger" onclick="deleteInv('${inv.id}')">${ICONS.trash} Delete</button>
     </div>`;
+    if(currentProfile?.role==='admin')renderInvoiceJobPhotos(inv,items);
   }catch(err){
     console.error('openInvDetail',err);
     const payLine=invoicePaymentRecorded(inv)?`<div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value">${esc([invoicePaidPhrase(inv),String(inv.payment_reference||'').trim()].filter(Boolean).join(' · '))}</span></div>`:'';
@@ -6051,9 +6120,15 @@ async function emailInvoice(id){
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
   const subject=`Invoice ${inv.invoice_number} from Sumak Lawncare`;
+  let photoHtml='';
+  if(invoiceIncludePhotos(inv)){
+    const loaded=await loadInvoiceData(id);
+    photoHtml=await invoicePhotoEmailHTML(inv,loaded&&loaded.items);
+  }
   const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6">
     <p>Hi ${cust.name},</p>
     <p>Attached is invoice <strong>${inv.invoice_number}</strong> for <strong>${fmt(inv.total)}</strong>${inv.due_date?`, due ${fmtDate(inv.due_date)}`:''}${inv.address?` for service at ${inv.address}`:''}.</p>
+    ${photoHtml}
     <p>Thank you for your business!</p>
     <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
@@ -6247,6 +6322,30 @@ function onInvPropSelect(){
   if(sel&&sel!=='__new'){manual.value='';}
   if(sel==='__new'){document.getElementById('inv-prop-select').value='';manual.focus();}
 }
+function prefillInvAddress(address){
+  const manual=document.getElementById('inv-address');
+  const sel=document.getElementById('inv-prop-select');
+  const want=String(address||'').trim().toLowerCase();
+  if(!want){if(manual)manual.value='';return;}
+  const match=sel?[...sel.options].find(o=>o.value&&o.value!=='__new'&&o.value.trim().toLowerCase()===want):null;
+  if(match){sel.value=match.value;if(manual)manual.value='';}
+  else{if(sel)sel.value='';if(manual)manual.value=address;}
+}
+function invAddressBlank(){
+  const manual=(document.getElementById('inv-address')?.value||'').trim();
+  const sel=document.getElementById('inv-prop-select')?.value||'';
+  return !manual&&(!sel||sel==='__new');
+}
+function onInvJobChange(){
+  refreshInvoiceDupWarning();
+  const jobId=document.getElementById('inv-job')?.value;
+  if(!jobId)return;
+  const j=jobs.find(x=>x.id===jobId);
+  if(!j)return;
+  const cust=document.getElementById('inv-customer');
+  if(cust&&!cust.value&&j.customer_id){cust.value=j.customer_id;loadInvCustomerProps();}
+  if(invAddressBlank())prefillInvAddress(j.address);
+}
 function draftInvoiceJobIds(){
   const ids=new Set();
   const main=document.getElementById('inv-job')?.value;
@@ -6333,6 +6432,28 @@ async function restoreSentStamp(id,prevSentAt){
     if(back.error)console.error('restore sent_at',back.error);
   }catch(e){console.error('restore sent_at',e);}
 }
+async function writeInvoiceRow(editId,payload){
+  const run=async(body)=>{
+    if(editId)return db.from('invoices').update(body).eq('id',editId);
+    return db.from('invoices').insert(body).select().single();
+  };
+  let res=await run(payload);
+  const msg=res.error&&res.error.message||'';
+  if(res.error&&/include_job_photos/i.test(msg)){
+    const copy={...payload};
+    delete copy.include_job_photos;
+    res=await run(copy);
+  }
+  return res;
+}
+function invoiceIncludePhotos(inv){return !inv||inv.include_job_photos!==false;}
+function invoiceLinkedJobIds(inv,items){
+  const ids=[];
+  const add=id=>{if(id&&!ids.includes(id))ids.push(id);};
+  if(inv)add(inv.job_id);
+  (items||[]).forEach(i=>add(i.job_id||i.jobId));
+  return ids;
+}
 async function saveInvoice(sendNow){
   const custId=document.getElementById('inv-customer').value;
   if(!custId){toast(`${ICONS.alert} Select a customer`);return;}
@@ -6341,10 +6462,17 @@ async function saveInvoice(sendNow){
   const sub=lineItemsSubtotal(invLineItems);
   const taxAmt=roundMoney(sub*(tax/100));const total=roundMoney(sub+taxAmt);
   const editId=document.getElementById('inv-edit-id').value;
-  const selAddr=document.getElementById('inv-prop-select').value;
+  const selRaw=document.getElementById('inv-prop-select').value;
+  const selAddr=selRaw&&selRaw!=='__new'?selRaw:'';
   const manualAddr=document.getElementById('inv-address').value.trim();
-  const invAddr=manualAddr||selAddr||null;
-  const payload={customer_id:custId,job_id:document.getElementById('inv-job').value||null,address:invAddr,status:document.getElementById('inv-status').value,due_date:document.getElementById('inv-due').value||null,tax_rate:tax,tax_amount:taxAmt,subtotal:sub,total,notes:document.getElementById('inv-notes').value.trim()||null};
+  const jobId=document.getElementById('inv-job').value||null;
+  let invAddr=manualAddr||selAddr||'';
+  if(!invAddr&&jobId){
+    const linked=jobs.find(x=>x.id===jobId);
+    if(linked&&String(linked.address||'').trim())invAddr=String(linked.address).trim();
+  }
+  const includeBox=document.getElementById('inv-include-photos');
+  const payload={customer_id:custId,job_id:jobId,address:invAddr||null,status:document.getElementById('inv-status').value,due_date:document.getElementById('inv-due').value||null,tax_rate:tax,tax_amount:taxAmt,subtotal:sub,total,notes:document.getElementById('inv-notes').value.trim()||null,include_job_photos:includeBox?!!includeBox.checked:true};
   const conflicts=duplicateInvoiceConflicts(draftInvoiceJobIds(),editId||null);
   if(conflicts.length){
     const ok=await askDuplicateInvoiceOverride(conflicts);
@@ -6354,12 +6482,15 @@ async function saveInvoice(sendNow){
     if(manualAddr&&!selAddr&&custId)await ensurePropertySaved(custId,manualAddr);
     const prevSent=editId?(invoices.find(x=>x.id===editId)?.sent_at||null):null;
     let invId=editId;
-    if(editId){const{error}=await db.from('invoices').update(payload).eq('id',editId);if(error){toast('Error: '+error.message);return;}await db.from('invoice_items').delete().eq('invoice_id',editId);}
-    else{const{data,error}=await db.from('invoices').insert(payload).select().single();if(error){toast('Error: '+error.message);return;}invId=data.id;}
+    const saved=await writeInvoiceRow(editId,payload);
+    if(saved.error){toast('Error: '+saved.error.message);return;}
+    if(editId)await db.from('invoice_items').delete().eq('invoice_id',editId);
+    else invId=saved.data.id;
     const{error:iiErr}=await db.from('invoice_items').insert(invLineItems.map(i=>{const a=lineAmounts(i.qty,i.price,i._recalc?null:i.storedTotal);return {invoice_id:invId,job_id:i.jobId||document.getElementById('inv-job').value||null,title:i.title||null,description:i.desc||i.title||' ',quantity:moneyNum(i.qty)||0,unit_price:a.unit,total:a.total,cost:roundMoney(i.cost||0),margin_pct:i.marginPct||0,pricing_mode:i.mode||'margin'};}));
     if(iiErr){toast('Error saving line items: '+iiErr.message);console.error('invoice_items',iiErr);}
     await restoreSentStamp(invId,prevSent);
     logActivity(editId?'Invoice edited':'Invoice created',`${customers.find(c=>c.id===custId)?.name||''} · ${fmt(total)}`.trim(),'invoice',invId);
+    closeDetail('job');
     closeModal('invoice');await fetchInvoices();await fetchInvoicedJobIds();renderInvoices();renderJobs();
     if(sendNow){toast('Saved — opening to send…');setTimeout(()=>openInvDetail(invId),400);}
     else toast(editId?'Invoice updated ✓':'Invoice saved ✓');
@@ -6381,6 +6512,8 @@ async function editInv(id){
     document.getElementById('inv-due').value=inv.due_date||'';
     document.getElementById('inv-tax').value=inv.tax_rate||0;
     document.getElementById('inv-notes').value=inv.notes||'';
+    const photoBox=document.getElementById('inv-include-photos');
+    if(photoBox)photoBox.checked=inv.include_job_photos!==false;
     renderInvLineItems();
   },60);
 }
@@ -6394,11 +6527,73 @@ function jobPhotoStoragePath(url){
   const rest=s.slice(at+marker.length).split('?')[0];
   try{return decodeURIComponent(rest);}catch(e){return rest;}
 }
-async function signedJobPhotoUrl(path){
+async function signedJobPhotoUrl(path,seconds){
   if(!path)return '';
-  const{data,error}=await db.storage.from('job-photos').createSignedUrl(path,60*60);
-  if(error||!data?.signedUrl)return '';
-  return data.signedUrl;
+  const ttl=seconds||60*60;
+  let res=await db.storage.from('job-photos').createSignedUrl(path,ttl);
+  if((res.error||!res.data?.signedUrl)&&ttl>60*60*24*7){
+    res=await db.storage.from('job-photos').createSignedUrl(path,60*60*24*7);
+  }
+  if(res.error||!res.data?.signedUrl)return '';
+  return res.data.signedUrl;
+}
+const INVOICE_EMAIL_PHOTO_TTL=60*60*24*30;
+function safeUrlAttr(url){return String(url||'').replace(/"/g,'%22').replace(/</g,'');}
+async function jobPhotosForJobs(jobIds,seconds){
+  const ids=(jobIds||[]).filter(Boolean);
+  if(!ids.length)return [];
+  const{data,error}=await db.from('job_photos').select('id,job_id,url,created_at').in('job_id',ids).order('created_at');
+  if(error){console.error('job_photos',error);return [];}
+  const rows=await Promise.all((data||[]).map(async p=>{
+    const path=jobPhotoStoragePath(p.url);
+    const signedUrl=await signedJobPhotoUrl(path,seconds);
+    return signedUrl?{...p,signedUrl}:null;
+  }));
+  return rows.filter(Boolean);
+}
+let invoiceDetailPhotos=[];
+async function renderInvoiceJobPhotos(inv,items){
+  const grid=document.getElementById('inv-photo-grid');
+  if(!grid||currentProfile?.role!=='admin')return;
+  const ids=invoiceLinkedJobIds(inv,items);
+  if(!ids.length){invoiceDetailPhotos=[];grid.textContent='Link this invoice to a job to show its completion photos.';return;}
+  const photos=await jobPhotosForJobs(ids,60*60);
+  if(!document.getElementById('inv-photo-grid'))return;
+  invoiceDetailPhotos=photos;
+  if(!photos.length){grid.textContent='No completion photos on the linked job yet.';return;}
+  grid.innerHTML=`<div class="photo-grid">${photos.map((p,i)=>`<div class="photo-thumb"><img src="${safeUrlAttr(p.signedUrl)}" alt="Job photo" loading="lazy" onclick="openInvoicePhoto(${i})"></div>`).join('')}</div>`;
+}
+function openInvoicePhoto(i){
+  if(!invoiceDetailPhotos.length)return;
+  currentJobPhotos=invoiceDetailPhotos.slice();
+  openLightbox(i);
+}
+async function setInvoiceIncludePhotos(id,on){
+  const want=!!on;
+  const{error}=await db.from('invoices').update({include_job_photos:want}).eq('id',id);
+  const inv=invoices.find(x=>x.id===id);
+  if(error){
+    if(inv){
+      const box=document.getElementById('inv-include-photos-detail');
+      if(box)box.checked=invoiceIncludePhotos(inv);
+    }
+    toast('Could not save the photo setting yet');
+    return;
+  }
+  if(inv)inv.include_job_photos=want;
+  toast(want?'Job photos will be included':'Job photos will be left off the email');
+}
+async function invoicePhotoEmailHTML(inv,items){
+  if(!invoiceIncludePhotos(inv))return '';
+  const photos=await jobPhotosForJobs(invoiceLinkedJobIds(inv,items),INVOICE_EMAIL_PHOTO_TTL);
+  const shown=photos.slice(0,24);
+  if(!shown.length)return '';
+  const thumbs=shown.map(p=>{
+    const href=safeUrlAttr(p.signedUrl);
+    return `<a href="${href}" style="display:inline-block;margin:4px"><img src="${href}" alt="Job photo" width="160" height="160" style="width:160px;height:160px;object-fit:cover;border-radius:8px;border:0"></a>`;
+  }).join('');
+  const more=photos.length>shown.length?`<div style="font-size:12px;color:#777;margin-top:6px">${photos.length-shown.length} more photos are on file with the office.</div>`:'';
+  return `<div style="margin:16px 0"><div style="font-size:13px;font-weight:700;margin-bottom:6px">Photos from the job</div>${thumbs}${more}<div style="font-size:12px;color:#777;margin-top:6px">Photo links stay available for 30 days.</div></div>`;
 }
 function setupPhotoUpload(jobId){
   currentPhotoJobId=jobId;
@@ -6550,7 +6745,7 @@ async function openJobDetail(id){
   if(!beginRecordOpen(j.id))return;
   document.getElementById('detail-job-num').textContent=j.job_number||'Job';
   const pill=document.getElementById('detail-job-pill');if(pill){pill.className=pClass(j.status);pill.textContent=j.status||'';}
-  document.getElementById('job-detail').classList.add('open');
+  document.getElementById('job-detail').classList.add('open');syncDetailOpenClass();
   syncRecordUrl('job',j);
   const addr=j.address||'';
   const jobBody=document.getElementById('detail-job-body');
@@ -6689,13 +6884,12 @@ function jobInvoiceActionHTML(j){
 async function convertJobToInvoice(jobId){
   const j=jobs.find(x=>x.id===jobId);if(!j)return;
   if(!j.customer_id){toast(`${ICONS.alert} This job has no client attached — add one via Edit Job first`);return;}
-  closeDetail('job');
   openModal('invoice');
-  document.getElementById('inv-modal-title').textContent='New Invoice';
-  setTimeout(()=>{
-    document.getElementById('inv-customer').value=j.customer_id;
-    document.getElementById('inv-job').value=j.id;
-  },60);
+  document.getElementById('inv-customer').value=j.customer_id;
+  loadInvCustomerProps();
+  prefillInvAddress(j.address);
+  document.getElementById('inv-job').value=j.id;
+  refreshInvoiceDupWarning();
   // If this job came from an estimate, carry over that estimate's full line items
   let loaded=false;
   if(j.estimate_id){
@@ -7263,14 +7457,29 @@ function openModal(type){
     document.getElementById('inv-customer').value='';document.getElementById('inv-status').value='Unpaid';
     document.getElementById('inv-due').value='';document.getElementById('inv-tax').value='';document.getElementById('inv-notes').value='';
     document.getElementById('inv-address').value='';document.getElementById('inv-prop-select').innerHTML='<option value="">Select saved address...</option>';
+    const includePhotos=document.getElementById('inv-include-photos');if(includePhotos)includePhotos.checked=true;
     wireAddressAutocomplete('inv-address','inv-address-suggest');
     // populate job dropdown
     const sel=document.getElementById('inv-job');sel.innerHTML='<option value="">Select job (optional)...</option>'+jobs.map(j=>{const billed=nonVoidInvoicesForJob(j.id).length?' · already invoiced':'';return `<option value="${j.id}">${esc(j.job_number)} — ${esc(j.title)}${billed}</option>`;}).join('');
     invLineItems=[{desc:'',qty:1,price:0}];renderInvLineItems();
     refreshInvoiceDupWarning();
   }
-  document.getElementById(`modal-${type}`).classList.add('open');pushHistoryState('modal');
+  document.getElementById(`modal-${type}`).classList.add('open');
+  document.body.classList.add('modal-open');
+  pushHistoryState('modal');
 }
+function sheetIsOpen(){
+  const trash=document.getElementById('trash-overlay');
+  const activity=document.getElementById('activity-overlay');
+  return (trash&&trash.style.display==='flex')||(activity&&activity.style.display==='flex');
+}
+function syncModalOpenClass(){
+  document.body.classList.toggle('modal-open',!!document.querySelector('.modal-overlay.open')||sheetIsOpen());
+}
+function syncDetailOpenClass(){
+  document.body.classList.toggle('detail-open',!!document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open'));
+}
+let modalClosePending=false;
 function closeModal(type){
   const overlay=document.getElementById(`modal-${type}`);
   if(!overlay)return;
@@ -7280,12 +7489,26 @@ function closeModal(type){
   if(type==='markpaid'||type==='subpay'){overlay.style.zIndex='';overlay.style.position='';}
   if(type==='sendto')abandonSendPick();
   if(type==='dupinv')abandonDupInvoicePrompt();
+  syncModalOpenClass();
 }
-function overlayClose(e,type){if(e.target===document.getElementById(`modal-${type}`))closeModal(type);}
+function requestCloseModal(type){
+  if(modalClosePending)return;
+  const overlay=document.getElementById(`modal-${type}`);
+  if(!overlay||!overlay.classList.contains('open'))return;
+  const open=[...document.querySelectorAll('.modal-overlay.open')];
+  const top=open[open.length-1];
+  if(top===overlay&&history.state&&history.state.kind==='modal'){
+    modalClosePending=true;
+    try{history.back();return;}catch(e){modalClosePending=false;}
+  }
+  closeModal(type);
+}
+function overlayClose(e,type){if(e.target===document.getElementById(`modal-${type}`))requestCloseModal(type);}
 function closeDetail(type){
   const map={job:'job-detail',cust:'cust-detail',est:'est-detail',inv:'inv-detail'};
   const el=document.getElementById(map[type]);if(el)el.classList.remove('open');
   if(type==='job')stopJobMessages();
+  syncDetailOpenClass();
 }
 const NAV_ORDER=['dashboard','jobs','calendar','customers','estimates','invoices'];
 // ── REAL URLS ──
@@ -7356,11 +7579,40 @@ function abandonSendPick(){
 }
 function closeAllOverlays(){
   abandonSendPick();
+  modalClosePending=false;
   document.querySelectorAll('.modal-overlay.open').forEach(m=>{m.classList.remove('open');const modal=m.querySelector('.modal');if(modal)modal.style.transform='';});
   ['job','cust','est','inv'].forEach(closeDetail);
-  const trash=document.getElementById('trash-overlay');if(trash)trash.style.display='none';
-  const activity=document.getElementById('activity-overlay');if(activity)activity.style.display='none';
+  hideSheetEl(document.getElementById('trash-overlay'));
+  hideSheetEl(document.getElementById('activity-overlay'));
   const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
+  const light=document.getElementById('photo-lightbox');if(light)light.classList.remove('open');
+  syncModalOpenClass();
+  syncDetailOpenClass();
+}
+const viewScroll=Object.create(null);
+function rememberViewScroll(){
+  const active=document.querySelector('#content .view.active');
+  const sc=document.getElementById('content');
+  if(active&&sc)viewScroll[active.id]=sc.scrollTop;
+}
+function restoreViewScroll(name){
+  const sc=document.getElementById('content');
+  if(!sc)return;
+  const y=viewScroll['view-'+name]||0;
+  requestAnimationFrame(()=>{sc.scrollTop=y;});
+}
+function dismissStrayChrome(){
+  document.querySelectorAll('.modal-overlay.open').forEach(m=>closeModal(m.id.replace(/^modal-/,'')));
+  ['job','cust','est','inv'].forEach(closeDetail);
+  hideSheetEl(document.getElementById('trash-overlay'));
+  hideSheetEl(document.getElementById('activity-overlay'));
+  const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
+  const light=document.getElementById('photo-lightbox');if(light)light.classList.remove('open');
+  if(history.state&&(history.state.kind==='modal'||history.state.kind==='sheet')){
+    try{history.replaceState({sumak:true,path:currentUrl()},'',currentUrl());}catch(e){}
+  }
+  syncModalOpenClass();
+  syncDetailOpenClass();
 }
 function pageFromPath(pathname){
   const parts=String(pathname||'').split('/').filter(Boolean);
@@ -7501,18 +7753,24 @@ document.addEventListener('click',(e)=>{
   else if(type==='client')openCustDetail(rid);
 });
 window.addEventListener('popstate',()=>{
+  modalClosePending=false;
   if(document.getElementById('public-quote-host'))return;
-  const modalOpen=document.querySelector('.modal-overlay.open');
+  const openModals=[...document.querySelectorAll('.modal-overlay.open')];
+  const modalOpen=openModals[openModals.length-1];
   const trash=document.getElementById('trash-overlay');
   const activity=document.getElementById('activity-overlay');
   const notif=document.getElementById('notif-panel');
   const sheetOpen=(trash&&trash.style.display==='flex')||(activity&&activity.style.display==='flex')||(notif&&notif.classList.contains('open'));
-  if(modalOpen||sheetOpen){
-    if(modalOpen){abandonSendPick();modalOpen.classList.remove('open');const modal=modalOpen.querySelector('.modal');if(modal)modal.style.transform='';}
-    if(trash)trash.style.display='none';
-    if(activity)activity.style.display='none';
+  if(sheetOpen){
+    hideSheetEl(trash);
+    hideSheetEl(activity);
     if(notif)notif.classList.remove('open');
-    if(location.pathname.split('/').filter(Boolean).length<2){['job','cust','est','inv'].forEach(closeDetail);}
+    syncModalOpenClass();
+    return;
+  }
+  if(modalOpen){
+    closeModal(modalOpen.id.replace(/^modal-/,''));
+    const light=document.getElementById('photo-lightbox');if(light)light.classList.remove('open');
     return;
   }
   applyRoute(location.pathname);
@@ -7521,7 +7779,8 @@ function showView(name,el){
   const fromNav=!routeSilent;
   attnFocus=null;
   if(fromNav){
-    closeDetail('job');closeDetail('cust');closeDetail('est');closeDetail('inv');
+    rememberViewScroll();
+    dismissStrayChrome();
     resetListFilters();
   }
   const viewEl=document.getElementById('view-'+name);
@@ -7550,6 +7809,7 @@ function showView(name,el){
     else if(name==='recurring')renderRecurringView();
     else if(name==='subs')renderSubsList();
     else if(name==='dashboard')renderDashboard();
+    restoreViewScroll(name);
   }
   const notif=document.getElementById('notif-panel');if(notif)notif.classList.remove('open');
 }
@@ -7590,7 +7850,7 @@ function wireModalSwipeDismiss(){
       if(delta>90){
         const type=overlay.id.replace('modal-','');
         modal.style.transform='translateY(100%)';
-        setTimeout(()=>{modal.style.transform='';closeModal(type);},200);
+        setTimeout(()=>{modal.style.transform='';requestCloseModal(type);},200);
       }else{
         modal.style.transform='';
       }
