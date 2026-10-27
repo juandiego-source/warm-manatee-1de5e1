@@ -510,6 +510,7 @@ textarea.form-input{resize:vertical;min-height:80px;line-height:1.5;}
   <div class="auth-brand">Sumak Ops</div>
   <div class="auth-tagline">Treasure Valley, Idaho</div>
   <div id="invite-banner" style="display:none;background:var(--red-l);border:1px solid var(--red);border-radius:var(--rsm);padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--ink2);text-align:center">You've been invited to join <strong style="color:var(--ink)">Sumak Ops</strong>. Register below. This link ties your login to that subcontractor, as long as nobody else is already linked.</div>
+  <div id="card-return-banner" style="display:none;background:var(--green-bg);border:1px solid var(--green);border-radius:var(--rsm);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--ink);text-align:center;line-height:1.45"></div>
   <div class="auth-card">
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchAuthTab('login',this)">Sign In</div>
@@ -1180,6 +1181,12 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div class="form-label">CC</div>
     <div id="sendto-cc-choices"></div>
     <div class="form-group" style="margin-top:12px"><label class="form-label">CC addresses</label><input class="form-input" id="sendto-cc" type="text" placeholder="cc@example.com, other@example.com" autocomplete="off"></div>
+    <div id="sendto-card-row" style="display:none;margin:4px 0 14px">
+      <label style="display:flex;gap:10px;align-items:flex-start;min-height:44px;font-size:13px;color:var(--ink2);cursor:pointer">
+        <input type="checkbox" id="sendto-card" style="width:22px;height:22px;margin-top:1px;flex-shrink:0">
+        <span>Include a Pay by card button <span style="color:var(--ink3)">Opens Stripe checkout. The card fee is its own line. Venmo stays in the email either way.</span></span>
+      </label>
+    </div>
     <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
     <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('sendto')">Cancel</button>
   </div>
@@ -1200,6 +1207,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
         <option>Cash</option>
         <option>ACH/bank deposit</option>
         <option>Card</option>
+        <option>Card (Stripe)</option>
         <option>Other</option>
       </select>
     </div>
@@ -1208,6 +1216,20 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div id="invpaid-error" style="display:none;font-size:12.5px;color:var(--rose);font-weight:600;margin:-2px 0 12px;line-height:1.4"></div>
     <button class="btn btn-red btn-full" id="invpaid-save" onclick="confirmInvoicePaid()">Confirm Payment</button>
     <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('invpaid')">Cancel</button>
+  </div>
+</div>
+
+<!-- CARD PAYMENT LINK -->
+<div class="modal-overlay" id="modal-cardpay" onclick="overlayClose(event,'cardpay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title-row"><div class="modal-title">Card payment link</div><button type="button" class="modal-close" onclick="requestCloseModal('cardpay')" aria-label="Close">✕</button></div>
+    <p id="cardpay-sub" style="font-size:12.5px;color:var(--ink3);margin:-6px 0 14px;line-height:1.5"></p>
+    <div id="cardpay-break" style="font-size:13px;color:var(--ink2);line-height:1.5;margin-bottom:12px"></div>
+    <div class="form-group"><label class="form-label">Link</label><input class="form-input" id="cardpay-url" type="text" readonly></div>
+    <button class="btn btn-red btn-full" type="button" onclick="copyCardPaymentLink()">Copy link</button>
+    <p style="font-size:12px;color:var(--ink3);margin:10px 0 0;line-height:1.45">The client enters the card on Stripe's page. Venmo is still mentioned in the invoice email.</p>
+    <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('cardpay')">Close</button>
   </div>
 </div>
 
@@ -1563,6 +1585,8 @@ function showApp(role){
     document.getElementById('content').innerHTML=`<div class="empty" style="padding-top:80px"><div class="empty-icon">${ICONS.hourglass}</div><div class="empty-title">Account pending</div><div class="empty-sub">Your login is not linked to a subcontractor yet.<br><br>If you registered from an invite link, sign out and back in. If you registered without the link, ask your admin to use Link Accounts. After that, refresh or sign out and back in.</div><button class="btn btn-glass btn-sm" style="margin-top:20px" onclick="doSignOut()">Sign out</button></div>`;
   }
   routeSilent=false;
+  const cardMsg=cardReturnMessage();
+  if(cardMsg&&role==='admin')toast(cardMsg);
 }
 async function doLogin(){
   const email=document.getElementById('login-email').value.trim();
@@ -1652,6 +1676,10 @@ function asSubJob(row){
   delete copy.margin;
   delete copy.margin_pct;
   delete copy.cost;
+  delete copy.stripe_checkout_url;
+  delete copy.stripe_checkout_session_id;
+  delete copy.card_fee;
+  delete copy.card_fee_percent;
   if(!copy.customers&&copy.customer_name)copy.customers={name:copy.customer_name};
   if(!copy.subcontractors&&copy.subcontractor_name)copy.subcontractors={name:copy.subcontractor_name};
   return copy;
@@ -5335,11 +5363,11 @@ function sendChoiceHTML(c,inputName,checked){
     <span><span style="font-weight:600;color:var(--ink)">${who}${esc(c.email)}</span><br><span style="font-size:11px;color:var(--ink3)">${kindLbl}</span></span>
   </label>`;
 }
-function pickSendRecipient(cust,kind,docLabel){
+function pickSendRecipient(cust,kind,docLabel,opts){
   const contacts=clientContactList(cust);
   const preferred=preferredSendEmail(cust,kind).toLowerCase();
   return new Promise(resolve=>{
-    _sendPick={resolve};
+    _sendPick={resolve,kind,allowCard:!!(opts&&opts.allowCard)};
     const box=document.getElementById('sendto-choices');
     const ccBox=document.getElementById('sendto-cc-choices');
     const empty='<div style="font-size:12.5px;color:var(--ink3);padding:6px 0 10px">No saved emails yet. Type one below — it is used for this send only.</div>';
@@ -5351,6 +5379,10 @@ function pickSendRecipient(cust,kind,docLabel){
     if(cc)cc.value='';
     const title=document.getElementById('sendto-title');
     if(title)title.textContent='Send '+(docLabel||'');
+    const cardRow=document.getElementById('sendto-card-row');
+    const cardBox=document.getElementById('sendto-card');
+    if(cardBox)cardBox.checked=false;
+    if(cardRow)cardRow.style.display=(kind==='invoice'&&opts&&opts.allowCard)?'block':'none';
     openModal('sendto');
   });
 }
@@ -5370,7 +5402,9 @@ function collectSendChoice(){
 function confirmSendTo(){
   const choice=collectSendChoice();
   if(choice.error){toast(choice.error);return;}
-  const resolve=_sendPick&&_sendPick.resolve;
+  const pick=_sendPick;
+  const resolve=pick&&pick.resolve;
+  choice.includeCard=!!(pick&&pick.kind==='invoice'&&pick.allowCard&&document.getElementById('sendto-card')?.checked);
   _sendPick=null;
   closeModal('sendto');
   if(resolve)resolve(choice);
@@ -5638,6 +5672,13 @@ function unpaidAuditHTML(){
   </div>`;
 }
 function renderInvoices(){
+  if(currentProfile?.role==='sub'){
+    const listEl=document.getElementById('invoices-list');
+    if(listEl)listEl.innerHTML='';
+    const batch=document.getElementById('batch-invoice-section');
+    if(batch)batch.innerHTML='';
+    return;
+  }
   renderBatchInvoice();
   const q=(document.getElementById('inv-search')?.value||'').trim();
   const unpaidView=invFilter==='Unpaid'&&!attnFocus;
@@ -5768,7 +5809,7 @@ async function createBatchInvoices(){
 
 function filterInv(el,val){invFilter=val;document.querySelectorAll('#view-invoices .fchip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderInvoices();}
 
-const INVOICE_PAY_METHODS=['Check','Venmo','Zelle','Cash','ACH/bank deposit','Card','Other'];
+const INVOICE_PAY_METHODS=['Check','Venmo','Zelle','Cash','ACH/bank deposit','Card','Card (Stripe)','Other'];
 function invoicePaymentRecorded(inv){
   if(!inv||inv.status!=='Paid')return false;
   if(String(inv.payment_method||'').trim())return true;
@@ -5799,12 +5840,18 @@ function invoicePaidPhrase(inv){
   if(method)s+=' via '+method;
   return s;
 }
+function invoiceCardFeeLine(inv){
+  if(!inv||inv.card_fee==null||inv.card_fee==='')return '';
+  const pct=inv.card_fee_percent!=null&&inv.card_fee_percent!==''?` (${inv.card_fee_percent}%)`:'';
+  return `Card fee ${fmt(inv.card_fee)}${pct}`;
+}
 function invoicePaymentDetailHTML(inv){
   if(!invoicePaymentRecorded(inv))return '';
   const phrase=invoicePaidPhrase(inv);
   const ref=String(inv.payment_reference||'').trim();
-  if((!phrase||phrase==='Paid')&&!ref)return '';
-  return `<div style="margin-top:2px;font-weight:600">${esc(phrase||'Paid')}</div>${ref?`<div style="font-size:11px;color:var(--ink2)">${esc(ref)}</div>`:''}`;
+  const fee=invoiceCardFeeLine(inv);
+  if((!phrase||phrase==='Paid')&&!ref&&!fee)return '';
+  return `<div style="margin-top:2px;font-weight:600">${esc(phrase||'Paid')}</div>${ref?`<div style="font-size:11px;color:var(--ink2)">${esc(ref)}</div>`:''}${fee?`<div style="font-size:11px;color:var(--ink2)">${esc(fee)}. Charged on top of the invoice total.</div>`:''}`;
 }
 function invoicePaidCardHTML(inv){
   if(!invoicePaymentRecorded(inv))return '';
@@ -5836,6 +5883,7 @@ function invoiceTimelineHTML(inv){
   </div>`;
 }
 async function openInvDetail(id){
+  if(currentProfile?.role==='sub')return;
   const inv=invoices.find(x=>x.id===id||x.invoice_number===id);if(!inv)return;
   if(!beginRecordOpen(inv.id))return;
   const numEl=document.getElementById('detail-inv-num');
@@ -5854,6 +5902,7 @@ async function openInvDetail(id){
   }catch(err){console.error('invoice_items',err);}
   const body=document.getElementById('detail-inv-body');
   if(!body)return;
+  const isAdmin=currentProfile?.role==='admin';
   try{
   body.innerHTML=`
     <div class="invoice-preview">
@@ -5870,13 +5919,16 @@ async function openInvDetail(id){
         <div class="inv-total-row"><span>Subtotal</span><span>${fmt(inv.subtotal)}</span></div>
         ${inv.tax_rate>0?`<div class="inv-total-row"><span>Tax (${inv.tax_rate}%)</span><span>${fmt(inv.tax_amount)}</span></div>`:''}
         <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(inv.total)}</span></div>
+        ${invoiceCardFeeLine(inv)?`<div class="inv-total-row"><span>${esc(invoiceCardFeeLine(inv))}</span><span>on top</span></div>`:''}
       </div>
       ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${esc(inv.notes)}</div>`:''}
+      ${invoiceCardLinkHTML(inv)}
     </div>
     ${currentProfile?.role==='admin'?`<div class="detail-card" id="inv-photo-block"><div class="detail-section-lbl">Job photos</div><div id="inv-photo-grid" style="font-size:12.5px;color:var(--ink3)">Loading photos…</div><label style="display:flex;gap:10px;align-items:center;min-height:44px;margin-top:10px;font-size:13px;color:var(--ink2);cursor:pointer"><input type="checkbox" id="inv-include-photos-detail" ${invoiceIncludePhotos(inv)?'checked':''} style="width:22px;height:22px;flex-shrink:0" onchange="setInvoiceIncludePhotos('${inv.id}',this.checked)"> Include job photos</label><div style="font-size:11.5px;color:var(--ink3);line-height:1.4">Checked invoices email these completion photos to the client. Nothing else from the job is included.</div></div>`:''}
     ${invoiceTimelineHTML(inv)}
     <div class="action-row">
       ${inv.status!=='Paid'&&inv.status!=='Cancelled'?`<button class="action-btn ab-green" onclick="openInvoicePaid('${inv.id}')">${ICONS.dollar} Mark as Paid</button>`:''}
+      ${isAdmin&&invoiceCanTakeCard(inv)?`<button class="action-btn ab-glass" onclick="createCardPaymentLink('${inv.id}')">${ICONS.creditCard} Card payment link</button>`:''}
       ${inv.status==='Paid'?`<button class="action-btn ab-glass" onclick="openInvoicePaid('${inv.id}')">${ICONS.pencil} Edit payment</button>`:''}
       ${inv.status==='Unpaid'?`<button class="action-btn ab-red" onclick="markInvOverdue('${inv.id}')">${ICONS.alert} Mark Overdue</button>`:''}
       <button class="action-btn ab-glass" onclick="printInvoice('${inv.id}')">${ICONS.printer} Print / Save PDF</button>
@@ -6108,14 +6160,119 @@ async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc,met
   if(error||(data&&data.error))throw new Error(await resendErrorMessage(error,data));
   return data;
 }
+function invoiceCanTakeCard(inv){
+  return !!(inv&&currentProfile?.role==='admin'&&inv.status!=='Paid'&&inv.status!=='Cancelled'&&roundMoney(inv.total)>0);
+}
+function cardPayUrlAllowed(url){
+  try{
+    const u=new URL(String(url||''));
+    return u.protocol==='https:'&&u.hostname==='checkout.stripe.com';
+  }catch(e){return false;}
+}
+function invoiceCardLinkHTML(inv){
+  if(currentProfile?.role!=='admin'||!inv||inv.status==='Paid'||inv.status==='Cancelled')return '';
+  const url=String(inv.stripe_checkout_url||'');
+  if(!cardPayUrlAllowed(url))return '';
+  const pct=inv.card_fee_percent!=null&&inv.card_fee_percent!==''?esc(inv.card_fee_percent)+'% fee':'card fee';
+  return `<div style="margin-top:10px;font-size:12px;color:var(--ink2);line-height:1.4">Card link ready · ${pct} added on Stripe. <button type="button" class="btn btn-sm btn-glass" onclick="copyStoredCardLink('${inv.id}')">Copy</button></div>`;
+}
+let cardPayBusy=false,_cardPayUrl='';
+function openCardPayModal(data){
+  _cardPayUrl=data&&data.url||'';
+  const sub=document.getElementById('cardpay-sub');
+  if(sub)sub.textContent=`${data.invoice_number||'Invoice'} · balance ${fmt(data.balance)}`;
+  const box=document.getElementById('cardpay-break');
+  if(box)box.innerHTML=`Balance due ${esc(fmt(data.balance))}<br>Card processing fee (${esc(data.fee_percent)}%) ${esc(fmt(data.fee))}<br><strong>Client pays ${esc(fmt(data.charge))} on Stripe</strong>`;
+  const input=document.getElementById('cardpay-url');
+  if(input)input.value=_cardPayUrl;
+  openModal('cardpay');
+}
+async function copyText(text,okMsg){
+  const value=String(text||'');
+  if(!value){toast('Nothing to copy');return;}
+  try{
+    await navigator.clipboard.writeText(value);
+    toast(okMsg||'Copied');
+  }catch(e){
+    prompt('Copy this link:',value);
+  }
+}
+function copyCardPaymentLink(){
+  if(currentProfile?.role!=='admin'||!cardPayUrlAllowed(_cardPayUrl)){toast('No card link yet');return;}
+  copyText(_cardPayUrl,'Card link copied');
+}
+function copyStoredCardLink(id){
+  if(currentProfile?.role!=='admin')return;
+  const inv=invoices.find(x=>x.id===id);
+  const url=inv&&inv.stripe_checkout_url;
+  if(!cardPayUrlAllowed(url)){toast('No card link yet');return;}
+  copyText(url,'Card link copied');
+}
+async function createCardPaymentLink(id,opts){
+  if(currentProfile?.role!=='admin'){toast('Only the office can create a card link.');return null;}
+  if(cardPayBusy)return null;
+  const inv=invoices.find(x=>x.id===id);
+  if(!inv){toast('Invoice not found.');return null;}
+  if(!invoiceCanTakeCard(inv)){toast('This invoice cannot take a card payment.');return null;}
+  const silent=!!(opts&&opts.silent);
+  cardPayBusy=true;
+  if(!silent)toast('Creating the card link…');
+  try{
+    const{data,error}=await db.functions.invoke('stripe-checkout',{body:{invoice_id:id}});
+    if(error||(data&&data.error))throw new Error(await resendErrorMessage(error,data));
+    if(!data||!cardPayUrlAllowed(data.url)||!data.session_id)throw new Error('Stripe did not return a checkout link.');
+    inv.stripe_checkout_url=data.url;
+    inv.stripe_checkout_session_id=data.session_id;
+    inv.card_fee_percent=data.fee_percent;
+    if(!silent){
+      openCardPayModal(data);
+      logActivity('Card payment link created',`${inv.invoice_number||''} · ${fmt(data.balance)} + ${fmt(data.fee)} fee`.trim(),'invoice',id);
+      if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
+    }
+    return data;
+  }catch(e){
+    if(silent)throw e;
+    toast(e.message||'Could not create the card link.');
+    return null;
+  }finally{
+    cardPayBusy=false;
+  }
+}
+function invoicePayEmailHTML(cardLink){
+  if(cardLink&&cardPayUrlAllowed(cardLink.url)){
+    const pct=cardLink.fee_percent!=null?cardLink.fee_percent:3;
+    return `<p>You can pay by card or by Venmo.</p>
+    <p style="text-align:center;margin:22px 0">
+      <a href="${escapeAttr(cardLink.url)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">Pay by card</a>
+    </p>
+    <p style="font-size:12px;color:#666">Paying by card adds a ${esc(pct)}% processing fee (${esc(fmt(cardLink.fee))} on this invoice). Stripe charges ${esc(fmt(cardLink.charge))}. The fee is its own line on the secure checkout page. Venmo does not add that fee.</p>
+    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(cardLink.url)}</p>`;
+  }
+  return `<p>You can pay by Venmo. If you would rather pay by card, reply to this email and we will send a secure payment link. Card payments include a processing fee.</p>`;
+}
 async function emailInvoice(id){
+  if(currentProfile?.role==='sub')return;
   const inv=invoices.find(x=>x.id===id);if(!inv)return;
   const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers||{};
-  const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number);
+  const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number,{allowCard:invoiceCanTakeCard(inv)});
   if(!choice||!choice.to||!choice.to.length)return;
   const sentRecord=encodeSentTo(choice);
   if(!sentRecord){toast('Add a To address before sending.');return;}
   const who=sentRecipientsPhrase(sentRecord);
+  let cardLink=null;
+  if(choice.includeCard){
+    toast('Creating the card link…');
+    try{
+      cardLink=await createCardPaymentLink(id,{silent:true});
+    }catch(err){
+      toast('Email was not sent. The card link was not created: '+(err.message||'Stripe rejected it'));
+      return;
+    }
+    if(!cardLink||!cardPayUrlAllowed(cardLink.url)){
+      toast('Email was not sent. The card link was not a Stripe checkout page.');
+      return;
+    }
+  }
   toast('Preparing & sending…');
   const result=await getInvoicePdfFile(id);
   if(!result){toast('⚠ Could not generate PDF');return;}
@@ -6126,9 +6283,10 @@ async function emailInvoice(id){
     photoHtml=await invoicePhotoEmailHTML(inv,loaded&&loaded.items);
   }
   const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6">
-    <p>Hi ${cust.name},</p>
-    <p>Attached is invoice <strong>${inv.invoice_number}</strong> for <strong>${fmt(inv.total)}</strong>${inv.due_date?`, due ${fmtDate(inv.due_date)}`:''}${inv.address?` for service at ${inv.address}`:''}.</p>
+    <p>Hi ${esc(cust.name||'')},</p>
+    <p>Attached is invoice <strong>${esc(inv.invoice_number||'')}</strong> for <strong>${fmt(inv.total)}</strong>${inv.due_date?`, due ${fmtDate(inv.due_date)}`:''}${inv.address?` for service at ${esc(inv.address)}`:''}.</p>
     ${photoHtml}
+    ${invoicePayEmailHTML(cardLink)}
     <p>Thank you for your business!</p>
     <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
   </div>`;
@@ -7891,6 +8049,21 @@ if(inviteSubId){
   document.getElementById('invite-banner').style.display='block';
   switchAuthTab('register',document.querySelectorAll('.auth-tab')[1]);
 }
+function cardReturnMessage(){
+  const card=new URLSearchParams(location.search).get('card');
+  if(card==='paid')return 'Payment received. Thank you. Sumak Lawncare marks the invoice paid when Stripe confirms it.';
+  if(card==='cancelled')return 'Card payment was not completed. You can use the same link to try again.';
+  return '';
+}
+function showCardReturnBanner(){
+  const msg=cardReturnMessage();
+  const el=document.getElementById('card-return-banner');
+  if(!el)return;
+  if(!msg){el.style.display='none';el.textContent='';return;}
+  el.textContent=msg;
+  el.style.display='block';
+}
+showCardReturnBanner();
 // ── PUBLIC CLIENT QUOTE PAGE ──
 // Email links are /q/TOKEN. Older emails use /?quote=TOKEN. Either one renders
 // this page with no login. The live site also server-renders /q/TOKEN so a

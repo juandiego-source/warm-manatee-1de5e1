@@ -7,3 +7,8 @@ verify_jwt = false
 # Resend calls this with a Svix signature, not a Supabase JWT.
 [functions.resend-webhook]
 verify_jwt = false
+
+# Stripe calls this with a Stripe-Signature header, not a Supabase JWT.
+# The function rejects any body that does not match STRIPE_WEBHOOK_SECRET.
+[functions.stripe-webhook]
+verify_jwt = false
