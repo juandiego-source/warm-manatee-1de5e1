@@ -12,6 +12,7 @@ import {
   dollarsToCents,
   ensureCheckoutSession,
   feePercentFromEnv,
+  expectedStripeLivemode,
   markInvoiceFromStripeEvent,
   paymentFromCheckoutEvent,
   verifyStripeSignature,
@@ -51,7 +52,7 @@ test('checkout charges the balance and the fee as separate line items', () => {
   });
   const params = new URLSearchParams(body);
   assert.equal(params.get('mode'), 'payment');
-  assert.equal(params.get('payment_method_types[0]'), 'card');
+  assert.equal(params.get('payment_method_types[0]'), null);
   assert.equal(params.get('line_items[0][price_data][unit_amount]'), '10000');
   assert.equal(params.get('line_items[0][price_data][product_data][name]'), 'Invoice INV-1042');
   assert.equal(params.get('line_items[1][price_data][unit_amount]'), '300');
@@ -218,7 +219,7 @@ test('test mode creates a checkout link, then a signed webhook marks the invoice
     assert.equal(sent.get('line_items[0][price_data][unit_amount]'), '10000');
     assert.equal(sent.get('line_items[1][price_data][unit_amount]'), '300');
     assert.equal(sent.get('line_items[1][price_data][product_data][name]'), 'Card processing fee (3%)');
-    assert.equal(sent.get('payment_method_types[0]'), 'card');
+    assert.equal(sent.get('payment_method_types[0]'), null);
 
     const again = await ensureCheckoutSession({
       secretKey: SECRET_KEY,
@@ -244,6 +245,7 @@ test('test mode creates a checkout link, then a signed webhook marks the invoice
     const event = {
       id: 'evt_e2e',
       type: 'checkout.session.completed',
+      livemode: false,
       data: {
         object: {
           id: created.session_id,
@@ -272,6 +274,7 @@ test('test mode creates a checkout link, then a signed webhook marks the invoice
     const calls = [];
     const first = await markInvoiceFromStripeEvent({
       event,
+      expectedLivemode: false,
       admin: {
         rpc(name, args) {
           calls.push({ name, args });
@@ -287,9 +290,20 @@ test('test mode creates a checkout link, then a signed webhook marks the invoice
     assert.equal(calls[0].args.p_fee, 3);
     assert.equal(calls[0].args.p_fee_percent, 3);
     assert.equal(calls[0].args.p_session_id, created.session_id);
+    assert.equal(calls[0].args.p_balance_cents, 10000);
+    assert.equal(calls[0].args.p_livemode, false);
+    assert.equal(calls[0].args.p_expected_livemode, false);
+
+    const mismatch = await markInvoiceFromStripeEvent({
+      event: { ...event, livemode: true },
+      expectedLivemode: false,
+      admin: { rpc() { throw new Error('rpc should not run'); } },
+    });
+    assert.equal(mismatch.status, 400);
 
     const second = await markInvoiceFromStripeEvent({
       event,
+      expectedLivemode: false,
       admin: {
         rpc() {
           return { data: { ok: true, already: true }, error: null };
@@ -318,9 +332,12 @@ function applyEndToEnd(args) {
   const fee = Number(args.p_fee);
   const percent = args.p_fee_percent == null ? 'NULL' : Number(args.p_fee_percent);
   const session = args.p_session_id ? `'${args.p_session_id}'` : 'NULL';
+  const balance = Number(args.p_balance_cents);
+  const live = args.p_livemode ? 'true' : 'false';
+  const expected = args.p_expected_livemode ? 'true' : 'false';
   const applied = execFileSync('sudo', [
     '-u', 'postgres', 'psql', '-d', 'sumak_stripe_card', '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c',
-    `SELECT public.apply_stripe_invoice_payment('${args.p_invoice_id}', '${args.p_payment_intent_id}', ${fee}, ${percent}, ${session}, NULL)::text;`,
+    `SELECT public.apply_stripe_invoice_payment('${args.p_invoice_id}', '${args.p_payment_intent_id}', ${fee}, ${percent}, ${session}, NULL, ${balance}, ${live}, ${expected})::text;`,
   ], { encoding: 'utf8' });
   const result = JSON.parse(applied.trim());
   assert.equal(result.ok, true);
@@ -336,7 +353,7 @@ function applyEndToEnd(args) {
      FROM public.invoices WHERE id = '${args.p_invoice_id}';`,
   ], { encoding: 'utf8' }).trim();
   assert.equal(row, 'true');
-  psql(`SELECT public.apply_stripe_invoice_payment('${args.p_invoice_id}', '${args.p_payment_intent_id}', ${fee}, ${percent}, ${session}, NULL);`);
+  psql(`SELECT public.apply_stripe_invoice_payment('${args.p_invoice_id}', '${args.p_payment_intent_id}', ${fee}, ${percent}, ${session}, NULL, ${balance}, ${live}, ${expected});`);
   const notes = execFileSync('sudo', [
     '-u', 'postgres', 'psql', '-d', 'sumak_stripe_card', '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c',
     `SELECT count(*) FROM public.notifications WHERE link_id = '${args.p_invoice_id}';`,
@@ -368,12 +385,23 @@ test('the office UI keeps the card link away from subcontractors, and secrets st
   assert.equal(detail.indexOf("role==='sub'") < detail.indexOf('Card payment link'), true);
   assert.match(checkout, /role === 'admin'/);
   assert.equal(checkout.includes('STRIPE_WEBHOOK_SECRET'), false);
-  assert.equal(webhook.includes('STRIPE_SECRET_KEY'), false);
   const serve = webhook.slice(webhook.indexOf('Deno.serve'));
+  assert.equal(serve.indexOf('verifyStripeSignature') < serve.indexOf('STRIPE_SECRET_KEY'), true);
+  assert.equal(serve.indexOf('STRIPE_SECRET_KEY') < serve.indexOf('markInvoiceFromStripeEvent'), true);
+  assert.match(webhook, /expectedStripeLivemode/);
   assert.equal(serve.indexOf('verifyStripeSignature') < serve.indexOf('markInvoiceFromStripeEvent'), true);
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.apply_stripe_invoice_payment/);
   assert.match(sql, /'Card \(Stripe\)'/);
   assert.equal(sql.includes('sk_live_'), false);
+});
+
+test('stripe mode comes from the env flag, then the secret key prefix', () => {
+  assert.equal(expectedStripeLivemode({ expectedRaw: 'true', secretKey: 'sk_test_x' }), true);
+  assert.equal(expectedStripeLivemode({ expectedRaw: 'test', secretKey: 'sk_live_x' }), false);
+  assert.equal(expectedStripeLivemode({ secretKey: 'sk_live_x' }), true);
+  assert.equal(expectedStripeLivemode({ secretKey: 'sk_test_x' }), false);
+  assert.equal(expectedStripeLivemode({ secretKey: 'pk_test_x' }), null);
+  assert.equal(expectedStripeLivemode({ expectedRaw: 'maybe' }), null);
 });
 
 test('publishable keys are rejected before any Stripe call', async () => {

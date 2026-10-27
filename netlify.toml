@@ -26,3 +26,16 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# The app is one HTML file with an inline script, so the content security
+# policy allows unsafe-inline. It is report-only until the office has watched
+# a real session. Camera stays available for the photo file picker.
+# Geolocation is unused.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cdn.jsdelivr.net https://nrnnpprcshkgroghhbro.supabase.co; connect-src 'self' https://nrnnpprcshkgroghhbro.supabase.co wss://nrnnpprcshkgroghhbro.supabase.co https://checkout.stripe.com; frame-src https://checkout.stripe.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; object-src 'none'; worker-src 'self' blob:; manifest-src 'self' data:"

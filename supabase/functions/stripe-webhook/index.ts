@@ -5,7 +5,9 @@
 //
 // The gateway JWT check stays off. Stripe does not send a Supabase JWT.
 // This function rejects any body whose Stripe-Signature does not match
-// STRIPE_WEBHOOK_SECRET. The secret key is not required here and is not read.
+// STRIPE_WEBHOOK_SECRET. After that check it compares event.livemode with
+// the mode from STRIPE_EXPECTED_LIVEMODE or STRIPE_LIVEMODE, or from the
+// STRIPE_SECRET_KEY prefix (sk_live_ / sk_test_). The key is not logged.
 //
 // In the Stripe dashboard (Developers → Webhooks), add an endpoint:
 //   https://nrnnpprcshkgroghhbro.supabase.co/functions/v1/stripe-webhook
@@ -23,7 +25,7 @@
 // payment reference is the payment intent id, and card_fee is the fee.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { markInvoiceFromStripeEvent, verifyStripeSignature } from '../_shared/stripe.js';
+import { expectedStripeLivemode, markInvoiceFromStripeEvent, verifyStripeSignature } from '../_shared/stripe.js';
 
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -57,7 +59,15 @@ Deno.serve(async (req) => {
     return json(400, { error: 'JSON body required.' });
   }
   try {
-    const result = await markInvoiceFromStripeEvent({ event: payload, admin: adminClient() });
+    const expectedLivemode = expectedStripeLivemode({
+      secretKey: Deno.env.get('STRIPE_SECRET_KEY') || '',
+      expectedRaw: Deno.env.get('STRIPE_EXPECTED_LIVEMODE') || Deno.env.get('STRIPE_LIVEMODE') || '',
+    });
+    const result = await markInvoiceFromStripeEvent({
+      event: payload,
+      admin: adminClient(),
+      expectedLivemode,
+    });
     return json(result.status, result.body);
   } catch (err) {
     console.error('stripe-webhook', err?.message || err);

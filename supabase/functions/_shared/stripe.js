@@ -121,7 +121,8 @@ export function buildCheckoutBody({
   params.set('success_url', `${root}/?card=paid`);
   params.set('cancel_url', `${root}/?card=cancelled`);
   params.set('client_reference_id', invoiceId);
-  params.set('payment_method_types[0]', 'card');
+  // Checkout shows the methods turned on for this Stripe account. Card is
+  // one of them. Do not pin payment_method_types here.
   params.set('metadata[invoice_id]', invoiceId);
   params.set('metadata[invoice_number]', cleanLine(invoiceNumber, 40));
   params.set('metadata[balance_cents]', String(balanceCents));
@@ -419,13 +420,35 @@ function paymentFromMeta(metadata, source) {
     ignore: false,
     invoiceId,
     paymentIntentId: pi,
+    balanceCents: balance,
     feeCents: fee,
     feePercent: percent,
     sessionId,
   };
 }
 
-export async function markInvoiceFromStripeEvent({ event, admin }) {
+// STRIPE_EXPECTED_LIVEMODE (or STRIPE_LIVEMODE) wins when set.
+// Otherwise sk_live_ is live and sk_test_ is test. Anything else is unset.
+export function expectedStripeLivemode({ secretKey = '', expectedRaw = '' } = {}) {
+  const raw = String(expectedRaw || '').trim().toLowerCase();
+  if (raw) {
+    if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'live') return true;
+    if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'test') return false;
+    return null;
+  }
+  const key = String(secretKey || '').trim();
+  if (key.startsWith('sk_live_')) return true;
+  if (key.startsWith('sk_test_')) return false;
+  return null;
+}
+
+export async function markInvoiceFromStripeEvent({ event, admin, expectedLivemode }) {
+  if (typeof expectedLivemode !== 'boolean') {
+    return { status: 500, body: { error: 'Stripe mode is not configured.' } };
+  }
+  if (!event || typeof event.livemode !== 'boolean' || event.livemode !== expectedLivemode) {
+    return { status: 400, body: { error: 'Stripe mode does not match this server.' } };
+  }
   const parsed = paymentFromCheckoutEvent(event);
   if (parsed.ignore) return { status: 200, body: { ok: true, ignored: true, reason: parsed.reason || null } };
   const { data, error } = await admin.rpc('apply_stripe_invoice_payment', {
@@ -435,6 +458,9 @@ export async function markInvoiceFromStripeEvent({ event, admin }) {
     p_fee_percent: parsed.feePercent,
     p_session_id: parsed.sessionId,
     p_paid_on: null,
+    p_balance_cents: parsed.balanceCents,
+    p_livemode: event.livemode,
+    p_expected_livemode: expectedLivemode,
   });
   if (error) {
     console.error('apply_stripe_invoice_payment', error.message || error);
