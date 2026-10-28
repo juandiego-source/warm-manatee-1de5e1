@@ -14,8 +14,8 @@
 <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/lucide-icons/lucide@main/icons/leaf.svg">
 <link rel="manifest" href='data:application/manifest+json,{"name":"Sumak Ops","short_name":"Sumak","start_url":"/","scope":"/","display":"standalone","orientation":"portrait","background_color":"%23110D0B","theme_color":"%23110D0B","icons":[{"src":"https://cdn.jsdelivr.net/gh/lucide-icons/lucide@main/icons/leaf.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}'>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha384-Yv5O+t3uE3hunW8uyrbpPW3iw6/5/Y7HitWJBLgqfMoA36NogMmy+8wWZMpn3HWc" crossorigin="anonymous"></script>
 <style>
 :root{
   --red:#E0574A;--red-d:#C4453A;--red-l:rgba(224,87,74,0.14);
@@ -1501,9 +1501,9 @@ function renderNotifPanel(){
   const badge=document.getElementById('notif-badge');
   if(unread>0){badge.style.display='flex';badge.textContent=unread>9?'9+':unread;}else{badge.style.display='none';}
   document.getElementById('notif-list').innerHTML=notifications.length?notifications.map(n=>`
-    <div class="notif-item ${n.read?'read':'unread'}" onclick="openNotif('${n.id}','${n.link_type||''}','${n.link_id||''}')">
+    <div class="notif-item ${n.read?'read':'unread'}" onclick="openNotif('${jsAttr(n.id)}','${jsAttr(n.link_type||'')}','${jsAttr(n.link_id||'')}')">
       <div class="notif-dot"></div>
-      <div><div class="notif-msg">${n.message}</div><div class="notif-time">${timeAgo(n.created_at)}</div></div>
+      <div><div class="notif-msg">${esc(n.message)}</div><div class="notif-time">${timeAgo(n.created_at)}</div></div>
     </div>`).join(''):`<div class="notif-empty">Nothing yet — you'll see updates here as they happen</div>`;
 }
 function timeAgo(ts){
@@ -1847,7 +1847,7 @@ function invoiceSortKey(inv){
 function sortInvoices(list){
   return list.slice().sort((a,b)=>invoiceSortKey(b)-invoiceSortKey(a)||String(b.created_at||'').localeCompare(String(a.created_at||''))||String(b.invoice_number||'').localeCompare(String(a.invoice_number||'')));
 }
-function buildSelect(id,items,ph){const el=document.getElementById(id);if(!el)return;const prev=el.value;el.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');if(prev&&items.some(i=>i.id===prev))el.value=prev;}
+function buildSelect(id,items,ph){const el=document.getElementById(id);if(!el)return;const prev=el.value;el.innerHTML=`<option value="">${esc(ph)}</option>`+items.map(i=>`<option value="${escapeAttr(i.id)}">${esc(i.name)}</option>`).join('');if(prev&&items.some(i=>i.id===prev))el.value=prev;}
 function renderAll(){renderDashboard();renderJobs();renderCustomers();renderSubsList();renderPayments();renderEstimates();renderInvoices();checkUnlinked();}
 function toggleSection(key){
   const hdr=document.getElementById('hdr-'+key);
@@ -1998,7 +1998,9 @@ function firstYMDAfter(anchor,frequency,afterYmd){
   }
   return ymd;
 }
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function escBlock(s){return esc(s).replace(/\r\n|\r|\n/g,'<br>');}
+function jsAttr(s){return String(s??'').replace(/\\/g,'\\\\').replace(/\r?\n/g,' ').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function invoiceIsOpen(i){return !!(i&&i.status!=='Paid'&&i.status!=='Cancelled');}
 function openInvoices(){return invoices.filter(invoiceIsOpen);}
 function unpaidInvoiceTotal(){return roundMoney(openInvoices().reduce((s,i)=>s+moneyNum(i.total),0));}
@@ -2351,8 +2353,8 @@ function renderDashboard(){
   document.getElementById('w-schedule').innerHTML=schedList.length?schedList.map(j=>`
     <div class="mini-row" onclick="openJobDetail('${j.id}')">
       <div class="mini-main">
-        <div class="mini-title">${j.title}</div>
-        <div class="mini-sub">${j.customers?.name||'—'} · ${!j.scheduled_date?'No date':fmtDate(j.scheduled_date)}${!j.subcontractor_id?' · No sub':''}</div>
+        <div class="mini-title">${esc(j.title)}</div>
+        <div class="mini-sub">${esc(j.customers?.name||'—')} · ${!j.scheduled_date?'No date':fmtDate(j.scheduled_date)}${!j.subcontractor_id?' · No sub':''}</div>
       </div>
       <div class="mini-right">${!j.subcontractor_id?`<span class="mini-pill" style="background:var(--rose-l,rgba(224,87,74,0.15));color:var(--rose)">Needs sub</span>`:`<span class="mini-pill" style="background:var(--gold-l,rgba(200,160,60,0.15));color:var(--gold)">No date</span>`}</div>
     </div>`).join(''):`<div class="widget-empty">Everything's scheduled and assigned ✓</div>`;
@@ -2368,8 +2370,8 @@ function renderDashboard(){
   const miniRow=(j)=>`
     <div class="mini-row" onclick="openJobDetail('${j.id}')">
       <div class="mini-main">
-        <div class="mini-title">${j.title}</div>
-        <div class="mini-sub">${j.customers?.name||'—'}${j.subcontractors?.name?` · ${j.subcontractors.name}`:''}</div>
+        <div class="mini-title">${esc(j.title)}</div>
+        <div class="mini-sub">${esc(j.customers?.name||'—')}${j.subcontractors?.name?` · ${esc(j.subcontractors.name)}`:''}</div>
       </div>
       <div class="mini-right"><div class="mini-sub" style="font-weight:600;color:var(--ink2)">${j.scheduled_date===todayStr?'Today':fmtDate(j.scheduled_date)}</div><span class="${pClass(j.status)} mini-pill">${j.status}</span></div>
     </div>`;
@@ -2499,8 +2501,8 @@ function renderCalendar(){
   document.getElementById('cal-unscheduled').innerHTML=unsched.length?`
     <div class="warn-banner" style="margin:14px 14px 0">
       <div class="warn-title">${ICONS.alert} ${unsched.length} job${unsched.length!==1?'s':''} need${unsched.length===1?'s':''} a date</div>
-      <div class="warn-sub">${unsched.map(j=>j.title).slice(0,3).join(', ')}${unsched.length>3?`, +${unsched.length-3} more`:''}</div>
-      ${unsched.map(j=>`<button class="btn btn-sm" style="background:var(--amber);color:white;margin-top:8px;margin-right:6px;border-radius:8px" onclick="openJobDetail('${j.id}')">${j.title.slice(0,24)}</button>`).join('')}
+      <div class="warn-sub">${unsched.map(j=>esc(j.title)).slice(0,3).join(', ')}${unsched.length>3?`, +${unsched.length-3} more`:''}</div>
+      ${unsched.map(j=>`<button class="btn btn-sm" style="background:var(--amber);color:white;margin-top:8px;margin-right:6px;border-radius:8px" onclick="openJobDetail('${j.id}')">${esc(j.title.slice(0,24))}</button>`).join('')}
     </div>`:'';
   const firstDay=new Date(calYear,calMonth,1).getDay();
   const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
@@ -2534,7 +2536,7 @@ function renderCalDay(ds){
   const dr=(recMap[ds]||[]).filter(r=>!realRecIds.has(r.id));
   const lbl=new Date(ds+'T00:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
   const el=document.getElementById('cal-day-jobs');el.style.display='block';
-  const recHtml=dr.map(r=>`<div class="card" style="opacity:0.75;border-style:dashed" onclick="closeDetail('cust');showView('customers',document.querySelectorAll('.nav-item')[3])"><div class="card-top"><div><div class="card-id">${ICONS.calendar} Recurring · ${freqLabel(r.frequency)}</div><div class="card-title">${r.title}</div></div></div><div class="card-meta"><span class="card-meta-item">${ICONS.user} ${r.customerName}</span>${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${r.address}</span>`:''}</div><div style="font-size:10.5px;color:var(--ink3);margin-top:4px">Upcoming — not yet scheduled</div></div>`).join('');
+  const recHtml=dr.map(r=>`<div class="card" style="opacity:0.75;border-style:dashed" onclick="closeDetail('cust');showView('customers',document.querySelectorAll('.nav-item')[3])"><div class="card-top"><div><div class="card-id">${ICONS.calendar} Recurring · ${freqLabel(r.frequency)}</div><div class="card-title">${esc(r.title)}</div></div></div><div class="card-meta"><span class="card-meta-item">${ICONS.user} ${esc(r.customerName)}</span>${r.address?`<span class="card-meta-item">${ICONS.mapPin} ${esc(r.address)}</span>`:''}</div><div style="font-size:10.5px;color:var(--ink3);margin-top:4px">Upcoming — not yet scheduled</div></div>`).join('');
   el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><div class="cal-day-title">${lbl}</div><button class="btn btn-red btn-sm" onclick="openModalWithDate('${ds}')">+ Job</button></div>`+
     recHtml+
     (dj.length?dj.map(j=>jobCard(j,`openJobDetail('${j.id}')`)).join(''):(dr.length?'':`<div style="text-align:center;padding:16px;font-size:13px;color:var(--ink3)">No jobs — tap + Job to add one</div>`));
@@ -2569,7 +2571,7 @@ function previewImport(){
   document.getElementById('import-preview').innerHTML=importRows.length?`
     <div style="font-size:12px;color:var(--ink3);margin-bottom:8px">${importRows.length} client${importRows.length!==1?'s':''} ready to import${skipped?` · ${skipped} row${skipped!==1?'s':''} skipped (no name)`:''}</div>
     <div style="max-height:220px;overflow-y:auto;margin-bottom:12px;border:1px solid var(--line);border-radius:var(--rxs)">
-      ${importRows.map(r=>`<div class="detail-row"><div style="font-size:13px;color:var(--ink)">${r.name}</div><div style="font-size:11px;color:var(--ink3)">${[r.phone,r.city].filter(Boolean).join(' · ')||'—'}</div></div>`).join('')}
+      ${importRows.map(r=>`<div class="detail-row"><div style="font-size:13px;color:var(--ink)">${esc(r.name)}</div><div style="font-size:11px;color:var(--ink3)">${[r.phone,r.city].filter(Boolean).map(esc).join(' · ')||'—'}</div></div>`).join('')}
     </div>`:'<div style="color:var(--rose);font-size:12px;margin-bottom:12px">No valid rows found — make sure each line starts with a name</div>';
   document.getElementById('import-confirm-btn').style.display=importRows.length?'block':'none';
 }
@@ -2595,10 +2597,10 @@ function renderCustomers(){
   document.getElementById('customers-list').innerHTML=list.length
     ?list.map(c=>`<div class="card" data-type="client" data-id="${c.id}" onclick="openCustDetail('${c.id}')">
       <div class="card-top">
-        <div><div class="card-title">${c.name}</div>
+        <div><div class="card-title">${esc(c.name)}</div>
           <div class="card-meta" style="margin-top:6px">
-            ${c.city?`<span class="card-meta-item">${ICONS.mapPin} ${c.city}</span>`:''}
-            ${c.phone?`<span class="card-meta-item">${ICONS.phone} ${c.phone}</span>`:''}
+            ${c.city?`<span class="card-meta-item">${ICONS.mapPin} ${esc(c.city)}</span>`:''}
+            ${c.phone?`<span class="card-meta-item">${ICONS.phone} ${esc(c.phone)}</span>`:''}
           </div>
         </div>
         <div style="text-align:right;font-size:12px;color:var(--ink3)">
@@ -2606,9 +2608,9 @@ function renderCustomers(){
           <div>${plural(properties.filter(p=>p.customer_id===c.id).length,'property','properties')}</div>
         </div>
       </div>
-      ${c.email?`<div style="font-size:12px;color:var(--ink3);margin-top:4px">${ICONS.mail} ${c.email}</div>`:''}
+      ${c.email?`<div style="font-size:12px;color:var(--ink3);margin-top:4px">${ICONS.mail} ${esc(c.email)}</div>`:''}
     </div>`).join('')
-    :`<div class="empty"><div class="empty-icon">${ICONS.users}</div><div class="empty-title">${q?'No matches':'No clients yet'}</div>${q?`<div class="empty-sub">Nothing found for "${q}"</div>`:''}</div>`;
+    :`<div class="empty"><div class="empty-icon">${ICONS.users}</div><div class="empty-title">${q?'No matches':'No clients yet'}</div>${q?`<div class="empty-sub">Nothing found for "${esc(q)}"</div>`:''}</div>`;
   syncDeskChrome();
 }
 
@@ -2626,17 +2628,17 @@ function openCustDetail(id){
   document.getElementById('detail-cust-body').innerHTML=`
     <div class="detail-card">
       <div class="detail-section-lbl">Contact</div>
-      ${c.phone?`<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value"><a href="tel:${c.phone}" style="color:var(--blue)">${c.phone}</a></span></div>`:''}
+      ${c.phone?`<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value"><a href="tel:${escapeAttr(c.phone)}" style="color:var(--blue)">${esc(c.phone)}</a></span></div>`:''}
       ${c.email?`<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value"><a href="mailto:${esc(c.email)}" style="color:var(--blue)">${esc(c.email)}</a></span></div>`:''}
       ${c.billing_email?`<div class="detail-row"><span class="detail-label">Billing Email</span><span class="detail-value"><a href="mailto:${esc(c.billing_email)}" style="color:var(--blue)">${esc(c.billing_email)}</a></span></div>`:''}
       ${parseContacts(c.contacts).map(ct=>`<div class="detail-row"><span class="detail-label">${esc(ct.name||'Contact')}</span><span class="detail-value"><a href="mailto:${esc(ct.email)}" style="color:var(--blue)">${esc(ct.email)}</a></span></div>`).join('')}
-      ${c.city?`<div class="detail-row"><span class="detail-label">City</span><span class="detail-value">${c.city}</span></div>`:''}
-      ${c.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%">${c.notes}</span></div>`:''}
+      ${c.city?`<div class="detail-row"><span class="detail-label">City</span><span class="detail-value">${esc(c.city)}</span></div>`:''}
+      ${c.notes?`<div class="detail-row"><span class="detail-label">Notes</span><span class="detail-value" style="max-width:55%;white-space:pre-wrap">${escBlock(c.notes)}</span></div>`:''}
     </div>
     <div class="detail-card">
       <div class="detail-section-lbl">Properties</div>
       <div class="prop-list" id="prop-list-${id}">
-        ${cProps.map(p=>`<div class="prop-item"><span class="prop-addr">${ICONS.mapPin} ${p.address}</span><button class="prop-del" onclick="deleteProp('${p.id}','${id}')">×</button></div>`).join('')||'<div style="font-size:13px;color:var(--ink3)">No addresses yet</div>'}
+        ${cProps.map(p=>`<div class="prop-item"><span class="prop-addr">${ICONS.mapPin} ${esc(p.address)}</span><button class="prop-del" onclick="deleteProp('${p.id}','${id}')">×</button></div>`).join('')||'<div style="font-size:13px;color:var(--ink3)">No addresses yet</div>'}
       </div>
       <div class="add-prop-row">
         <input class="add-prop-input" id="new-prop-${id}" placeholder="Add address..." autocomplete="off">
@@ -2665,7 +2667,7 @@ function openCustDetail(id){
     <div class="action-row" style="margin-top:12px">
       <button class="action-btn ab-glass" onclick="editCustFromDetail('${id}')">${ICONS.pencil} Edit Client</button>
       <button class="action-btn ab-glass" onclick="openMergeTool('${id}')">Merge into another client</button>
-      <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${c.name.replace(/'/g,"\\'")}')">${ICONS.trash} Delete Client</button>
+      <button class="action-btn ab-danger" onclick="deleteCustomer('${id}','${jsAttr(c.name)}')">${ICONS.trash} Delete Client</button>
     </div>`;
   wireAddressAutocomplete(`new-prop-${id}`,`new-prop-suggest-${id}`);
 }
@@ -2846,8 +2848,8 @@ function recCardsFor(custId){
   return list.map(r=>`
     <div class="detail-row" style="align-items:flex-start">
       <div style="flex:1">
-        <div style="font-weight:600;color:var(--ink);font-size:13.5px;${r.active?'':'opacity:0.5;text-decoration:line-through'}">${r.title}</div>
-        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${freqLabel(r.frequency)} · next ${fmtDate(r.next_run_date)}${r.subcontractors?.name?' · '+r.subcontractors.name:''}</div>
+        <div style="font-weight:600;color:var(--ink);font-size:13.5px;${r.active?'':'opacity:0.5;text-decoration:line-through'}">${esc(r.title)}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:2px">${freqLabel(r.frequency)} · next ${fmtDate(r.next_run_date)}${r.subcontractors?.name?' · '+esc(r.subcontractors.name):''}</div>
       </div>
       <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div style="font-weight:700;color:var(--red);font-size:14px;font-family:'Cormorant Garamond',serif">${fmt(r.client_price)}</div>
@@ -2936,7 +2938,7 @@ function loadCrCustomerProps(){
   const sel=document.getElementById('cr-prop-select');
   if(!custId){sel.innerHTML='<option value="">Select saved address...</option>';return;}
   const custProps=properties.filter(p=>p.customer_id===custId);
-  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${p.address}">${p.address}</option>`).join('');
+  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${esc(p.address)}</option>`).join('');
   sel.onchange=()=>{if(sel.value)document.getElementById('cr-address').value=sel.value;};
 }
 async function saveCostRequest(){
@@ -2998,8 +3000,8 @@ function renderCostRequestsSection(){
       <div class="batch-client">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
-            <div style="font-weight:600;color:var(--ink);font-size:13px">${r.title}</div>
-            <div style="font-size:11px;color:var(--ink3);margin-top:2px">${r.customers?.name||'—'}${r.address?' · '+r.address:''} · ${r.subcontractors?.name||'—'}</div>
+            <div style="font-weight:600;color:var(--ink);font-size:13px">${esc(r.title)}</div>
+            <div style="font-size:11px;color:var(--ink3);margin-top:2px">${esc(r.customers?.name||'—')}${r.address?' · '+esc(r.address):''} · ${esc(r.subcontractors?.name||'—')}</div>
           </div>
           <span class="pill ${r.status==='Submitted'?'pill-approved':'pill-pending'}">${r.status==='Submitted'?'Ready':'Waiting'}</span>
         </div>
@@ -3007,7 +3009,7 @@ function renderCostRequestsSection(){
           <div style="margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:var(--rxs)">
             <div style="font-size:11px;color:var(--ink3)">Sub's cost</div>
             <div style="font-weight:700;color:var(--red);font-size:16px;font-family:'Cormorant Garamond',serif">${fmt(r.submitted_cost)}</div>
-            ${r.submitted_notes?`<div style="font-size:11.5px;color:var(--ink2);margin-top:4px">${r.submitted_notes}</div>`:''}
+            ${r.submitted_notes?`<div style="font-size:11.5px;color:var(--ink2);margin-top:4px;white-space:pre-wrap">${escBlock(r.submitted_notes)}</div>`:''}
           </div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <button class="btn btn-red btn-sm" style="flex:2;justify-content:center" onclick="convertCostRequestToEstimate('${r.id}')">Build Estimate</button>
@@ -3074,7 +3076,7 @@ function loadRecCustomerProps(){
   const custProps=properties.filter(p=>p.customer_id===custId);
   if(isEdit){
     const sel=document.getElementById('rec-address-select');
-    sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${p.address}">${p.address}</option>`).join('');
+    sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${esc(p.address)}</option>`).join('');
     sel.onchange=()=>{if(sel.value)document.getElementById('rec-address-manual').value=sel.value;};
   }else{
     renderRecPropsChecklist(custProps);
@@ -3084,7 +3086,7 @@ function renderRecPropsChecklist(custProps){
   const el=document.getElementById('rec-props-checklist');
   if(!custProps.length){el.innerHTML='<div style="font-size:12px;color:var(--ink3)">No saved addresses yet for this client — add one below.</div>';return;}
   el.innerHTML=`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink);padding:6px 0;border-bottom:1px solid var(--line);margin-bottom:4px;cursor:pointer;font-weight:600"><input type="checkbox" id="rec-select-all" onchange="document.querySelectorAll('.rec-prop-cb').forEach(cb=>cb.checked=this.checked)"> Select All (${custProps.length})</label>`+
-    custProps.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);padding:5px 0;cursor:pointer"><input type="checkbox" class="rec-prop-cb" value="${escapeAttr(p.address)}"> ${p.address}</label>`).join('');
+    custProps.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);padding:5px 0;cursor:pointer"><input type="checkbox" class="rec-prop-cb" value="${escapeAttr(p.address)}"> ${esc(p.address)}</label>`).join('');
 }
 async function addRecPropertyChoice(){
   const custId=document.getElementById('rec-customer').value;
@@ -3254,10 +3256,10 @@ function renderRecurringView(){
         <span class="pill pill-sent">${fmt(r.client_price)}/visit</span>
       </div>
       <div class="card-meta">
-        <span class="card-meta-item">${ICONS.user} ${r.customers?.name||'—'}</span>
-        ${r.subcontractors?.name?`<span class="card-meta-item">${ICONS.wrench} ${r.subcontractors.name}</span>`:`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} No sub</span>`}
+        <span class="card-meta-item">${ICONS.user} ${esc(r.customers?.name||'—')}</span>
+        ${r.subcontractors?.name?`<span class="card-meta-item">${ICONS.wrench} ${esc(r.subcontractors.name)}</span>`:`<span class="card-meta-item" style="color:var(--rose)">${ICONS.alert} No sub</span>`}
       </div>
-      ${r.address?`<div class="card-meta"><span class="card-meta-item">${ICONS.mapPin} ${r.address}</span></div>`:''}
+      ${r.address?`<div class="card-meta"><span class="card-meta-item">${ICONS.mapPin} ${esc(r.address)}</span></div>`:''}
       <div class="card-footer">
         <div style="font-size:11px;color:var(--ink3)">${upcoming.length} upcoming${done>0?` · ${done} done`:''}${next?` · next ${fmtDate(next.scheduled_date)}`:''}</div>
         <div style="font-size:11px;color:var(--red)">View ›</div>
@@ -3277,14 +3279,14 @@ function openRecDetail(id){
   if(!overlay){overlay=document.createElement('div');overlay.id='trash-overlay';overlay.style.cssText='position:fixed;inset:0;z-index:900;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px);';overlay.onclick=(e)=>{if(e.target===overlay)userCloseTrash();};document.body.appendChild(overlay);}
   overlay.innerHTML=`<div style="background:var(--white);width:100%;max-width:480px;max-height:85vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:20px;border:1px solid var(--glass-b);border-bottom:none;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-      <div><div style="font-size:11px;color:var(--ink3)">${freqLabel(r.frequency)} maintenance${r.active?'':' · PAUSED'}</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${r.title}</div></div>
+      <div><div style="font-size:11px;color:var(--ink3)">${freqLabel(r.frequency)} maintenance${r.active?'':' · PAUSED'}</div><div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--ink)">${esc(r.title)}</div></div>
       <span style="cursor:pointer;color:var(--ink3);font-size:18px;padding:4px" onclick="userCloseTrash()">×</span>
     </div>
     <div style="background:var(--card2);border-radius:var(--rsm);padding:14px;margin:12px 0">
-      <div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${r.customers?.name||'—'}</span></div>
-      ${r.customers?.phone?`<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${r.customers.phone}</span></div>`:''}
-      ${r.address?`<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value" style="text-align:right;max-width:60%">${r.address}</span></div>`:''}
-      <div class="detail-row"><span class="detail-label">Sub</span><span class="detail-value">${r.subcontractors?.name||'Unassigned'}</span></div>
+      <div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(r.customers?.name||'—')}</span></div>
+      ${r.customers?.phone?`<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${esc(r.customers.phone)}</span></div>`:''}
+      ${r.address?`<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value" style="text-align:right;max-width:60%">${esc(r.address)}</span></div>`:''}
+      <div class="detail-row"><span class="detail-label">Sub</span><span class="detail-value">${esc(r.subcontractors?.name||'Unassigned')}</span></div>
       <div class="detail-row"><span class="detail-label">Client price</span><span class="detail-value">${fmt(r.client_price)}/visit</span></div>
       <div class="detail-row"><span class="detail-label">Sub pay</span><span class="detail-value">${fmt(r.sub_pay)}/visit</span></div>
       <div class="detail-row"><span class="detail-label">Frequency</span><span class="detail-value">${freqLabel(r.frequency)}</span></div>
@@ -3621,7 +3623,7 @@ function openInvitePicker(){
   const list=unlinkedSubs.length?unlinkedSubs.map(s=>{
     const url=`${window.location.origin}${window.location.pathname}?invite=${s.id}`;
     return`<div class="detail-row" style="flex-direction:column;align-items:stretch;gap:6px">
-      <div style="font-weight:600;color:var(--ink);font-size:13px">${s.name}</div>
+      <div style="font-weight:600;color:var(--ink);font-size:13px">${esc(s.name)}</div>
       <input class="form-input" readonly value="${escapeAttr(url)}" onclick="this.select()" style="font-size:11px;padding:9px 10px">
       <button class="btn btn-sm btn-red" style="width:100%;justify-content:center" onclick="copyInviteLink('${escapeAttr(url)}',this)">${ICONS.send} Copy Link</button>
     </div>`;
@@ -3658,17 +3660,17 @@ function renderSubsList(){
     const linked=profiles.find(p=>p.subcontractor_id===s.id);
     const jobCount=jobs.filter(j=>j.subcontractor_id===s.id).length;
     return`<div class="sub-card">
-      <div class="sub-avatar">${initials}</div>
+      <div class="sub-avatar">${esc(initials)}</div>
       <div class="sub-info">
-        <div class="sub-name">${s.name}</div>
-        <div class="sub-meta">${s.specialty||'—'} · ${jobCount} job${jobCount!==1?'s':''}</div>
-        ${s.phone?`<div class="sub-meta"><a href="tel:${s.phone}" style="color:var(--blue)">${s.phone}</a></div>`:''}
+        <div class="sub-name">${esc(s.name)}</div>
+        <div class="sub-meta">${esc(s.specialty||'—')} · ${jobCount} job${jobCount!==1?'s':''}</div>
+        ${s.phone?`<div class="sub-meta"><a href="tel:${escapeAttr(s.phone)}" style="color:var(--blue)">${esc(s.phone)}</a></div>`:''}
         ${linked?`<div class="sub-meta" style="color:var(--green)">✓ Portal linked</div>`:`<div class="sub-meta" style="color:var(--ink3)">No portal yet · <span style="color:var(--red);text-decoration:underline;cursor:pointer;font-weight:600" onclick="openInvitePicker()">Get Invite Link</span></div>`}
       </div>
       <div class="sub-actions">
         <span class="active-badge ${s.active?'on':'off'}">${s.active?'Active':'Inactive'}</span>
         <button class="btn btn-glass btn-sm" onclick="editSub('${s.id}');event.stopPropagation()">Edit</button>
-        <button class="btn btn-sm" style="background:var(--rose-bg);color:var(--rose);border-radius:50px;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;border:none" onclick="deleteSub('${s.id}','${s.name.replace(/'/g,"\\'")}',${jobCount},event)">Delete</button>
+        <button class="btn btn-sm" style="background:var(--rose-bg);color:var(--rose);border-radius:50px;padding:5px 10px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer;border:none" onclick="deleteSub('${s.id}','${jsAttr(s.name)}',${jobCount},event)">Delete</button>
       </div>
     </div>`;}).join('')
     :`<div class="empty"><div class="empty-icon">${ICONS.wrench}</div><div class="empty-title">No subcontractors</div></div>`);
@@ -3688,8 +3690,8 @@ function openAssignModal(){
   const unlinkedSubs=subs.filter(s=>!profiles.find(p=>p.subcontractor_id===s.id));
   document.getElementById('assign-list').innerHTML=unlinked.map(p=>`
     <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line)">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ink)">${ICONS.mail} ${p.email}</div>
-      <select class="form-input" id="assign-${p.id}"><option value="">Select subcontractor...</option>${unlinkedSubs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ink)">${ICONS.mail} ${esc(p.email)}</div>
+      <select class="form-input" id="assign-${p.id}"><option value="">Select subcontractor...</option>${unlinkedSubs.map(s=>`<option value="${escapeAttr(s.id)}">${esc(s.name)}</option>`).join('')}</select>
       <button class="btn btn-red btn-sm" style="margin-top:8px;width:100%;justify-content:center;border-radius:var(--rsm)" onclick="linkSubAccount('${p.id}')">Link</button>
     </div>`).join('');
   openModal('assign');
@@ -4826,7 +4828,7 @@ async function openEstDetail(id){
         ${money.optional>0?`<div class="inv-total-row"><span>Optional (not included)</span><span>${fmt(money.optional)}</span></div>`:''}
         <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(money.total)}</span></div>`;})()}
       </div>
-      ${e.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${e.notes}</div>`:''}
+      ${e.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px;white-space:pre-wrap">${escBlock(e.notes)}</div>`:''}
     </div>
     ${estimateTimelineHTML(e)}
     <div class="action-row">
@@ -4853,7 +4855,7 @@ function estimateDocHTML(est,items,cust){
   const statusBg={Approved:'#eaf3de',Sent:'#e6f1fb',Draft:'#faeeda',Declined:'#fcebeb'}[est.status]||'#faeeda';
   const money=estimateDisplayMoney(est,items);
   const acceptedIds=clientAcceptedIds(est);
-  const rows=(items||[]).map(i=>{const opt=lineIsOptional(i);const skipped=opt&&acceptedIds&&!lineCountsTowardApproved(i,acceptedIds);return `<tr><td><div class="item-title">${i.title||i.description||''}${opt?' · Optional':''}${skipped?' · not chosen':''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`;}).join('');
+  const rows=(items||[]).map(i=>{const opt=lineIsOptional(i);const skipped=opt&&acceptedIds&&!lineCountsTowardApproved(i,acceptedIds);return `<tr><td><div class="item-title">${esc(i.title||i.description||'')}${opt?' · Optional':''}${skipped?' · not chosen':''}</div>${i.title&&i.description?`<div class="item-desc">${esc(i.description)}</div>`:''}</td><td class="num">${esc(i.quantity)}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`;}).join('');
   return `<div class="pdf-doc">
 <div class="letterhead">
   <div class="brand">
@@ -4866,19 +4868,19 @@ function estimateDocHTML(est,items,cust){
   </div>
   <div class="doc-meta">
     <div class="doc-title">Estimate</div>
-    <div class="doc-num">${est.estimate_number}</div>
+    <div class="doc-num">${esc(est.estimate_number)}</div>
     <div class="doc-date">Issued ${fmtDate(est.created_at||bizYMD())}</div>
     ${est.valid_until?`<div class="doc-date">Valid until ${fmtDate(est.valid_until)}</div>`:''}
-    <div class="status-pill" style="color:${statusColor};background:${statusBg}">${est.status}</div>
+    <div class="status-pill" style="color:${statusColor};background:${statusBg}">${esc(est.status)}</div>
   </div>
 </div>
 <div class="billto">
   <div class="billto-block">
     <div class="billto-lbl">Prepared For</div>
-    <div class="billto-name">${cust.name||est.customers?.name||'—'}</div>
-    <div class="billto-detail">${[cust.city,cust.phone,cust.email].filter(Boolean).join('<br>')}</div>
+    <div class="billto-name">${esc(cust.name||est.customers?.name||'—')}</div>
+    <div class="billto-detail">${[cust.city,cust.phone,cust.email].filter(Boolean).map(esc).join('<br>')}</div>
   </div>
-  ${est.address?`<div class="billto-block"><div class="billto-lbl">Property</div><div class="billto-detail">${est.address}</div></div>`:''}
+  ${est.address?`<div class="billto-block"><div class="billto-lbl">Property</div><div class="billto-detail">${esc(est.address)}</div></div>`:''}
 </div>
 <table>
   <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
@@ -4890,7 +4892,7 @@ function estimateDocHTML(est,items,cust){
   ${money.optional>0?`<div class="trow"><span>Optional (not included)</span><span>${fmt(money.optional)}</span></div>`:''}
   <div class="grand"><span class="grand-lbl">Estimated Total</span><span class="grand-val">${fmt(money.total)}</span></div>
 </div>
-${est.notes?`<div class="notes"><strong>Notes:</strong> ${est.notes}</div>`:''}
+${est.notes?`<div class="notes"><strong>Notes:</strong> ${escBlock(est.notes)}</div>`:''}
 <div class="footer">
   <div class="thanks">Thanks for considering Sumak</div>
   <div class="footer-sub">Questions about this estimate? Call or text 208-695-7239.</div>
@@ -5013,7 +5015,7 @@ async function openTrash(){
   const{data:djobs}=await db.from('jobs').select('*, customers(name)').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const{data:dcust}=await db.from('customers').select('*').not('deleted_at','is',null).order('deleted_at',{ascending:false}).limit(50);
   const items=[...(djobs||[]).map(j=>({type:'job',id:j.id,label:j.title,sub:j.customers?.name||'',deleted_at:j.deleted_at})),...(dcust||[]).map(c=>({type:'customer',id:c.id,label:c.name,sub:c.city||'',deleted_at:c.deleted_at}))].sort((a,b)=>(b.deleted_at||'').localeCompare(a.deleted_at||''));
-  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${i.label}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+i.sub:''} · deleted ${fmtDate(i.deleted_at)}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
+  const html=items.length?items.map(i=>`<div class="detail-row"><div><div style="font-weight:600;color:var(--ink);font-size:13px">${esc(i.label)}</div><div style="font-size:11px;color:var(--ink3)">${i.type==='job'?'Job':'Client'}${i.sub?' · '+esc(i.sub):''} · deleted ${fmtDate(i.deleted_at)}</div></div><button class="btn btn-sm btn-green" onclick="${i.type==='job'?'undoDeleteJob':'undoDeleteCustomer'}('${i.id}');closeTrash();">Restore</button></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--ink3);font-size:13px">Trash is empty</div>';
   let overlay=document.getElementById('trash-overlay');
   if(!overlay){
     overlay=document.createElement('div');
@@ -5063,7 +5065,7 @@ async function generateAIEstimate(){
   const btn=document.getElementById('ai-build-btn');
   btn.textContent='Thinking...';btn.disabled=true;
   try{
-    const{data,error}=await db.functions.invoke('ai-estimate',{body:{description:desc,services}});
+    const{data,error}=await db.functions.invoke('smooth-handler',{body:{description:desc,services}});
     if(error||!data||data.error){toast('⚠ AI build unavailable — add items manually');return;}
     if(data.lineItems&&data.lineItems.length){
       estLineItems=data.lineItems.map(i=>({title:i.description||'',desc:'',qty:i.quantity||1,price:i.unitPrice||0,cost:0,marginPct:0,mode:'margin'}));
@@ -5077,7 +5079,7 @@ async function generateAIEstimate(){
 function renderServicePickerList(target){
   return services.length?services.map(s=>`
     <div class="detail-row" style="cursor:pointer" onclick="pickService('${s.id}','${target}')">
-      <div><div style="font-weight:600;color:var(--ink);font-size:13px">${s.name}</div>${s.description?`<div style="font-size:11px;color:var(--ink3)">${s.description}</div>`:''}</div>
+      <div><div style="font-weight:600;color:var(--ink);font-size:13px">${esc(s.name)}</div>${s.description?`<div style="font-size:11px;color:var(--ink3)">${esc(s.description)}</div>`:''}</div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="font-weight:700;color:var(--red);font-size:14px;font-family:'Cormorant Garamond',serif">${fmt(s.default_price)}</div>
         <span style="color:var(--ink3);cursor:pointer;padding:4px" onclick="event.stopPropagation();deleteService('${s.id}','${target}')">×</span>
@@ -5735,12 +5737,12 @@ function renderBatchInvoice(){
       return`<div class="batch-client" data-cust="${custId}">
         <label style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink);cursor:pointer">
           <input type="checkbox" class="batch-client-cb" data-cust="${custId}" onchange="toggleBatchClient('${custId}',this.checked)">
-          ${d.name}<span style="margin-left:auto;font-weight:700;color:var(--red);font-family:'Cormorant Garamond',serif;font-size:15px">${fmt(total)}</span>
+          ${esc(d.name)}<span style="margin-left:auto;font-weight:700;color:var(--red);font-family:'Cormorant Garamond',serif;font-size:15px">${fmt(total)}</span>
         </label>
         <div style="padding-left:24px">
           ${d.jobs.map(j=>`<label class="batch-job-row">
             <input type="checkbox" class="batch-job-cb" data-job="${j.id}" data-cust="${custId}" onchange="syncBatchClientCb('${custId}')">
-            ${j.title}${j.scheduled_date?' · '+fmtDate(j.scheduled_date):''} — ${fmt(j.client_price)}
+            ${esc(j.title)}${j.scheduled_date?' · '+fmtDate(j.scheduled_date):''} — ${fmt(j.client_price)}
           </label>`).join('')}
         </div>
       </div>`;
@@ -5921,7 +5923,7 @@ async function openInvDetail(id){
         <div class="inv-total-row inv-grand"><span>Total</span><span>${fmt(inv.total)}</span></div>
         ${invoiceCardFeeLine(inv)?`<div class="inv-total-row"><span>${esc(invoiceCardFeeLine(inv))}</span><span>on top</span></div>`:''}
       </div>
-      ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px">${esc(inv.notes)}</div>`:''}
+      ${inv.notes?`<div style="margin-top:12px;font-size:12px;color:var(--ink2);border-top:1px solid var(--line);padding-top:10px;white-space:pre-wrap">${escBlock(inv.notes)}</div>`:''}
       ${invoiceCardLinkHTML(inv)}
     </div>
     ${currentProfile?.role==='admin'?`<div class="detail-card" id="inv-photo-block"><div class="detail-section-lbl">Job photos</div><div id="inv-photo-grid" style="font-size:12.5px;color:var(--ink3)">Loading photos…</div><label style="display:flex;gap:10px;align-items:center;min-height:44px;margin-top:10px;font-size:13px;color:var(--ink2);cursor:pointer"><input type="checkbox" id="inv-include-photos-detail" ${invoiceIncludePhotos(inv)?'checked':''} style="width:22px;height:22px;flex-shrink:0" onchange="setInvoiceIncludePhotos('${inv.id}',this.checked)"> Include job photos</label><div style="font-size:11.5px;color:var(--ink3);line-height:1.4">Checked invoices email these completion photos to the client. Nothing else from the job is included.</div></div>`:''}
@@ -5996,7 +5998,7 @@ body{margin:0;}
 function invoiceDocHTML(inv,items,cust){
   const statusColor={Paid:'#2a6010',Unpaid:'#7a4500',Overdue:'#8B1A1A'}[inv.status]||'#7a4500';
   const statusBg={Paid:'#eaf3de',Unpaid:'#faeeda',Overdue:'#fcebeb'}[inv.status]||'#faeeda';
-  const rows=(items||[]).map(i=>`<tr><td><div class="item-title">${i.title||i.description||''}</div>${i.title&&i.description?`<div class="item-desc">${i.description}</div>`:''}</td><td class="num">${i.quantity}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`).join('');
+  const rows=(items||[]).map(i=>`<tr><td><div class="item-title">${esc(i.title||i.description||'')}</div>${i.title&&i.description?`<div class="item-desc">${esc(i.description)}</div>`:''}</td><td class="num">${esc(i.quantity)}</td><td class="num">${fmt(i.unit_price)}</td><td class="num">${fmt(i.total)}</td></tr>`).join('');
   return `<div class="pdf-doc">
 <div class="letterhead">
   <div class="brand">
@@ -6009,20 +6011,20 @@ function invoiceDocHTML(inv,items,cust){
   </div>
   <div class="doc-meta">
     <div class="doc-title">Invoice</div>
-    <div class="doc-num">${inv.invoice_number}</div>
+    <div class="doc-num">${esc(inv.invoice_number)}</div>
     <div class="doc-date">Issued ${fmtDate(inv.created_at||bizYMD())}</div>
     ${inv.due_date?`<div class="doc-date">Due ${fmtDate(inv.due_date)}</div>`:''}
-    <div class="status-pill" style="color:${statusColor};background:${statusBg}">${inv.status}</div>
+    <div class="status-pill" style="color:${statusColor};background:${statusBg}">${esc(inv.status)}</div>
     ${invoiceDocPaymentHTML(inv)}
   </div>
 </div>
 <div class="billto">
   <div class="billto-block">
     <div class="billto-lbl">Billed To</div>
-    <div class="billto-name">${cust.name||inv.customers?.name||'—'}</div>
-    <div class="billto-detail">${[cust.city,cust.phone,cust.billing_email||cust.email].filter(Boolean).join('<br>')}</div>
+    <div class="billto-name">${esc(cust.name||inv.customers?.name||'—')}</div>
+    <div class="billto-detail">${[cust.city,cust.phone,cust.billing_email||cust.email].filter(Boolean).map(esc).join('<br>')}</div>
   </div>
-  ${inv.address?`<div class="billto-block"><div class="billto-lbl">Service Address</div><div class="billto-name" style="font-size:14px">${inv.address}</div></div>`:(inv.jobs?.title?`<div class="billto-block"><div class="billto-lbl">For</div><div class="billto-detail">${inv.jobs.title}</div></div>`:'')}
+  ${inv.address?`<div class="billto-block"><div class="billto-lbl">Service Address</div><div class="billto-name" style="font-size:14px">${esc(inv.address)}</div></div>`:(inv.jobs?.title?`<div class="billto-block"><div class="billto-lbl">For</div><div class="billto-detail">${esc(inv.jobs.title)}</div></div>`:'')}
 </div>
 <table>
   <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
@@ -6033,7 +6035,7 @@ function invoiceDocHTML(inv,items,cust){
   ${inv.tax_rate>0?`<div class="trow"><span>Tax (${inv.tax_rate}%)</span><span>${fmt(inv.tax_amount)}</span></div>`:''}
   <div class="grand"><span class="grand-lbl">Total Due</span><span class="grand-val">${fmt(inv.total)}</span></div>
 </div>
-${inv.notes?`<div class="notes"><strong>Notes:</strong> ${inv.notes}</div>`:''}
+${inv.notes?`<div class="notes"><strong>Notes:</strong> ${escBlock(inv.notes)}</div>`:''}
 <div class="footer">
   <div class="thanks">Thank you for your business</div>
   <div class="footer-sub">Questions about this invoice? Call or text 208-695-7239.</div>
@@ -6472,7 +6474,7 @@ function loadInvCustomerProps(){
   if(!sel)return;
   if(!custId){sel.innerHTML='<option value="">Select saved address...</option>';return;}
   const custProps=properties.filter(p=>p.customer_id===custId);
-  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${p.address}</option>`).join('')+'<option value="__new">+ Type a new address</option>';
+  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${esc(p.address)}</option>`).join('')+'<option value="__new">+ Type a new address</option>';
 }
 function onInvPropSelect(){
   const sel=document.getElementById('inv-prop-select').value;
@@ -7514,7 +7516,7 @@ function loadCustomerProps(){
   const sel=document.getElementById('job-prop-select');
   if(!custId){sel.innerHTML='<option value="">Select saved address...</option>';return;}
   const custProps=properties.filter(p=>p.customer_id===custId);
-  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${p.address}">${p.address}</option>`).join('');
+  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${esc(p.address)}</option>`).join('');
   sel.onchange=()=>{if(sel.value)document.getElementById('job-address').value=sel.value;};
 }
 function loadEstCustomerProps(){
@@ -7522,7 +7524,7 @@ function loadEstCustomerProps(){
   const sel=document.getElementById('est-prop-select');
   if(!custId){sel.innerHTML='<option value="">Select saved address...</option>';return;}
   const custProps=properties.filter(p=>p.customer_id===custId);
-  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${p.address}">${p.address}</option>`).join('');
+  sel.innerHTML='<option value="">Select saved address...</option>'+custProps.map(p=>`<option value="${escapeAttr(p.address)}">${esc(p.address)}</option>`).join('');
   sel.onchange=()=>{if(sel.value)document.getElementById('est-address').value=sel.value;};
 }
 async function ensurePropertySaved(custId,address){
@@ -7973,7 +7975,25 @@ function showView(name,el){
 }
 function toast(msg,actionFn,actionArg,actionLabel){
   const t=document.getElementById('toast');
-  t.innerHTML=actionFn?`<span>${msg}</span> <span style="text-decoration:underline;cursor:pointer;font-weight:700;margin-left:8px" onclick="${actionFn}('${actionArg}');dismissToast()">${actionLabel||'Undo'}</span>`:msg;
+  const text=String(msg??'');
+  const known=Object.values(ICONS).filter(svg=>text.startsWith(svg)).sort((a,b)=>b.length-a.length)[0];
+  t.replaceChildren();
+  let rest=text;
+  if(known){
+    const icon=document.createElement('span');
+    icon.innerHTML=known;
+    t.appendChild(icon);
+    rest=text.slice(known.length);
+  }
+  t.appendChild(document.createTextNode(rest));
+  if(actionFn&&typeof window[actionFn]==='function'){
+    t.appendChild(document.createTextNode(' '));
+    const btn=document.createElement('span');
+    btn.style.cssText='text-decoration:underline;cursor:pointer;font-weight:700;margin-left:8px';
+    btn.textContent=actionLabel||'Undo';
+    btn.addEventListener('click',()=>{window[actionFn](actionArg);dismissToast();});
+    t.appendChild(btn);
+  }
   t.style.display='block';
   void t.offsetWidth;
   t.classList.add('show');

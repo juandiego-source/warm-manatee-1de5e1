@@ -87,13 +87,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS invoices_card_payment_intent_uidx
   ON public.invoices (payment_reference)
   WHERE payment_method = 'Card (Stripe)' AND payment_reference IS NOT NULL;
 
+-- The 6-argument form did not check the unpaid balance or livemode.
+-- Drop it so a later paste of this file cannot leave that overload behind.
+DROP FUNCTION IF EXISTS public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date);
+
 CREATE OR REPLACE FUNCTION public.apply_stripe_invoice_payment(
   p_invoice_id uuid,
   p_payment_intent_id text,
   p_fee numeric,
   p_fee_percent numeric,
   p_session_id text,
-  p_paid_on date
+  p_paid_on date,
+  p_balance_cents integer,
+  p_livemode boolean,
+  p_expected_livemode boolean
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -107,7 +114,11 @@ DECLARE
   v_session text;
   v_paid_on date;
   v_message text;
+  v_due_cents integer;
 BEGIN
+  IF p_livemode IS NULL OR p_expected_livemode IS NULL OR p_livemode IS DISTINCT FROM p_expected_livemode THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'livemode');
+  END IF;
   IF p_invoice_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'error', 'invoice required');
   END IF;
@@ -152,6 +163,13 @@ BEGIN
 
   IF v_row.status NOT IN ('Unpaid', 'Overdue') THEN
     RETURN jsonb_build_object('ok', true, 'ignored', true, 'reason', 'status', 'invoice_id', p_invoice_id);
+  END IF;
+
+  -- The card fee is extra. The balance part must equal what the invoice
+  -- still shows as unpaid, in cents. A partial or stale checkout is rejected.
+  v_due_cents := round(coalesce(v_row.total, 0) * 100)::integer;
+  IF p_balance_cents IS NULL OR p_balance_cents IS DISTINCT FROM v_due_cents THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'amount_mismatch', 'invoice_id', p_invoice_id);
   END IF;
 
   IF EXISTS (
@@ -205,11 +223,11 @@ EXCEPTION
 END
 $fn$;
 
-REVOKE ALL ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date) TO service_role;
+REVOKE ALL ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date, integer, boolean, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date, integer, boolean, boolean) TO service_role;
 
-COMMENT ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date) IS
-  'Marks one invoice paid from a verified Stripe webhook. Idempotent for the same payment intent. Service role only.';
+COMMENT ON FUNCTION public.apply_stripe_invoice_payment(uuid, text, numeric, numeric, text, date, integer, boolean, boolean) IS
+  'Marks one invoice paid from a verified Stripe webhook. The balance part, excluding the card fee, must equal the invoice total in cents, and livemode must match the expected mode. Idempotent for the same payment intent. Service role only.';
 
 SELECT column_name, data_type
 FROM information_schema.columns
