@@ -15,6 +15,9 @@
 // On success: { id } where id is the Resend message id.
 // The row in email_events stores that id and the recipients.
 // An invoice or estimate id also writes sent_to and sent_at.
+// A draft estimate becomes Sent. Approved and Declined stay as they are.
+// A repeat of the same recipients within 3 minutes returns the existing id
+// and does not send again. The optional idempotency_key is forwarded to Resend.
 // On a Resend error this returns a non-2xx JSON body and writes nothing,
 // so the app does not mark the document sent.
 
@@ -62,6 +65,44 @@ function asList(value) {
 function cleanId(value) {
   const id = String(value || '').trim();
   return UUID.test(id) ? id : null;
+}
+
+function cleanAttempt(value) {
+  const attempt = String(value || '').trim();
+  return /^[A-Za-z0-9_-]{8,80}$/.test(attempt) ? attempt : '';
+}
+
+function sameAddressList(left, right) {
+  const norm = (list) => (Array.isArray(list) ? list : [])
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+  const a = norm(left);
+  const b = norm(right);
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+// A retry of a send that already reached Resend must not mail the client again.
+// Bounced and complained rows are skipped so the office can send a replacement.
+async function recentConfirmedSend(admin, invoiceId, estimateId, to, cc) {
+  const since = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+  let query = admin
+    .from('email_events')
+    .select('resend_id, to_addresses, cc_addresses, status, sent_at')
+    .gte('sent_at', since)
+    .order('sent_at', { ascending: false })
+    .limit(5);
+  query = invoiceId ? query.eq('invoice_id', invoiceId) : query.eq('estimate_id', estimateId);
+  const { data, error } = await query;
+  if (error) {
+    console.error('recent send lookup', error.message);
+    return null;
+  }
+  return (data || []).find((row) => {
+    if (!row?.resend_id) return false;
+    if (row.status === 'bounced' || row.status === 'complained') return false;
+    return sameAddressList(row.to_addresses, to) && sameAddressList(row.cc_addresses, cc);
+  }) || null;
 }
 
 function adminClient() {
@@ -140,6 +181,14 @@ Deno.serve(async (req) => {
     }
     const resendKey = Deno.env.get('RESEND_API_KEY') || '';
     if (!resendKey) return json(500, { error: 'Email is not configured.' });
+    if (invoiceId || estimateId) {
+      const prior = await recentConfirmedSend(admin, invoiceId, estimateId, to, cc);
+      if (prior) return json(200, { id: prior.resend_id, already: true });
+    }
+    const attempt = cleanAttempt(body.idempotency_key);
+    const idempotencyKey = attempt && (invoiceId || estimateId)
+      ? `${kind}/${invoiceId || estimateId}/${attempt}`.slice(0, 256)
+      : '';
     const payload = {
       from: FROM,
       to,
@@ -154,12 +203,14 @@ Deno.serve(async (req) => {
         content: pdf,
       }];
     }
+    const resendHeaders = {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    };
+    if (idempotencyKey) resendHeaders['Idempotency-Key'] = idempotencyKey;
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: resendHeaders,
       body: JSON.stringify(payload),
     });
     const text = await res.text();
@@ -170,6 +221,13 @@ Deno.serve(async (req) => {
       data = {};
     }
     if (!res.ok || data.error || !data.id) {
+      if (res.status === 409 && (invoiceId || estimateId)) {
+        const prior = await recentConfirmedSend(admin, invoiceId, estimateId, to, cc);
+        if (prior) return json(200, { id: prior.resend_id, already: true });
+        return json(409, {
+          error: 'A send for this document was already accepted. Refresh and check the client inbox before sending again.',
+        });
+      }
       const detail = data.message || data.error || text || 'Resend rejected the email.';
       return json(res.status >= 400 && res.status < 600 ? res.status : 502, {
         error: 'Email was not sent.',

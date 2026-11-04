@@ -177,8 +177,19 @@ async function stripeRequest({ fetchImpl, secretKey, method, path, body, apiBase
   return { ok: res.ok, status: res.status, data };
 }
 
-function sessionMatches(session, invoiceId, chargeCents, feeCents) {
+// Checkout Sessions die after 24 hours. Reuse one only while it will still
+// be open when the client lands on it. A missing expires_at is left alone
+// so a test double that omits the field can still be reused.
+function sessionStillPayable(session, nowSec) {
+  if (!session || session.expires_at == null || session.expires_at === '') return true;
+  const exp = Number(session.expires_at);
+  if (!Number.isFinite(exp)) return false;
+  return exp >= nowSec + 30 * 60;
+}
+
+function sessionMatches(session, invoiceId, chargeCents, feeCents, nowSec) {
   if (!session || session.status !== 'open') return false;
+  if (!sessionStillPayable(session, nowSec)) return false;
   if (Number(session.amount_total) !== chargeCents) return false;
   const meta = session.metadata || {};
   if (String(meta.invoice_id || '') !== String(invoiceId)) return false;
@@ -221,6 +232,7 @@ export async function ensureCheckoutSession({
   if (balanceCents == null || balanceCents <= 0) throw new StripeFlowError('This invoice has no balance due.');
   const feeCents = cardFeeCents(balanceCents, feePercent);
   const chargeCents = balanceCents + feeCents;
+  const nowSec = Math.floor(Date.now() / 1000);
   const existingId = String(invoice.stripe_checkout_session_id || '').trim();
   if (/^cs_(test|live)_[A-Za-z0-9]+$/.test(existingId)) {
     const got = await stripeRequest({
@@ -242,7 +254,7 @@ export async function ensureCheckoutSession({
         409,
       );
     }
-    if (sessionMatches(session, invoice.id, chargeCents, feeCents)) {
+    if (sessionMatches(session, invoice.id, chargeCents, feeCents, nowSec)) {
       return checkoutResult(session, invoice, feePercent, balanceCents, feeCents, true);
     }
     if (session && session.status === 'open') {
