@@ -237,9 +237,15 @@ BEGIN
      WHERE id = p_invoice_id;
   END IF;
   IF p_estimate_id IS NOT NULL THEN
+    -- Sent is recorded only after Resend has accepted the message.
+    -- Approved and Declined stay as they are.
     UPDATE public.estimates
        SET sent_to = v_sent,
-           sent_at = v_sent_at
+           sent_at = v_sent_at,
+           status = CASE
+             WHEN status IS NULL OR status = 'Draft' THEN 'Sent'
+             ELSE status
+           END
      WHERE id = p_estimate_id;
   END IF;
   RETURN v_id;

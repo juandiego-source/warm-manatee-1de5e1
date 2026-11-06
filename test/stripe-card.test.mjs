@@ -404,6 +404,80 @@ test('stripe mode comes from the env flag, then the secret key prefix', () => {
   assert.equal(expectedStripeLivemode({ expectedRaw: 'maybe' }), null);
 });
 
+test('a checkout session near expiry is replaced instead of reused', async () => {
+  const sessions = new Map();
+  const server = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const raw = Buffer.concat(chunks).toString();
+    const url = new URL(req.url, 'https://api.stripe.com');
+    if (req.method === 'POST' && url.pathname === '/v1/checkout/sessions') {
+      const params = new URLSearchParams(raw);
+      const id = `cs_test_${sessions.size + 1}`;
+      const session = {
+        id,
+        url: `https://checkout.stripe.com/c/pay/${id}`,
+        status: 'open',
+        expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
+        amount_total: Number(params.get('metadata[balance_cents]')) + Number(params.get('metadata[fee_cents]')),
+        metadata: {
+          invoice_id: params.get('metadata[invoice_id]'),
+          fee_cents: params.get('metadata[fee_cents]'),
+        },
+      };
+      sessions.set(id, session);
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(session));
+      return;
+    }
+    const expire = url.pathname.match(/^\/v1\/checkout\/sessions\/([^/]+)\/expire$/);
+    if (req.method === 'POST' && expire) {
+      const session = sessions.get(decodeURIComponent(expire[1]));
+      session.status = 'expired';
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(session));
+      return;
+    }
+    const got = url.pathname.match(/^\/v1\/checkout\/sessions\/([^/]+)$/);
+    if (req.method === 'GET' && got) {
+      const session = sessions.get(decodeURIComponent(got[1]));
+      res.writeHead(session ? 200 : 404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(session || { error: { message: 'missing' } }));
+      return;
+    }
+    res.writeHead(404);
+    res.end('{}');
+  });
+  const { port } = server.address();
+  try {
+    const invoice = {
+      id: INVOICE_ID,
+      invoice_number: 'INV-E2E',
+      status: 'Unpaid',
+      total: '100.00',
+    };
+    const created = await ensureCheckoutSession({
+      secretKey: SECRET_KEY,
+      invoice,
+      feePercent: 3,
+      apiBase: `http://127.0.0.1:${port}`,
+    });
+    sessions.get(created.session_id).expires_at = Math.floor(Date.now() / 1000) + 60;
+    const replaced = await ensureCheckoutSession({
+      secretKey: SECRET_KEY,
+      invoice: { ...invoice, stripe_checkout_session_id: created.session_id },
+      feePercent: 3,
+      apiBase: `http://127.0.0.1:${port}`,
+    });
+    assert.equal(replaced.reused, false);
+    assert.notEqual(replaced.session_id, created.session_id);
+    assert.equal(replaced.url.startsWith('https://checkout.stripe.com/'), true);
+    assert.equal(sessions.get(created.session_id).status, 'expired');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
 test('publishable keys are rejected before any Stripe call', async () => {
   await assert.rejects(
     () => ensureCheckoutSession({

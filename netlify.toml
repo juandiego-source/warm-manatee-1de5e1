@@ -20,6 +20,15 @@
   status = 200
   force = true
 
+# Card links in emails and the Copy button are /pay/<invoice_id>.
+# The function starts a live Stripe Checkout session, so a link saved
+# last month still opens. The Stripe URL itself expires after 24 hours.
+[[redirects]]
+  from = "/pay/:invoiceId"
+  to = "/.netlify/functions/pay?invoice_id=:invoiceId"
+  status = 200
+  force = true
+
 # History routes (/estimates/EST-0015, /jobs/SMK-97456, …) are handled in the app.
 # Serve index.html for any path that is not a real file so refresh does not 404.
 [[redirects]]

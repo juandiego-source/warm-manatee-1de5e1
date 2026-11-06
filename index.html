@@ -1184,7 +1184,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div id="sendto-card-row" style="display:none;margin:4px 0 14px">
       <label style="display:flex;gap:10px;align-items:flex-start;min-height:44px;font-size:13px;color:var(--ink2);cursor:pointer">
         <input type="checkbox" id="sendto-card" style="width:22px;height:22px;margin-top:1px;flex-shrink:0">
-        <span>Include a Pay by card button <span style="color:var(--ink3)">Opens Stripe checkout. The card fee is its own line. Venmo stays in the email either way.</span></span>
+        <span>Include a Pay by card button <span style="color:var(--ink3)">The link stays good. Opening it starts Stripe checkout, with the 3% card fee on its own line. Venmo stays in the email either way.</span></span>
       </label>
     </div>
     <button class="btn btn-red btn-full" onclick="confirmSendTo()">Send</button>
@@ -1228,7 +1228,7 @@ Do Good Properties, 208-555-9876, , Caldwell"></textarea>
     <div id="cardpay-break" style="font-size:13px;color:var(--ink2);line-height:1.5;margin-bottom:12px"></div>
     <div class="form-group"><label class="form-label">Link</label><input class="form-input" id="cardpay-url" type="text" readonly></div>
     <button class="btn btn-red btn-full" type="button" onclick="copyCardPaymentLink()">Copy link</button>
-    <p style="font-size:12px;color:var(--ink3);margin:10px 0 0;line-height:1.45">The client enters the card on Stripe's page. Venmo is still mentioned in the invoice email.</p>
+    <p style="font-size:12px;color:var(--ink3);margin:10px 0 0;line-height:1.45">This link does not expire. When the client opens it, a new Stripe checkout starts if the last one has expired. The 3% card fee is added there. Venmo is still mentioned in the invoice email.</p>
     <button class="btn btn-full btn-full-ghost" onclick="requestCloseModal('cardpay')">Close</button>
   </div>
 </div>
@@ -1353,6 +1353,10 @@ async function initAuth(){
       return;
     }
     if(recoveryMode)return;
+    // Token refresh used to replay login, and login calls applyRoute. That
+    // closed the screen in the middle of a send and the email never went out.
+    if(event==='TOKEN_REFRESHED')return;
+    if(sendBusy())return;
     if(session)await afterLogin(session.user);
     else showAuthScreen();
   });
@@ -2093,7 +2097,6 @@ function estimateDateLabel(e){
   if(!e)return '';
   const sent=coerceTimestamp(e.sent_at);
   if(sent){const d=shortBizDate(sent);return d?'Sent '+d:'Sent';}
-  if(e.status==='Sent'||e.status==='Approved'||e.status==='Declined')return 'Sent';
   return sentOrCreatedLabel(e);
 }
 function invoiceAnchorYMD(i){
@@ -4569,7 +4572,7 @@ function lineItemCardHTML(item,i,arr){
         <div class="li-field li-pct"><input class="li-num" type="number" placeholder="0" value="${item.marginPct||''}" oninput="updateLineItemField('${arr}',${i},'marginPct',this.value)"><span class="li-pct-sign">%</span></div>
       </div>
       <div class="li-bottom" style="margin-top:8px">
-        <div class="li-field li-price" style="flex:1"><label>Client Price ($)</label><span class="li-price-sign">$</span><input class="li-num with-sign" type="number" step="0.01" id="${arr}-li-price-${i}" value="${item.price===0||item.price?roundMoney(item.price).toFixed(2):''}" oninput="updateLineItemField('${arr}',${i},'price',this.value)"></div>
+        <div class="li-field li-price" style="flex:1"><label>Client Price ($)</label><span class="li-price-sign">$</span><input class="li-num with-sign" type="text" inputmode="decimal" autocomplete="off" id="${arr}-li-price-${i}" value="${item.price?roundMoney(item.price).toFixed(2):''}" oninput="updateLineItemField('${arr}',${i},'price',this.value)" onblur="commitLineItemPrice('${arr}',${i},this.value)"></div>
         <div class="li-field li-linetotal"><label>${arr==='est'&&item.isOptional?'Optional':'Line Total'}</label><div class="li-linetotal-val" id="${arr}-li-total-${i}">${lineTotal}</div></div>
       </div>
       <div id="${arr}-li-margin-${i}">${marginBadge}</div>
@@ -4603,7 +4606,8 @@ async function saveLineItemToCatalog(arr,i){
 function updateLineItemField(arr,i,field,rawValue){
   const list=arr==='est'?estLineItems:invLineItems;
   const item=list[i];if(!item)return;
-  if(field==='qty'||field==='cost'||field==='marginPct'||field==='price')item[field]=parseFloat(rawValue)||0;
+  if(field==='qty'||field==='cost'||field==='marginPct')item[field]=parseFloat(rawValue)||0;
+  else if(field==='price')item.price=roundMoney(parseFloat(rawValue));
   else if(field==='isOptional'){
     item.isOptional=!!rawValue;
     if(arr==='est'){renderEstLineItems();return;}
@@ -4611,20 +4615,33 @@ function updateLineItemField(arr,i,field,rawValue){
   else item[field]=rawValue;
   // Title, description (visit date), and qty keep the client price.
   // Price is recalculated only when cost, margin, or the pricing mode changes.
+  // The client price box is not rewritten on each keystroke. "625" used to
+  // become 6.01 because the field was forced to two decimals after the first digit.
   const reprices=field==='cost'||field==='marginPct';
-  if(field==='price')item.price=roundMoney(item.price);
-  else if(reprices)item.price=calcLineItemPrice(item);
+  if(reprices)item.price=calcLineItemPrice(item);
   if(field==='qty'||field==='price'||reprices)item._recalc=true;
   const totalEl=document.getElementById(`${arr}-li-total-${i}`);
   if(totalEl)totalEl.textContent=fmt(lineAmounts(item.qty,item.price,item._recalc?null:item.storedTotal).total);
   const priceEl=document.getElementById(`${arr}-li-price-${i}`);
-  if(priceEl&&(field==='price'||reprices))priceEl.value=roundMoney(item.price).toFixed(2);
+  if(priceEl&&field!=='price'&&reprices)priceEl.value=roundMoney(item.price).toFixed(2);
   // Live-update the margin/markup badge
   const marginEl=document.getElementById(`${arr}-li-margin-${i}`);
   if(marginEl){
     const m=calcLineMargin(item);
     marginEl.innerHTML=m?`<div style="font-size:11px;padding:5px 9px;border-radius:var(--rxs);margin-top:8px;background:${m.marginPct<40?'rgba(224,87,74,0.12)':'rgba(74,180,120,0.12)'};color:${m.marginPct<40?'var(--rose)':'var(--green)'};font-weight:600">${m.marginPct<40?'⚠ ':''}Margin ${m.marginPct.toFixed(0)}% · Markup ${m.markupPct.toFixed(0)}% · Profit ${fmt(m.profit)}${m.marginPct<40?' (below 40% floor)':''}</div>`:'';
   }
+  if(arr==='est')calcEstTotal();else calcInvTotal();
+}
+function commitLineItemPrice(arr,i,raw){
+  const list=arr==='est'?estLineItems:invLineItems;
+  const item=list[i];if(!item)return;
+  const text=String(raw??'').trim();
+  item.price=text===''?0:roundMoney(parseFloat(text));
+  item._recalc=true;
+  const priceEl=document.getElementById(`${arr}-li-price-${i}`);
+  if(priceEl)priceEl.value=text===''?'':roundMoney(item.price).toFixed(2);
+  const totalEl=document.getElementById(`${arr}-li-total-${i}`);
+  if(totalEl)totalEl.textContent=fmt(lineAmounts(item.qty,item.price,null).total);
   if(arr==='est')calcEstTotal();else calcInvTotal();
 }
 function setLineItemMode(arr,i,mode){
@@ -4686,9 +4703,9 @@ async function saveEstimate(sendNow){
   const isRecurring=document.getElementById('est-recurring').checked;
   const recFreq=normalizeFrequency(document.getElementById('est-rec-frequency').value);
   const recStart=document.getElementById('est-rec-start').value||null;
-  // If Save & Send, force status to Sent (unless already approved/declined)
+  // Save & Send only opens the email step. Status stays Draft until Resend
+  // confirms. Setting Sent here showed "Sent to client" when no email went out.
   let status=document.getElementById('est-status').value;
-  if(sendNow&&(status==='Draft'))status='Sent';
   const recEnd=document.getElementById('est-rec-end').value||null;
   const payload={customer_id:custId,address:addr,status,valid_until:document.getElementById('est-valid').value||null,tax_rate:tax,tax_amount:taxAmt,subtotal:sub,total,notes:document.getElementById('est-notes').value.trim()||null,is_recurring:isRecurring,rec_frequency:isRecurring?recFreq:null,rec_start_date:isRecurring?recStart:null,rec_end_date:isRecurring?recEnd:null};
   try{
@@ -4778,9 +4795,9 @@ function tlTime(ts){return fmtDateTime(ts);}
 function estimateTimelineHTML(e){
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(e.created_at),icon:'✎'});
-  const sent=e.sent_at||(e.status!=='Draft'?e.created_at:null);
-  const sentWho=sentTimelineLabel(e.sent_to);
-  steps.push({label:sentWho,done:!!sent||e.status==='Sent'||e.status==='Approved'||e.status==='Declined',time:tlTime(e.sent_at),icon:'📤'});
+  const sent=!!coerceTimestamp(e.sent_at)||!!latestEmailEvent('estimate',e.id);
+  const sentWho=sent?sentTimelineLabel(e.sent_to):'Email to client';
+  steps.push({label:sentWho,done:sent,time:sent?tlTime(e.sent_at):'',icon:'📤'});
   steps.push({label:e.viewed_at?`Viewed by client${e.view_count>1?` (${e.view_count}×)`:''}`:'Viewed by client',done:!!e.viewed_at,time:tlTime(e.viewed_at),icon:'👁'});
   const respLabel=e.client_response||(e.status==='Approved'?'Accepted':e.status==='Declined'?'Declined':'Response');
   steps.push({label:e.client_response?`Client ${e.client_response}`:(e.status==='Approved'?'Accepted':'Awaiting response'),done:!!e.client_response||e.status==='Approved'||e.status==='Declined',time:tlTime(e.client_response_at),icon:e.client_response==='Declined'?'✕':'✓'});
@@ -4832,7 +4849,7 @@ async function openEstDetail(id){
     </div>
     ${estimateTimelineHTML(e)}
     <div class="action-row">
-      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" onclick="emailEstimate('${e.id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
+      ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-red" data-outbound-send="estimate" onclick="emailEstimate('${e.id}')">${ICONS.send} Email to Client (PDF + Accept link)</button>`:''}
       <button class="action-btn ab-glass" onclick="openMarkEstimateSent('${e.id}')">${e.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
       ${e.status==='Draft'||e.status==='Sent'?`<button class="action-btn ab-glass" onclick="copyQuoteLink('${e.id}')">${ICONS.link||''} Copy link (to text it instead)</button>`:''}
       ${e.client_response?`<div style="padding:10px 12px;background:${e.client_response==='Accepted'?'rgba(74,180,120,0.12)':e.client_response==='Declined'?'rgba(224,87,74,0.12)':'rgba(200,160,60,0.12)'};border-radius:var(--rsm);font-size:12.5px;margin-top:8px"><b>Client ${esc(e.client_response)}</b>${e.client_note?` — "${esc(e.client_note)}"`:''}${e.client_response_at?`<div style="color:var(--ink3);font-size:11px;margin-top:2px">${fmtDateTime(e.client_response_at)}</div>`:''}${e.client_response==='Accepted'&&acceptedIds?`<div style="color:var(--ink3);font-size:11px;margin-top:4px">The total above is what they accepted. Optional lines they left off are marked not chosen.</div>`:''}</div>`:''}
@@ -4849,6 +4866,7 @@ async function openEstDetail(id){
     console.error('openEstDetail',err);
     body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(e)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(estimateDisplayMoney(e).total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(e.status||'')}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded.</div></div>`;
   }
+  refreshSendButtons();
 }
 function estimateDocHTML(est,items,cust){
   const statusColor={Approved:'#2a6010',Sent:'#123d8f',Draft:'#7a4500',Declined:'#8B1A1A'}[est.status]||'#7a4500';
@@ -5325,7 +5343,7 @@ function emailDeliveryHTML(row,kind){
   const approx=ev&&ev.opened_at?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">Opened is approximate. A preview in the mail app can count as an open.</div>`:'';
   const safeId=/^[0-9a-f-]{36}$/i.test(String(row.id||''))?row.id:'';
   const fn=safeId?(kind==='invoice'?`emailInvoice('${safeId}')`:`emailEstimate('${safeId}')`):'';
-  const resend=problem&&fn?`<button type="button" class="action-btn ab-red" style="margin-top:8px;width:auto;padding:10px 14px" onclick="${fn}">${ICONS.send} Resend</button>`:'';
+  const resend=problem&&fn?`<button type="button" class="action-btn ab-red" data-outbound-send="${kind}" style="margin-top:8px;width:auto;padding:10px 14px" onclick="${fn}">${ICONS.send} Resend</button>`:'';
   const border=problem?'1px solid rgba(224,87,74,0.45)':'1px solid var(--line)';
   return `<div style="margin:0 0 14px;padding:10px 12px;border-radius:10px;border:${border};text-align:left">${sentLine}${missing}${statusLine}${approx}${resend}</div>`;
 }
@@ -5418,33 +5436,39 @@ function cancelSendTo(){
   if(resolve)resolve(null);
 }
 async function emailEstimate(id){
-  const est=estimates.find(x=>x.id===id);if(!est)return;
-  const cust=customers.find(c=>c.id===est.customer_id)||est.customers||{};
-  const choice=await pickSendRecipient(cust,'estimate',est.estimate_number);
-  if(!choice||!choice.to||!choice.to.length)return;
-  const sentRecord=encodeSentTo(choice);
-  const who=sentRecipientsPhrase(sentRecord);
-  toast('Preparing & sending…');
-  const result=await getEstimatePdfFile(id);
-  if(!result){toast('⚠ Could not generate PDF');return;}
-  // Get the interactive quote token so we can embed the Accept link.
-  // The path form survives mailboxes that drop a ?query= string.
-  const token=await ensurePublicToken(est);
-  const quoteUrl=token?quotePageUrl(token):null;
-  const subject=`Estimate ${est.estimate_number} from Sumak Lawncare`;
-  const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6;max-width:520px">
-    <p>Hi ${esc(cust.name||'')},</p>
-    <p>Thank you for the opportunity! Your estimate <strong>${est.estimate_number}</strong> comes to <strong>${fmt(estimateDisplayMoney(est).total)}</strong>${est.valid_until?`, valid until ${fmtDate(est.valid_until)}`:''}. The full details are attached as a PDF for your records.</p>
-    ${quoteUrl?`<p>You can review and respond to your quote online with one tap:</p>
-    <p style="text-align:center;margin:26px 0">
-      <a href="${escapeAttr(quoteUrl)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">View &amp; Respond to Your Quote</a>
-    </p>
-    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(quoteUrl)}</p>`:`<p>Just reply to this email or give us a call to move forward — we'd be glad to help!</p>`}
-    <p style="margin-top:24px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
-  </div>`;
-  if(!sentRecord){toast('Add a To address before sending.');return;}
+  if(outboundSendKeys.has('estimate:'+id)){toast('This estimate is already sending.');return;}
+  outboundSendKeys.add('estimate:'+id);
+  beginOutboundSend();
+  let confirmed=null;
   try{
-    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'estimate',estimate_id:id});
+    const est=estimates.find(x=>x.id===id);if(!est)return;
+    const cust=customers.find(c=>c.id===est.customer_id)||est.customers||{};
+    const choice=await pickSendRecipient(cust,'estimate',est.estimate_number);
+    if(!choice||!choice.to||!choice.to.length)return;
+    const sentRecord=encodeSentTo(choice);
+    const who=sentRecipientsPhrase(sentRecord);
+    if(!sentRecord){toast('Add a To address before sending.');return;}
+    toast('Preparing & sending…');
+    const result=await getEstimatePdfFile(id);
+    if(!result){toast('Could not generate the PDF. The email was not sent.');return;}
+    // Get the interactive quote token so we can embed the Accept link.
+    // The path form survives mailboxes that drop a ?query= string.
+    const token=await ensurePublicToken(est);
+    const quoteUrl=token?quotePageUrl(token):null;
+    const subject=`Estimate ${est.estimate_number} from Sumak Lawncare`;
+    const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6;max-width:520px">
+      <p>Hi ${esc(cust.name||'')},</p>
+      <p>Thank you for the opportunity! Your estimate <strong>${est.estimate_number}</strong> comes to <strong>${fmt(estimateDisplayMoney(est).total)}</strong>${est.valid_until?`, valid until ${fmtDate(est.valid_until)}`:''}. The full details are attached as a PDF for your records.</p>
+      ${quoteUrl?`<p>You can review and respond to your quote online with one tap:</p>
+      <p style="text-align:center;margin:26px 0">
+        <a href="${escapeAttr(quoteUrl)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">View &amp; Respond to Your Quote</a>
+      </p>
+      <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(quoteUrl)}</p>`:`<p>Just reply to this email or give us a call to move forward — we'd be glad to help!</p>`}
+      <p style="margin-top:24px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
+    </div>`;
+    confirmed=await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'estimate',estimate_id:id,idempotency_key:sendAttemptId('estimate',id)});
+    if(!confirmed||!confirmed.id)throw new Error('The email provider did not confirm the send.');
+    clearSendAttempt('estimate',id);
     const err=await stampSent('estimates',id,Object.assign({sent_to:sentRecord},est.status==='Draft'?{status:'Sent'}:{}));
     await fetchEstimates();
     await fetchEmailEvents();
@@ -5455,12 +5479,24 @@ async function emailEstimate(id){
       toast('The email went out, but the recipient was not saved: '+(err.message||'update failed'));
     }else{
       logActivity('Estimate emailed',`${est.estimate_number} — ${cust.name} · ${who}`,'estimate',id);
-      toast(`✓ Estimate emailed to ${who}`);
+      toast(confirmed.already?`Already emailed to ${who}`:`✓ Estimate emailed to ${who}`);
     }
     if(document.getElementById('est-detail').classList.contains('open'))openEstDetail(id);
   }catch(e){
-    console.error('resend',e);
-    toast('Email was not sent: '+(e.message||'the mailer rejected it'));
+    console.error('emailEstimate',e);
+    toast(confirmed&&confirmed.id
+      ?'The email went out, but the screen did not finish updating. Refresh before sending again.'
+      :'Email was not sent: '+(e&&e.message||'something went wrong'));
+    try{
+      await fetchEstimates();
+      await fetchEmailEvents();
+      renderEstimates();
+      renderDashboard();
+      if(document.getElementById('est-detail')?.classList.contains('open'))openEstDetail(id);
+    }catch(err){console.error('emailEstimate refresh',err);}
+  }finally{
+    outboundSendKeys.delete('estimate:'+id);
+    endOutboundSend();
   }
 }
 async function stampSent(table,id,extra){
@@ -5871,7 +5907,7 @@ function invoiceTimelineHTML(inv){
   const overdue=(typeof invIsOverdue==='function')&&invIsOverdue(inv);
   const steps=[];
   steps.push({label:'Created',done:true,time:tlTime(inv.created_at),icon:'✎'});
-  steps.push({label:sentTimelineLabel(inv.sent_to),done:!!inv.sent_at,time:inv.sent_at?tlTime(inv.sent_at):'',icon:'📤'});
+  steps.push({label:inv.sent_at?sentTimelineLabel(inv.sent_to):'Email to client',done:!!inv.sent_at,time:inv.sent_at?tlTime(inv.sent_at):'',icon:'📤'});
   if(overdue&&inv.status!=='Paid'){
     steps.push({label:'Overdue (30+ days)',done:true,time:'',icon:'!',overdue:true});
   }
@@ -5935,7 +5971,7 @@ async function openInvDetail(id){
       ${inv.status==='Unpaid'?`<button class="action-btn ab-red" onclick="markInvOverdue('${inv.id}')">${ICONS.alert} Mark Overdue</button>`:''}
       <button class="action-btn ab-glass" onclick="printInvoice('${inv.id}')">${ICONS.printer} Print / Save PDF</button>
       <button class="action-btn ab-glass" onclick="shareInvoicePdf('${inv.id}')">${ICONS.send} Share / Text PDF</button>
-      <button class="action-btn ab-red" onclick="emailInvoice('${inv.id}')">${ICONS.send} Email to Client</button>
+      <button class="action-btn ab-red" data-outbound-send="invoice" onclick="emailInvoice('${inv.id}')">${ICONS.send} Email to Client</button>
       <button class="action-btn ab-glass" onclick="toggleInvoiceSent('${inv.id}')">${inv.sent_at?ICONS.check+' Sent (tap to undo)':ICONS.send+' Mark as Sent'}</button>
       ${inv.sent_at?`<button class="action-btn ab-glass" onclick="openMarkInvoiceSent('${inv.id}')">${ICONS.mail} Edit who it was sent to</button>`:''}
       <button class="action-btn ab-glass" onclick="editInv('${inv.id}')">${ICONS.pencil} Edit Invoice</button>
@@ -5947,6 +5983,7 @@ async function openInvDetail(id){
     const payLine=invoicePaymentRecorded(inv)?`<div class="detail-row"><span class="detail-label">Payment</span><span class="detail-value">${esc([invoicePaidPhrase(inv),String(inv.payment_reference||'').trim()].filter(Boolean).join(' · '))}</span></div>`:'';
     body.innerHTML=`<div class="detail-card"><div class="detail-row"><span class="detail-label">Client</span><span class="detail-value">${esc(customerNameOf(inv)||'—')}</span></div><div class="detail-row"><span class="detail-label">Total</span><span class="detail-value">${fmt(inv.total)}</span></div><div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${esc(inv.status||'')}</span></div>${payLine}<div style="font-size:12px;color:var(--ink3);margin-top:8px">Line items could not be loaded. The invoice is still ${esc(inv.invoice_number||'on file')}.</div></div>${invoiceTimelineHTML(inv)}`;
   }
+  refreshSendButtons();
 }
 function invoiceCSS(){
   return `
@@ -6148,6 +6185,47 @@ async function resendErrorMessage(error,data){
   if(msg==='Edge Function returned a non-2xx status code')msg='Email was not sent';
   return msg;
 }
+const outboundSendKeys=new Set();
+let outboundSendCount=0;
+let routeDeferred=false;
+function sendBusy(){return outboundSendCount>0;}
+function beginOutboundSend(){
+  outboundSendCount++;
+  refreshSendButtons();
+}
+function endOutboundSend(){
+  outboundSendCount=Math.max(0,outboundSendCount-1);
+  refreshSendButtons();
+  if(!sendBusy()&&routeDeferred){
+    routeDeferred=false;
+    applyRoute(location.pathname);
+  }
+}
+function refreshSendButtons(){
+  const busy=sendBusy();
+  document.querySelectorAll('[data-outbound-send]').forEach(btn=>{
+    btn.disabled=busy;
+    if(busy)btn.setAttribute('aria-busy','true');
+    else btn.removeAttribute('aria-busy');
+  });
+}
+function sendAttemptKey(kind,id){return 'sumak-send-attempt:'+kind+':'+id;}
+function sendAttemptId(kind,id){
+  const key=sendAttemptKey(kind,id);
+  try{
+    const cur=sessionStorage.getItem(key)||'';
+    if(/^[A-Za-z0-9_-]{8,80}$/.test(cur))return cur;
+    const bytes=new Uint8Array(12);
+    if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(bytes);
+    else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+    const created=[...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
+    sessionStorage.setItem(key,created);
+    return created;
+  }catch(e){return '';}
+}
+function clearSendAttempt(kind,id){
+  try{sessionStorage.removeItem(sendAttemptKey(kind,id));}catch(e){}
+}
 async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc,meta){
   const pdfBase64=pdfBlob?await blobToBase64(pdfBlob):null;
   const toList=dedupeEmails(Array.isArray(to)?to:parseAddressList(to));
@@ -6158,27 +6236,33 @@ async function sendEmailViaResend(to,subject,htmlBody,pdfBlob,pdfFilename,cc,met
   if(meta&&meta.invoice_id)body.invoice_id=meta.invoice_id;
   if(meta&&meta.estimate_id)body.estimate_id=meta.estimate_id;
   if(meta&&meta.job_id)body.job_id=meta.job_id;
+  if(meta&&meta.idempotency_key)body.idempotency_key=meta.idempotency_key;
   const{data,error}=await db.functions.invoke('send-email',{body});
   if(error||(data&&data.error))throw new Error(await resendErrorMessage(error,data));
+  if(!data||!data.id)throw new Error('The email provider did not confirm the send.');
   return data;
 }
 function invoiceCanTakeCard(inv){
   return !!(inv&&currentProfile?.role==='admin'&&inv.status!=='Paid'&&inv.status!=='Cancelled'&&roundMoney(inv.total)>0);
 }
-function cardPayUrlAllowed(url){
-  try{
-    const u=new URL(String(url||''));
-    return u.protocol==='https:'&&u.hostname==='checkout.stripe.com';
-  }catch(e){return false;}
+function stableCardPayUrl(inv){
+  const id=String(inv&&inv.id||'');
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return '';
+  return location.origin+'/pay/'+id;
+}
+function invoiceCardQuote(inv){
+  const balanceCents=Math.round((moneyNum(inv&&inv.total)+Number.EPSILON)*100);
+  const pct=3;
+  const feeCents=balanceCents>0?Math.round((balanceCents*Math.round(pct*100))/10000):0;
+  return {fee_percent:pct,fee:feeCents/100,balance:balanceCents/100,charge:(balanceCents+feeCents)/100,url:stableCardPayUrl(inv),invoice_number:inv&&inv.invoice_number||''};
 }
 function invoiceCardLinkHTML(inv){
-  if(currentProfile?.role!=='admin'||!inv||inv.status==='Paid'||inv.status==='Cancelled')return '';
-  const url=String(inv.stripe_checkout_url||'');
-  if(!cardPayUrlAllowed(url))return '';
-  const pct=inv.card_fee_percent!=null&&inv.card_fee_percent!==''?esc(inv.card_fee_percent)+'% fee':'card fee';
-  return `<div style="margin-top:10px;font-size:12px;color:var(--ink2);line-height:1.4">Card link ready · ${pct} added on Stripe. <button type="button" class="btn btn-sm btn-glass" onclick="copyStoredCardLink('${inv.id}')">Copy</button></div>`;
+  if(!invoiceCanTakeCard(inv))return '';
+  const url=stableCardPayUrl(inv);
+  if(!url)return '';
+  return `<div style="margin-top:10px;font-size:12px;color:var(--ink2);line-height:1.4">Card link · 3% fee added on Stripe. <button type="button" class="btn btn-sm btn-glass" onclick="copyStoredCardLink('${inv.id}')">Copy</button></div>`;
 }
-let cardPayBusy=false,_cardPayUrl='';
+let _cardPayUrl='';
 function openCardPayModal(data){
   _cardPayUrl=data&&data.url||'';
   const sub=document.getElementById('cardpay-sub');
@@ -6200,106 +6284,94 @@ async function copyText(text,okMsg){
   }
 }
 function copyCardPaymentLink(){
-  if(currentProfile?.role!=='admin'||!cardPayUrlAllowed(_cardPayUrl)){toast('No card link yet');return;}
-  copyText(_cardPayUrl,'Card link copied');
+  if(currentProfile?.role!=='admin')return;
+  const url=stableCardPayUrl({id:(_cardPayUrl.match(/\/pay\/([0-9a-f-]{36})/i)||[])[1]||''});
+  if(!url||url!==_cardPayUrl){toast('No card link yet');return;}
+  copyText(url,'Card link copied');
 }
 function copyStoredCardLink(id){
   if(currentProfile?.role!=='admin')return;
   const inv=invoices.find(x=>x.id===id);
-  const url=inv&&inv.stripe_checkout_url;
-  if(!cardPayUrlAllowed(url)){toast('No card link yet');return;}
+  const url=inv&&stableCardPayUrl(inv);
+  if(!url){toast('No card link yet');return;}
   copyText(url,'Card link copied');
+  logActivity('Card payment link copied',`${inv.invoice_number||''} · ${url}`.trim(),'invoice',id);
 }
-async function createCardPaymentLink(id,opts){
+function createCardPaymentLink(id){
   if(currentProfile?.role!=='admin'){toast('Only the office can create a card link.');return null;}
-  if(cardPayBusy)return null;
   const inv=invoices.find(x=>x.id===id);
   if(!inv){toast('Invoice not found.');return null;}
   if(!invoiceCanTakeCard(inv)){toast('This invoice cannot take a card payment.');return null;}
-  const silent=!!(opts&&opts.silent);
-  cardPayBusy=true;
-  if(!silent)toast('Creating the card link…');
-  try{
-    const{data,error}=await db.functions.invoke('stripe-checkout',{body:{invoice_id:id}});
-    if(error||(data&&data.error))throw new Error(await resendErrorMessage(error,data));
-    if(!data||!cardPayUrlAllowed(data.url)||!data.session_id)throw new Error('Stripe did not return a checkout link.');
-    inv.stripe_checkout_url=data.url;
-    inv.stripe_checkout_session_id=data.session_id;
-    inv.card_fee_percent=data.fee_percent;
-    if(!silent){
-      openCardPayModal(data);
-      logActivity('Card payment link created',`${inv.invoice_number||''} · ${fmt(data.balance)} + ${fmt(data.fee)} fee`.trim(),'invoice',id);
-      if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
-    }
-    return data;
-  }catch(e){
-    if(silent)throw e;
-    toast(e.message||'Could not create the card link.');
-    return null;
-  }finally{
-    cardPayBusy=false;
-  }
+  const quote=invoiceCardQuote(inv);
+  if(!quote.url){toast('No card link yet');return null;}
+  openCardPayModal(quote);
+  return quote;
 }
-function invoicePayEmailHTML(cardLink){
-  if(cardLink&&cardPayUrlAllowed(cardLink.url)){
-    const pct=cardLink.fee_percent!=null?cardLink.fee_percent:3;
+function invoicePayEmailHTML(inv,includeCard){
+  const quote=includeCard?invoiceCardQuote(inv):null;
+  if(quote&&quote.url){
+    const pct=quote.fee_percent!=null?quote.fee_percent:3;
     return `<p>You can pay by card or by Venmo.</p>
     <p style="text-align:center;margin:22px 0">
-      <a href="${escapeAttr(cardLink.url)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">Pay by card</a>
+      <a href="${escapeAttr(quote.url)}" style="background:#7B1A1A;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:10px;font-weight:bold;font-size:16px;display:inline-block">Pay by card</a>
     </p>
-    <p style="font-size:12px;color:#666">Paying by card adds a ${esc(pct)}% processing fee (${esc(fmt(cardLink.fee))} on this invoice). Stripe charges ${esc(fmt(cardLink.charge))}. The fee is its own line on the secure checkout page. Venmo does not add that fee.</p>
-    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(cardLink.url)}</p>`;
+    <p style="font-size:12px;color:#666">Paying by card adds a ${esc(pct)}% processing fee (${esc(fmt(quote.fee))} on this invoice). Stripe charges ${esc(fmt(quote.charge))}. The fee is its own line on the secure checkout page. This link does not expire. Venmo does not add that fee.</p>
+    <p style="font-size:12px;color:#888;text-align:center">Or paste this link into your browser:<br>${esc(quote.url)}</p>`;
   }
   return `<p>You can pay by Venmo. If you would rather pay by card, reply to this email and we will send a secure payment link. Card payments include a processing fee.</p>`;
 }
 async function emailInvoice(id){
   if(currentProfile?.role==='sub')return;
-  const inv=invoices.find(x=>x.id===id);if(!inv)return;
-  const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers||{};
-  const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number,{allowCard:invoiceCanTakeCard(inv)});
-  if(!choice||!choice.to||!choice.to.length)return;
-  const sentRecord=encodeSentTo(choice);
-  if(!sentRecord){toast('Add a To address before sending.');return;}
-  const who=sentRecipientsPhrase(sentRecord);
-  let cardLink=null;
-  if(choice.includeCard){
-    toast('Creating the card link…');
-    try{
-      cardLink=await createCardPaymentLink(id,{silent:true});
-    }catch(err){
-      toast('Email was not sent. The card link was not created: '+(err.message||'Stripe rejected it'));
-      return;
-    }
-    if(!cardLink||!cardPayUrlAllowed(cardLink.url)){
-      toast('Email was not sent. The card link was not a Stripe checkout page.');
-      return;
-    }
-  }
-  toast('Preparing & sending…');
-  const result=await getInvoicePdfFile(id);
-  if(!result){toast('⚠ Could not generate PDF');return;}
-  const subject=`Invoice ${inv.invoice_number} from Sumak Lawncare`;
-  let photoHtml='';
-  if(invoiceIncludePhotos(inv)){
-    const loaded=await loadInvoiceData(id);
-    photoHtml=await invoicePhotoEmailHTML(inv,loaded&&loaded.items);
-  }
-  const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6">
-    <p>Hi ${esc(cust.name||'')},</p>
-    <p>Attached is invoice <strong>${esc(inv.invoice_number||'')}</strong> for <strong>${fmt(inv.total)}</strong>${inv.due_date?`, due ${fmtDate(inv.due_date)}`:''}${inv.address?` for service at ${esc(inv.address)}`:''}.</p>
-    ${photoHtml}
-    ${invoicePayEmailHTML(cardLink)}
-    <p>Thank you for your business!</p>
-    <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
-  </div>`;
+  if(outboundSendKeys.has('invoice:'+id)){toast('This invoice is already sending.');return;}
+  outboundSendKeys.add('invoice:'+id);
+  beginOutboundSend();
+  let confirmed=null;
   try{
-    await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'invoice',invoice_id:id});
+    const inv=invoices.find(x=>x.id===id);if(!inv)return;
+    const cust=customers.find(c=>c.id===inv.customer_id)||inv.customers||{};
+    const choice=await pickSendRecipient(cust,'invoice',inv.invoice_number,{allowCard:invoiceCanTakeCard(inv)});
+    if(!choice||!choice.to||!choice.to.length)return;
+    const sentRecord=encodeSentTo(choice);
+    if(!sentRecord){toast('Add a To address before sending.');return;}
+    const who=sentRecipientsPhrase(sentRecord);
+    toast('Preparing & sending…');
+    const result=await getInvoicePdfFile(id);
+    if(!result){toast('Could not generate the PDF. The email was not sent.');return;}
+    const subject=`Invoice ${inv.invoice_number} from Sumak Lawncare`;
+    let photoHtml='';
+    if(invoiceIncludePhotos(inv)){
+      const loaded=await loadInvoiceData(id);
+      photoHtml=await invoicePhotoEmailHTML(inv,loaded&&loaded.items);
+    }
+    const htmlBody=`<div style="font-family:Arial,sans-serif;font-size:14px;color:#333;line-height:1.6">
+      <p>Hi ${esc(cust.name||'')},</p>
+      <p>Attached is invoice <strong>${esc(inv.invoice_number||'')}</strong> for <strong>${fmt(inv.total)}</strong>${inv.due_date?`, due ${fmtDate(inv.due_date)}`:''}${inv.address?` for service at ${esc(inv.address)}`:''}.</p>
+      ${photoHtml}
+      ${invoicePayEmailHTML(inv,choice.includeCard)}
+      <p>Thank you for your business!</p>
+      <p style="margin-top:20px">Juan Diego Sotomayor<br>Sumak Lawncare<br>208-695-7239 · office@sumaklawncare.com</p>
+    </div>`;
+    confirmed=await sendEmailViaResend(choice.to,subject,htmlBody,result.blob,result.filename,choice.cc,{kind:'invoice',invoice_id:id,idempotency_key:sendAttemptId('invoice',id)});
+    if(!confirmed||!confirmed.id)throw new Error('The email provider did not confirm the send.');
+    clearSendAttempt('invoice',id);
     const saved=await markInvoiceSent(id,sentRecord);
-    if(saved)toast(`✓ Invoice emailed to ${who}`);
+    if(saved)toast(confirmed.already?`Already emailed to ${who}`:`✓ Invoice emailed to ${who}`);
     openInvDetail(id);
   }catch(e){
-    console.error('resend',e);
-    toast('Email was not sent: '+(e.message||'the mailer rejected it'));
+    console.error('emailInvoice',e);
+    toast(confirmed&&confirmed.id
+      ?'The email went out, but the screen did not finish updating. Refresh before sending again.'
+      :'Email was not sent: '+(e&&e.message||'something went wrong'));
+    try{
+      await fetchInvoices();
+      await fetchEmailEvents();
+      renderInvoices();
+      renderDashboard();
+      if(document.getElementById('inv-detail')?.classList.contains('open'))openInvDetail(id);
+    }catch(err){console.error('emailInvoice refresh',err);}
+  }finally{
+    outboundSendKeys.delete('invoice:'+id);
+    endOutboundSend();
   }
 }
 async function markInvoiceSent(id,sentTo){
@@ -7806,6 +7878,8 @@ async function fetchBySlug(table,field,slug){
   return null;
 }
 async function applyRoute(pathname){
+  if(sendBusy()){routeDeferred=true;return;}
+  routeDeferred=false;
   const path=pathname||location.pathname;
   const slug=routeSlug(path);
   const head=(()=>{const p=String(path||'').split('/').filter(Boolean)[0]||'';try{return decodeURIComponent(p).toLowerCase();}catch(e){return String(p).toLowerCase();}})();
@@ -8275,6 +8349,9 @@ maybeRenderPublicQuote().then(isQuote=>{
 let _lastRefresh=Date.now();
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState!=='visible'||!currentProfile)return;
+  // A refresh here used to call applyRoute while a send was still building
+  // the PDF. The send threw, nothing was emailed, and the screen stayed silent.
+  if(sendBusy())return;
   // Don't refresh while the user is filling out a form in an open modal — it's disruptive
   if(document.querySelector('.modal-overlay.open'))return;
   if(Date.now()-_lastRefresh<=4000)return;
@@ -8284,10 +8361,12 @@ document.addEventListener('visibilitychange',async()=>{
   const hadDetail=!!document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
   try{
     await loadAll();
+    if(sendBusy())return;
     if(currentProfile.role==='admin')renderAll();
     else renderSubPortal();
     await fetchNotifications();renderNotifPanel();
   }catch(e){}
+  if(sendBusy())return;
   const nowEl=document.querySelector('.view.active');
   const nowName=nowEl?nowEl.id.replace('view-',''):null;
   const stillDetail=!!document.querySelector('#job-detail.open,#cust-detail.open,#est-detail.open,#inv-detail.open');
